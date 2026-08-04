@@ -43,24 +43,29 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  const pathname = request.nextUrl.pathname;
+  // Pages publiques (connexion + réinitialisation de mot de passe) : tout /login/*.
+  const isPublic = pathname.startsWith("/login");
+  // Seule la page de connexion « racine » renvoie un utilisateur déjà connecté vers l'accueil
+  // (les pages de réinitialisation doivent rester accessibles même avec une session de récupération).
+  const isLoginRacine = pathname === "/login";
 
   // Non connecté + page protégée -> redirection login
-  if (!user && !isAuthRoute) {
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Déjà connecté + page login -> redirection accueil
-  if (user && isAuthRoute) {
+  // Déjà connecté + page de connexion racine -> redirection accueil
+  if (user && isLoginRacine) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
   // Contrôle d'accès par rôle (sécurité serveur, non contournable côté client).
-  if (user && !isAuthRoute) {
+  if (user && !isPublic) {
     const { data: membre } = await supabase.from("membre").select("role").eq("id", user.id).maybeSingle();
     const role = (membre?.role ?? "membre") as RoleMembre;
     if (!peutAcceder(role, request.nextUrl.pathname)) {

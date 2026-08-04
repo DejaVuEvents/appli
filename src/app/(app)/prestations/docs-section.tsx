@@ -119,14 +119,21 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
               className="flex w-full items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm transition-colors hover:bg-background"
             >
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted">{isOpen ? "▾" : "▸"}</span>
+                <svg
+                  className="h-3.5 w-3.5 text-muted"
+                  style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.22s ease" }}
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                >
+                  <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 <span className="font-semibold">{monthLabel(monthKey)}</span>
                 <span className="rounded-full bg-border/60 px-2 py-0.5 text-xs">{items.length}</span>
               </div>
             </button>
 
-            {isOpen && (
-              <div className="mt-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-background">
+            <div style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.25s ease" }}>
+              <div style={{ overflow: "hidden" }}>
+              <div className="mt-1 divide-y divide-border rounded-xl border border-border bg-background">
                 {items.map((d) => (
                   <div key={d.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface/50">
                     <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-muted sm:w-20">
@@ -161,7 +168,8 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
                   </div>
                 ))}
               </div>
-            )}
+              </div>
+            </div>
           </div>
         );
       })}

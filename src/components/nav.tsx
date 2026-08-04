@@ -6,8 +6,8 @@ import { useState } from "react";
 import { peutAcceder } from "@/lib/roles";
 import type { RoleMembre } from "@/lib/membre";
 
-type Sub = { href: string; label: string };
-type Group = { label: string; href: string; icon: React.ReactNode; children?: Sub[] };
+export type Sub = { href: string; label: string };
+export type Group = { label: string; href: string; icon: React.ReactNode; children?: Sub[] };
 
 const ICON = "h-5 w-5 shrink-0";
 
@@ -95,15 +95,18 @@ const ALL_GROUPS: Group[] = [
   },
 ];
 
-export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
-  const pathname = usePathname();
-  const [openMobile, setOpenMobile] = useState<string | null>(null);
-  const [openDesktop, setOpenDesktop] = useState<string | null>(null);
-
-  // Masque les liens interdits au rôle courant (la sécurité réelle est côté proxy).
-  const groups = ALL_GROUPS
+/** Groupes de navigation visibles pour un rôle (la sécurité réelle est côté proxy). */
+export function groupesVisibles(role: RoleMembre): Group[] {
+  return ALL_GROUPS
     .map((g) => ({ ...g, children: g.children?.filter((c) => peutAcceder(role, c.href)) }))
     .filter((g) => (g.children ? g.children.length > 0 : peutAcceder(role, g.href)));
+}
+
+export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
+  const pathname = usePathname();
+  const [openDesktop, setOpenDesktop] = useState<string | null>(null);
+
+  const groups = groupesVisibles(role);
 
   const hrefActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const groupActive = (g: Group) =>
@@ -166,52 +169,6 @@ export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
           ))}
         </nav>
       </aside>
-
-      {/* Tab bar — mobile */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] print:!hidden">
-        {/* Sous-menu mobile (au-dessus de la barre) */}
-        {groups.map((g) =>
-          g.children && openMobile === g.label ? (
-            <div key={g.label} className="absolute bottom-full inset-x-0 mb-px border-t border-border bg-surface p-2 shadow-lg">
-              <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted">{g.label}</div>
-              <div className="grid grid-cols-2 gap-1">
-                {g.children.map((c) => (
-                  <Link
-                    key={c.href}
-                    href={c.href}
-                    onClick={() => setOpenMobile(null)}
-                    className={`rounded-lg px-3 py-2 text-sm ${hrefActive(c.href) ? "bg-background font-medium text-primary" : "hover:bg-background"}`}
-                  >
-                    {c.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null,
-        )}
-
-        <div className="flex justify-around">
-          {groups.map((g) => {
-            const active = groupActive(g);
-            const cls = `flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${active ? "text-primary" : "text-muted"}`;
-            return g.children ? (
-              <button
-                key={g.label}
-                onClick={() => setOpenMobile((o) => (o === g.label ? null : g.label))}
-                className={cls}
-              >
-                {g.icon}
-                {g.label}
-              </button>
-            ) : (
-              <Link key={g.label} href={g.href} onClick={() => setOpenMobile(null)} className={cls}>
-                {g.icon}
-                {g.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
     </>
   );
 }

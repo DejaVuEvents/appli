@@ -193,7 +193,13 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                   className="flex w-full items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm transition-colors hover:bg-background"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted">{isOpen ? "▾" : "▸"}</span>
+                    <svg
+                      className="h-3.5 w-3.5 text-muted"
+                      style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.22s ease" }}
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    >
+                      <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                     <span className="font-semibold">{monthLabel(monthKey)}</span>
                     <span className="rounded-full bg-border/60 px-2 py-0.5 text-xs">
                       {entries.length}
@@ -218,8 +224,9 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                   </div>
                 </button>
 
-                {isOpen && (
-                  <div className="mt-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-background">
+                <div style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.25s ease" }}>
+                  <div style={{ overflow: "hidden" }}>
+                  <div className="mt-1 divide-y divide-border rounded-xl border border-border bg-background">
                     {entries.map((e) => {
                       const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
                       const missingDoc = e.statut === "reel" && !e.facture && !e.devis_facture_id && !justifSet.has(e.id);
@@ -282,7 +289,8 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                       );
                     })}
                   </div>
-                )}
+                  </div>
+                </div>
               </div>
             );
           })}

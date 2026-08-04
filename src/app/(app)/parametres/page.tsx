@@ -4,6 +4,7 @@ import { PageHeader, Card } from "@/components/ui";
 import { Field, TextArea, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { InfoTip } from "@/components/info-tip";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte } from "./actions";
 import { updateTresorerieReglages } from "../finance/actions";
 import { Modal, ModalForm } from "@/components/modal";
@@ -88,6 +89,13 @@ export default async function ParametresPage({
       {/* ── Mon compte ── */}
       {tab === "moncompte" && moi && (
         <section>
+          <Card className="mb-4 flex items-center justify-between gap-3 p-4">
+            <div>
+              <div className="text-sm font-medium">Apparence</div>
+              <div className="text-xs text-muted">Basculer entre le thème clair et sombre.</div>
+            </div>
+            <ThemeToggle />
+          </Card>
           <p className="mb-4 text-sm text-muted">
             Tes informations personnelles (utilisées pour pré-remplir tes notes de frais et y apposer ta signature).
           </p>

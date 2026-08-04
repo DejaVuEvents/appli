@@ -1,0 +1,62 @@
+erDiagram
+    CATEGORIE ||--o{ MATERIEL_REFERENCE : classe
+    MATERIEL_REFERENCE ||--o{ UNITE : "exemplaires sérialisés"
+    MATERIEL_REFERENCE ||--o{ TARIF_DEGRESSIF : "tarifs multi-jours"
+    MATERIEL_REFERENCE ||--o{ KIT_REGLE : "accessoires auto"
+
+    CLIENT ||--o{ PRESTATION : commande
+    PRESTATION ||--o{ LIGNE_PRESTATION : contient
+    PRESTATION ||--o{ TRANSPORT : "coûts véhicules"
+    VEHICULE ||--o{ TRANSPORT : utilise
+    PRESTATION ||--o{ DEVIS_FACTURE : génère
+
+    LIGNE_PRESTATION ||--o{ RESERVATION_UNITE : réserve
+    UNITE ||--o{ RESERVATION_UNITE : "dispo (anti-chevauchement)"
+    PRESTATION ||--o{ RESERVATION_UNITE : pour
+
+    UNITE ||--o{ MOUVEMENT : "sorties / retours"
+    PRESTATION ||--o{ MOUVEMENT : génère
+
+    SESSION_INVENTAIRE ||--o{ LIGNE_INVENTAIRE : contient
+    UNITE ||--o{ LIGNE_INVENTAIRE : vérifiée
+
+    PRESTATION ||--o{ PLAN_TECHNIQUE : "élec / levage"
+    PLAN_TECHNIQUE ||--o{ PONT : structures
+    PLAN_TECHNIQUE ||--o{ CIRCUIT_ELEC : circuits
+    LIGNE_PRESTATION ||--o{ AFFECTATION : répartie
+    PONT ||--o{ AFFECTATION : porte
+    CIRCUIT_ELEC ||--o{ AFFECTATION : alimente
+    UNITE ||--o{ AFFECTATION : "unité placée"
+
+    DEVIS_FACTURE ||--o{ TRANSACTION_BANCAIRE : rapproché
+    FACTURE_FOURNISSEUR ||--o{ TRANSACTION_BANCAIRE : rapproché
+    PRESTATION ||--o{ PREVISIONNEL : "rentrées prévues"
+
+    MATERIEL_REFERENCE {
+        uuid id PK
+        text nom
+        numeric prix_location_jour
+        numeric puissance_w
+        numeric intensite_a
+        numeric poids_kg
+    }
+    UNITE {
+        uuid id PK
+        text numero_serie
+        text qr_code
+        numeric compteur_heures
+        int compteur_sorties
+        text etat
+    }
+    PRESTATION {
+        uuid id PK
+        date date_prepa
+        date date_retour
+        text statut
+    }
+    RESERVATION_UNITE {
+        uuid unite_id FK
+        date date_debut
+        date date_fin
+        string EXCLUDE "chevauchement interdit"
+    }

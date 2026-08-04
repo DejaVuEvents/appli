@@ -1,0 +1,196 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { PageHeader, Card } from "@/components/ui";
+import { Field, Select, TextArea } from "@/components/form";
+import { SubmitButton } from "@/components/submit-button";
+import { ConfirmButton } from "@/components/confirm-button";
+import { PrintButton } from "@/components/print-button";
+import { dateFr } from "@/lib/format";
+import { addEtape, deleteEtape, toggleEtapeFait, deplacerEtape, calculerItineraire } from "../actions";
+import { orsConfigured } from "@/lib/ors";
+import { InfoHint } from "@/components/info-hint";
+import { EventTabBar } from "@/components/event-tab-bar";
+
+type Presta = {
+  id: string;
+  nom: string;
+  lieu: string | null;
+  date_prepa: string | null;
+  date_event_debut: string | null;
+  date_event_fin: string | null;
+  date_retour: string | null;
+  client: { nom: string } | null;
+};
+type Etape = {
+  id: string;
+  ordre: number;
+  type: string;
+  lieu: string | null;
+  adresse: string | null;
+  materiel: string | null;
+  heure: string | null;
+  notes: string | null;
+  fait: boolean;
+  distance_km: number | null;
+  duree_min: number | null;
+};
+
+function dureeTxt(min: number): string {
+  return min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}` : `${min} min`;
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  chargement: "Chargement", dechargement: "Déchargement", montage: "Montage",
+  demontage: "Démontage", route: "Route", autre: "Autre",
+};
+const TYPE_CLS: Record<string, string> = {
+  chargement: "bg-blue-100 text-blue-700", dechargement: "bg-amber-100 text-amber-800",
+  montage: "bg-green-100 text-green-700", demontage: "bg-purple-100 text-purple-700",
+  route: "bg-surface text-muted", autre: "bg-surface text-muted",
+};
+
+export default async function PlanificationDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const [{ data: prestData }, { data: etapesData }] = await Promise.all([
+    supabase.from("prestation").select("id, nom, lieu, date_prepa, date_event_debut, date_event_fin, date_retour, client(nom)").eq("id", id).single(),
+    supabase.from("etape_logistique").select("*").eq("prestation_id", id).order("ordre", { ascending: true }),
+  ]);
+  if (!prestData) notFound();
+  const p = prestData as unknown as Presta;
+  const etapes = (etapesData ?? []) as Etape[];
+
+  const totalKm = Math.round(etapes.reduce((s, e) => s + Number(e.distance_km ?? 0), 0) * 10) / 10;
+  const totalMin = etapes.reduce((s, e) => s + Number(e.duree_min ?? 0), 0);
+  const aDistances = etapes.some((e) => e.distance_km != null);
+  const peutCalculer = orsConfigured() && etapes.filter((e) => e.adresse || e.lieu).length >= 2;
+
+  const jalons = [
+    { label: "Préparation", date: p.date_prepa },
+    { label: "Événement (début)", date: p.date_event_debut },
+    { label: "Événement (fin)", date: p.date_event_fin },
+    { label: "Retour", date: p.date_retour },
+  ].filter((j) => j.date);
+
+  return (
+    <div className="max-w-6xl space-y-6">
+      <PageHeader
+        title={p.nom}
+        subtitle={`${p.client?.nom ?? "Sans client"}${p.lieu ? ` · ${p.lieu}` : ""}`}
+        action={<PrintButton label="Feuille de tournée" />}
+      />
+      <EventTabBar eventId={id} active="planification" />
+
+      {/* Jalons / dates clés */}
+      {jalons.length > 0 && (
+        <Card className="p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Dates clés</h2>
+          <div className="grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+            {jalons.map((j) => (
+              <div key={j.label} className="flex justify-between border-b border-border/60 py-1">
+                <span className="text-muted">{j.label}</span>
+                <span className="font-medium">{dateFr(j.date)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Tournée logistique */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+          Tournée logistique (jour J)
+          <InfoHint text="Ordonne les étapes : chargement aux entrepôts, route, déchargement, montage, démontage, retour. Utile quand le matériel est réparti sur plusieurs lieux." />
+        </h2>
+
+        {/* Itinéraire : total + recalcul auto des distances */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="text-sm">
+            {aDistances ? (
+              <span><strong>Itinéraire :</strong> {totalKm} km · {dureeTxt(totalMin)}</span>
+            ) : (
+              <span className="text-muted">Renseigne une adresse (ou un lieu) par arrêt pour calculer l&apos;itinéraire.</span>
+            )}
+          </div>
+          {peutCalculer && (
+            <form action={calculerItineraire.bind(null, id)} className="print:hidden">
+              <SubmitButton pendingLabel="Calcul…">{aDistances ? "Recalculer l'itinéraire" : "Calculer l'itinéraire"}</SubmitButton>
+            </form>
+          )}
+        </div>
+
+        <Card className="divide-y divide-border overflow-hidden">
+          {etapes.length === 0 && <p className="px-4 py-3 text-sm text-muted">Aucune étape. Ajoute la première ci-dessous.</p>}
+          {etapes.map((e, i) => (
+            <div key={e.id} className="flex items-start gap-3 px-4 py-3">
+              <div className="flex flex-col items-center gap-1 print:hidden">
+                <form action={deplacerEtape.bind(null, id, e.id, -1)}>
+                  <button className="text-muted hover:text-foreground disabled:opacity-30" disabled={i === 0} title="Monter">▲</button>
+                </form>
+                <form action={deplacerEtape.bind(null, id, e.id, 1)}>
+                  <button className="text-muted hover:text-foreground disabled:opacity-30" disabled={i === etapes.length - 1} title="Descendre">▼</button>
+                </form>
+              </div>
+              <div className="w-6 pt-0.5 text-center text-sm font-bold text-muted">{i + 1}</div>
+              <div className="min-w-0 flex-1">
+                {e.distance_km != null && (
+                  <div className="mb-1 text-xs font-medium text-primary">↳ {e.distance_km} km · {dureeTxt(e.duree_min ?? 0)} depuis l&apos;arrêt précédent</div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${TYPE_CLS[e.type] ?? "bg-surface"}`}>{TYPE_LABEL[e.type] ?? e.type}</span>
+                  {e.heure && <span className="text-xs font-medium">{e.heure}</span>}
+                  <span className="font-medium">{e.lieu ?? "—"}</span>
+                </div>
+                {e.adresse && <div className="text-xs text-muted">{e.adresse}</div>}
+                {e.materiel && <div className="mt-0.5 text-sm">📦 {e.materiel}</div>}
+                {e.notes && <div className="text-xs text-muted">{e.notes}</div>}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <form action={toggleEtapeFait.bind(null, id, e.id, e.fait)}>
+                  <button
+                    className={`flex h-6 w-6 items-center justify-center rounded border ${e.fait ? "border-green-600 bg-green-600 text-white" : "border-border"}`}
+                    title={e.fait ? "Fait" : "Marquer fait"}
+                  >
+                    {e.fait ? "✓" : ""}
+                  </button>
+                </form>
+                <form action={deleteEtape.bind(null, id, e.id)} className="print:hidden">
+                  <ConfirmButton confirm="Supprimer cette étape ?" className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
+                </form>
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        {/* Ajout d'étape */}
+        <Card className="mt-3 p-4 print:hidden">
+          <h3 className="mb-3 text-sm font-semibold">Ajouter une étape</h3>
+          <form action={addEtape.bind(null, id)} className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Select
+                label="Type"
+                name="type"
+                defaultValue="chargement"
+                options={[
+                  { value: "chargement", label: "Chargement" },
+                  { value: "route", label: "Route" },
+                  { value: "dechargement", label: "Déchargement" },
+                  { value: "montage", label: "Montage" },
+                  { value: "demontage", label: "Démontage" },
+                  { value: "autre", label: "Autre" },
+                ]}
+              />
+              <Field label="Heure" name="heure" placeholder="08:00" />
+              <Field label="Lieu" name="lieu" placeholder="Entrepôt A, scène…" className="sm:col-span-2" />
+            </div>
+            <Field label="Adresse (optionnel)" name="adresse" placeholder="12 rue…, ville" />
+            <Field label="Matériel concerné (optionnel)" name="materiel" placeholder="Son façade, 4 lyres, praticables…" />
+            <TextArea label="Notes (optionnel)" name="notes" rows={2} />
+            <SubmitButton>+ Ajouter l&apos;étape</SubmitButton>
+          </form>
+        </Card>
+      </section>
+    </div>
+  );
+}

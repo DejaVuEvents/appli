@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* Active les utilitaires dark:* sur la classe .dark (toggle manuel) plutôt que prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --foreground: #1a1d21;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #6d28d9; /* violet "scène" */
+  --primary-foreground: #ffffff;
+}
+
+/* Thème sombre : on surcharge les variables CSS → tout le site bascule. */
+html.dark {
+  --background: #0f1115;
+  --surface: #181b20;
+  --foreground: #e6e8eb;
+  --muted: #9aa1ab;
+  --border: #2a2f37;
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Largeur de la barre latérale + décalage du contenu (desktop ≥ 768px).
+   Défini en CSS explicite pour ne dépendre d'aucune génération JIT Tailwind. */
+@media (min-width: 768px) {
+  .app-sidebar { width: 13rem; }
+  .app-shift { padding-left: 13rem; }
+}
+
+/* Teinte violette OPAQUE (mélangée au fond) — pour les colonnes figées de la frise
+   d'avancement : évite la transparence qui laisse voir le tableau au scroll. */
+.cur-week-bg   { background-color: color-mix(in srgb, var(--primary) 8%,  var(--surface)); }
+.cur-week-head { background-color: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+
+/* Feuille de devis / facture : toujours en clair (aspect « papier »), même quand le
+   site est en mode sombre. On redéclare les variables de thème pour ce sous-arbre. */
+.document-sheet {
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --foreground: #1a1d21;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  background-color: #ffffff;
+  color: var(--foreground);
+}
+
+@media print {
+  :root {
+    --background: #ffffff;
+    --surface: #ffffff;
+  }
+  body {
+    background: #ffffff;
+  }
+}

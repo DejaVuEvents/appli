@@ -1,0 +1,165 @@
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { Modal } from "@/components/modal";
+import { ConfirmButton } from "@/components/confirm-button";
+import { PrestationForm } from "../prestations/prestation-form";
+import { createEvenement } from "../prestations/actions";
+import { LocationForm, type LocationRow } from "./location-form";
+import { createLocation, deleteLocation } from "./actions";
+import { dateFr, euros } from "@/lib/format";
+
+type PrestaRow = {
+  id: string;
+  nom: string;
+  statut: string | null;
+  date_prepa: string | null;
+  date_event_debut: string | null;
+  date_event_fin: string | null;
+  date_retour: string | null;
+  client: { nom: string } | null;
+};
+
+const STATUT_CLS: Record<string, string> = {
+  devis: "bg-surface text-muted",
+  confirme: "bg-blue-100 text-blue-700",
+  en_cours: "bg-amber-100 text-amber-800",
+  termine: "bg-green-100 text-green-700",
+  rendu: "bg-green-100 text-green-700",
+  prevu: "bg-surface text-muted",
+  annule: "bg-red-100 text-red-700",
+};
+
+function refDate(p: PrestaRow): string {
+  return p.date_event_debut ?? p.date_prepa ?? p.date_retour ?? "";
+}
+
+export default async function PlanificationPage({ searchParams }: { searchParams: Promise<{ vue?: string }> }) {
+  const { vue } = await searchParams;
+  const onglet = vue === "location" ? "location" : "evenements";
+  const supabase = await createClient();
+  const [{ data }, { data: clientsData }, { data: locData }] = await Promise.all([
+    supabase
+      .from("prestation")
+      .select("id, nom, statut, date_prepa, date_event_debut, date_event_fin, date_retour, client(nom)")
+      .eq("est_evenement", true)
+      .order("date_event_debut", { ascending: false }),
+    supabase.from("client").select("id, nom").order("nom"),
+    supabase.from("location").select("*").order("date_debut", { ascending: false }),
+  ]);
+  const prestations = (data ?? []) as unknown as PrestaRow[];
+  const clients = (clientsData ?? []) as { id: string; nom: string }[];
+  const clientNom = new Map(clients.map((c) => [c.id, c.nom]));
+  const locations = (locData ?? []) as LocationRow[];
+
+  const ajouterEvenement = (
+    <Modal trigger="+ Ajouter un événement" title="Nouvel événement">
+      <p className="mb-4 text-sm text-muted">Crée l&apos;événement (dates, lieu, client). Tu pourras ensuite y ajouter un ou plusieurs devis.</p>
+      <PrestationForm action={createEvenement} clients={clients} cancelHref="/planification" inModal submitLabel="Créer l'événement" />
+    </Modal>
+  );
+
+  const ajouterLocation = (
+    <Modal trigger="+ Ajouter une location" title="Nouvelle location">
+      <LocationForm action={createLocation} clients={clients} />
+    </Modal>
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+  const aVenir = prestations
+    .filter((p) => (p.date_event_fin ?? p.date_retour ?? refDate(p) ?? "") >= today)
+    .sort((a, b) => refDate(a).localeCompare(refDate(b)));
+  const passees = prestations
+    .filter((p) => !aVenir.includes(p))
+    .sort((a, b) => refDate(b).localeCompare(refDate(a)));
+
+  const Row = ({ p }: { p: PrestaRow }) => (
+    <Link href={`/prestations/${p.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
+      <div className="min-w-0">
+        <div className="font-medium truncate">{p.nom}</div>
+        <div className="text-xs text-muted">
+          {p.client?.nom ?? "Sans client"}
+          {refDate(p) ? ` · ${dateFr(refDate(p))}` : ""}
+        </div>
+      </div>
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[p.statut ?? ""] ?? "bg-surface text-muted"}`}>
+        {(p.statut ?? "—").replace(/_/g, " ")}
+      </span>
+    </Link>
+  );
+
+  const LocRow = ({ l }: { l: LocationRow }) => {
+    const tiers = l.sens === "sortie" ? (l.client_id ? clientNom.get(l.client_id) : l.tiers) : l.tiers;
+    return (
+      <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
+        <Link href={`/planification/location/${l.id}`} className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${l.sens === "sortie" ? "bg-amber-100 text-amber-800" : "bg-teal-100 text-teal-800"}`}>
+              {l.sens === "sortie" ? "↗ Sortie" : "↘ Entrée"}
+            </span>
+            <span className="truncate font-medium">{l.titre}</span>
+          </div>
+          <div className="text-xs text-muted">
+            {tiers ? `${tiers} · ` : ""}{dateFr(l.date_debut)}{l.date_fin && l.date_fin !== l.date_debut ? ` → ${dateFr(l.date_fin)}` : ""}
+            {l.montant != null ? ` · ${euros(l.montant)}` : ""}{l.lieu ? ` · ${l.lieu}` : ""}
+          </div>
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[l.statut] ?? "bg-surface text-muted"}`}>{l.statut.replace(/_/g, " ")}</span>
+          <form action={deleteLocation.bind(null, l.id)}>
+            <ConfirmButton confirm="Supprimer cette location ?" className="rounded-lg border border-border px-2 py-1 text-xs text-red-600 hover:bg-surface">✕</ConfirmButton>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const tabCls = (active: boolean) =>
+    `rounded-lg px-4 py-1.5 text-sm font-medium ${active ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`;
+
+  return (
+    <div className="max-w-6xl">
+      <PageHeader
+        title="Événements & Prestations"
+        subtitle="Événements, documents, charges, logistique camion — et locations de matériel"
+        action={onglet === "location" ? ajouterLocation : ajouterEvenement}
+      />
+
+      {/* Onglets Événements / Location */}
+      <div className="mb-5 inline-flex gap-1 rounded-xl border border-border bg-surface p-1">
+        <Link href="/planification" className={tabCls(onglet === "evenements")}>Événements</Link>
+        <Link href="/planification?vue=location" className={tabCls(onglet === "location")}>Location</Link>
+      </div>
+
+      {onglet === "location" ? (
+        <section>
+          {locations.length === 0 ? (
+            <EmptyState title="Aucune location" description="Suivez ici les locations de matériel (sorties vers vos clients, ou sous-locations entrantes)." />
+          ) : (
+            <Card className="divide-y divide-border overflow-hidden">{locations.map((l) => <LocRow key={l.id} l={l} />)}</Card>
+          )}
+        </section>
+      ) : (
+        <>
+          <section className="mb-6">
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">À venir</h2>
+            {aVenir.length === 0 ? (
+              <Card className="px-4 py-3 text-sm text-muted">Aucune prestation à venir.</Card>
+            ) : (
+              <Card className="divide-y divide-border overflow-hidden">{aVenir.map((p) => <Row key={p.id} p={p} />)}</Card>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Passées</h2>
+            {passees.length === 0 ? (
+              <EmptyState title="Aucune prestation passée" description="Les prestations terminées apparaîtront ici." />
+            ) : (
+              <Card className="divide-y divide-border overflow-hidden">{passees.map((p) => <Row key={p.id} p={p} />)}</Card>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}

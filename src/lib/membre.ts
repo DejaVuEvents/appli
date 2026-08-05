@@ -67,6 +67,6 @@ export async function getMembreActuel(supabase?: SupabaseClient): Promise<Membre
 }
 
 /** Nom affichable d'un membre. */
-export function nomMembre(m: { nom: string | null; email: string | null } | null): string {
-  return m?.nom?.trim() || m?.email?.split("@")[0] || "—";
+export function nomMembre(m: { prenom?: string | null; nom: string | null; email: string | null } | null): string {
+  return m?.prenom?.trim() || m?.nom?.trim() || m?.email?.split("@")[0] || "—";
 }

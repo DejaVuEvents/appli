@@ -120,8 +120,7 @@ export default async function PlanificationPage({ searchParams }: { searchParams
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Événements & Prestations"
-        subtitle="Événements, documents, charges, logistique camion — et locations de matériel"
+        title="Activités"
         action={onglet === "location" ? ajouterLocation : ajouterEvenement}
       />
 

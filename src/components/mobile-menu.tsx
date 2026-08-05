@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { groupesVisibles, type Group } from "./nav";
 import type { RoleMembre } from "@/lib/membre";
 
@@ -13,6 +14,9 @@ export function MobileMenu({ role = "membre" }: { role?: RoleMembre }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const groups = groupesVisibles(role);
 
@@ -46,8 +50,10 @@ export function MobileMenu({ role = "membre" }: { role?: RoleMembre }) {
         </svg>
       </button>
 
-      {/* Tiroir latéral + fond (toujours monté → animations d'ouverture ET de fermeture) */}
-      <div className="md:hidden fixed inset-0 z-50" style={{ pointerEvents: open ? "auto" : "none" }} aria-hidden={!open}>
+      {/* Tiroir latéral + fond — rendu via un portail sur <body> pour échapper au
+          `backdrop-filter` du header (qui casse sinon le position:fixed). */}
+      {mounted && createPortal(
+        <div className="md:hidden fixed inset-0 z-[60]" style={{ pointerEvents: open ? "auto" : "none" }} aria-hidden={!open}>
         {/* Fond assombri/flou */}
         <div
           onClick={() => setOpen(false)}
@@ -150,7 +156,8 @@ export function MobileMenu({ role = "membre" }: { role?: RoleMembre }) {
             })}
           </nav>
         </div>
-      </div>
+      </div>,
+      document.body)}
     </>
   );
 }

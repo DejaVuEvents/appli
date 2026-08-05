@@ -408,7 +408,8 @@ function copieLigne(
   };
 }
 
-export async function deleteDevis(devisId: string) {
+/** Supprime un devis/facture. `retour` fixe la redirection (ex. rester sur la liste globale). */
+export async function deleteDevis(devisId: string, retour?: string) {
   const supabase = await createSupabase();
   const { data: d } = await supabase.from("devis").select("prestation_id").eq("id", devisId).single();
   const prestId = (d?.prestation_id as string | null) ?? null;
@@ -427,6 +428,8 @@ export async function deleteDevis(devisId: string) {
     revalidatePath(`/prestations/${prestId}`);
   }
   revalidatePath("/prestations");
+  // Redirection explicite si fournie (suppression depuis une liste), sinon logique par défaut.
+  if (retour) redirect(retour);
   redirect(estEvt && prestId ? `/prestations/${prestId}?tab=devis` : "/prestations");
 }
 

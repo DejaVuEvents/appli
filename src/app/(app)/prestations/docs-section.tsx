@@ -155,7 +155,7 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
                         url={`/apercu/${d.id}?type=${d.type}`}
                         libelle={d.titre}
                       />
-                      <form action={deleteDevis.bind(null, d.id)}>
+                      <form action={deleteDevis.bind(null, d.id, `/prestations?tab=${d.type === "facture" ? "factures" : "devis"}`)}>
                         <ConfirmButton
                           confirm={`Supprimer « ${d.titre} » ? Cette action est définitive.`}
                           className="rounded-lg border border-border px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"

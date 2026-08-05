@@ -5,6 +5,7 @@ import { Modal } from "@/components/modal";
 import { PrestationForm } from "./prestation-form";
 import { createPrestation } from "./actions";
 import { DocsSection, type DocRow } from "./docs-section";
+import { calculerTotaux, type RemiseType } from "@/lib/devis";
 
 type DevisModeleRow = { id: string; nom: string | null; type: string; prestation: { nom: string } | null };
 
@@ -39,6 +40,8 @@ type DevisDocRow = {
   type: "devis" | "facture";
   statut_signature: string | null;
   created_at: string | null;
+  remise_globale_type: RemiseType;
+  remise_globale_valeur: number;
   prestation: { id: string; nom: string; lieu: string | null; date_event_debut: string | null; client: { nom: string } | null } | null;
 };
 
@@ -54,19 +57,45 @@ export default async function PrestationsPage({
 
   const { creerDevis, creerFacture } = await chargerModales(supabase);
 
-  // Tous les documents (devis + factures) avec leur événement parent + statut d'émission.
-  const [{ data: devisData }, { data: dfData }] = await Promise.all([
+  // Tous les documents (devis + factures) + statut d'émission + lignes/transport (pour le montant).
+  const [{ data: devisData }, { data: dfData }, { data: lignesData }, { data: transData }] = await Promise.all([
     supabase
       .from("devis")
-      .select("id, nom, type, statut_signature, created_at, prestation:prestation_id(id, nom, lieu, date_event_debut, client(nom))")
+      .select("id, nom, type, statut_signature, created_at, remise_globale_type, remise_globale_valeur, prestation:prestation_id(id, nom, lieu, date_event_debut, client(nom))")
       .order("created_at", { ascending: false }),
-    supabase.from("devis_facture").select("devis_id, numero, statut_paiement").eq("type", "facture"),
+    supabase.from("devis_facture").select("devis_id, type, numero, statut_paiement, montant_ttc"),
+    supabase.from("ligne_prestation").select("devis_id, prix_unitaire, quantite, prix_total"),
+    supabase.from("transport").select("devis_id, cout_calcule"),
   ]);
 
   const allDocs = (devisData ?? []) as unknown as DevisDocRow[];
-  const factureInfo = new Map(
-    (dfData ?? []).map((d) => [d.devis_id as string, d as { numero: string | null; statut_paiement: string | null }]),
-  );
+  const dfAll = (dfData ?? []) as { devis_id: string; type: string; numero: string | null; statut_paiement: string | null; montant_ttc: number | null }[];
+  const factureInfo = new Map(dfAll.filter((d) => d.type === "facture").map((d) => [d.devis_id, d]));
+  // Montant figé d'une émission (repli pour les documents importés sans lignes).
+  const emisMontant = new Map<string, number>();
+  for (const d of dfAll) {
+    if (d.montant_ttc != null) emisMontant.set(d.devis_id, Math.max(emisMontant.get(d.devis_id) ?? 0, Number(d.montant_ttc)));
+  }
+  // Lignes et transport groupés par devis.
+  const lignesByDevis = new Map<string, { prix_unitaire: number | null; quantite: number; prix_total: number | null }[]>();
+  for (const l of (lignesData ?? []) as { devis_id: string | null; prix_unitaire: number | null; quantite: number; prix_total: number | null }[]) {
+    if (!l.devis_id) continue;
+    (lignesByDevis.get(l.devis_id) ?? lignesByDevis.set(l.devis_id, []).get(l.devis_id)!).push(l);
+  }
+  const transByDevis = new Map<string, number>();
+  for (const t of (transData ?? []) as { devis_id: string | null; cout_calcule: number | null }[]) {
+    if (!t.devis_id) continue;
+    transByDevis.set(t.devis_id, (transByDevis.get(t.devis_id) ?? 0) + Number(t.cout_calcule ?? 0));
+  }
+  const montantDevis = (d: DevisDocRow): number => {
+    const ht = calculerTotaux({
+      lignes: lignesByDevis.get(d.id) ?? [],
+      transportTotal: transByDevis.get(d.id) ?? 0,
+      remiseGlobaleType: d.remise_globale_type,
+      remiseGlobaleValeur: Number(d.remise_globale_valeur ?? 0),
+    }).totalHT;
+    return ht !== 0 ? ht : (emisMontant.get(d.id) ?? 0);
+  };
 
   const toRow = (d: DevisDocRow): DocRow => {
     const df = d.type === "facture" ? factureInfo.get(d.id) : undefined;
@@ -79,6 +108,7 @@ export default async function PrestationsPage({
       lieu: d.prestation?.lieu ?? null,
       date: d.prestation?.date_event_debut ?? (d.created_at ? d.created_at.slice(0, 10) : null),
       type: d.type,
+      montant: montantDevis(d),
       emis: !!df?.numero,
       statutPaiement: df?.statut_paiement ?? null,
       statutSignature: d.statut_signature ?? null,

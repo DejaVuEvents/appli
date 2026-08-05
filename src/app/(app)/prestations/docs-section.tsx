@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { dateFr } from "@/lib/format";
+import { dateFr, euros } from "@/lib/format";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { ConfirmButton } from "@/components/confirm-button";
 import { setStatutPaiement, setStatutSignature } from "./[id]/document/actions";
@@ -16,6 +16,7 @@ export type DocRow = {
   lieu: string | null;
   date: string | null;     // date de l'événement (regroupement + affichage)
   type: "devis" | "facture";
+  montant: number;                   // total HT
   emis: boolean;                     // facture émise (a un n°)
   statutPaiement: string | null;     // facture
   statutSignature: string | null;    // devis
@@ -150,6 +151,7 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
                       </div>
                     </Link>
                     <div className="flex shrink-0 items-center gap-2">
+                      <span className="hidden whitespace-nowrap text-sm font-semibold tabular-nums sm:inline">{euros(d.montant)}</span>
                       <StatutSelect d={d} />
                       <JustificatifPreview
                         url={`/apercu/${d.id}?type=${d.type}`}

@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
 import { updateStatut, associerDevisAEvenement } from "../../actions";
-import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne } from "../../[id]/document/actions";
+import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
 import { assemblerContenuDocument } from "@/lib/document";
@@ -174,9 +174,16 @@ export default async function DevisEditorPage({
           </form>
           {!estFacture && (
             factureEmise ? (
-              <Link href={`/prestations/${prestationId}/document?devis=${devisId}&type=facture`} className={`${fullBtn} border border-border hover:bg-surface`}>
-                🧾 Voir la facture{facEmise?.numero ? ` n° ${facEmise.numero}` : ""}
-              </Link>
+              <>
+                <Link href={`/prestations/${prestationId}/document?devis=${devisId}&type=facture`} className={`${fullBtn} border border-border hover:bg-surface`}>
+                  🧾 Voir la facture{facEmise?.numero ? ` n° ${facEmise.numero}` : ""}
+                </Link>
+                <form action={supprimerFacture.bind(null, devisId, prestationId, `/prestations/devis/${devisId}`)}>
+                  <ConfirmButton confirm="Supprimer la facture ? Le devis est conservé ; seule l'émission de facture (et son entrée de trésorerie) est supprimée." className={`${fullBtn} border border-border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30`}>
+                    ✕ Supprimer la facture
+                  </ConfirmButton>
+                </form>
+              </>
             ) : (
               <form action={emettreDocument.bind(null, devisId, "facture")}>
                 <ConfirmButton confirm="Transformer ce devis en facture ? Une facture sera émise (n° définitif)." className={`${fullBtn} border border-border hover:bg-surface`}>

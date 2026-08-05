@@ -102,6 +102,25 @@ export async function setStatutPaiement(devisId: string, prestationId: string, f
   revaliderFinance();
 }
 
+/**
+ * Supprime l'ÉMISSION de facture d'un devis (le devis lui-même est conservé).
+ * L'entrée de trésorerie liée est retirée automatiquement (cascade FK).
+ */
+export async function supprimerFacture(devisId: string, prestationId: string, retour?: string) {
+  const supabase = await createSupabase();
+  const { error } = await supabase
+    .from("devis_facture")
+    .delete()
+    .eq("devis_id", devisId)
+    .eq("type", "facture");
+  if (error) throw new Error(error.message);
+  revalidatePath(`/prestations/${prestationId}`);
+  revalidatePath(`/prestations/${prestationId}/document`);
+  revalidatePath("/prestations");
+  revaliderFinance();
+  redirect(retour ?? `/prestations/devis/${devisId}`);
+}
+
 /** Statut de signature d'un devis par le client (signé / refusé / en attente). */
 export async function setStatutSignature(devisId: string, prestationId: string, formData: FormData) {
   const supabase = await createSupabase();

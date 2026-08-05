@@ -68,13 +68,22 @@ export default async function ClientsPage() {
                 <div className="flex shrink-0 items-center gap-3">
                   {/* Infos synthèse — desktop uniquement */}
                   <div className="hidden items-center gap-3 md:flex">
-                    {s && s.retard > 0 && (
+                    {(s?.retard ?? 0) > 0 ? (
                       <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                        {euros(s.retard)} en retard
+                        {euros(s!.retard)} en retard
                       </span>
-                    )}
-                    <span className="whitespace-nowrap text-xs text-muted">
-                      {s?.nb ?? 0} facture{(s?.nb ?? 0) > 1 ? "s" : ""}
+                    ) : (s?.nb ?? 0) > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-300">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        À jour
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-muted" title={`${s?.nb ?? 0} facture${(s?.nb ?? 0) > 1 ? "s" : ""}`}>
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" strokeLinejoin="round" />
+                        <path d="M14 3v5h5M8.5 13h7M8.5 16.5h7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      {s?.nb ?? 0}
                     </span>
                   </div>
                   {c.tarif_preferentiel_pct > 0 && (

@@ -97,27 +97,47 @@ export default async function PrestationsPage({
     return ht !== 0 ? ht : (emisMontant.get(d.id) ?? 0);
   };
 
-  const toRow = (d: DevisDocRow): DocRow => {
-    const df = d.type === "facture" ? factureInfo.get(d.id) : undefined;
-    const numero = df?.numero ? ` · n°${df.numero}` : "";
-    return {
+  // Devis (type=devis) transformés en facture : ils ont une émission de type facture.
+  const aEmissionFacture = new Set(dfAll.filter((d) => d.type === "facture").map((d) => d.devis_id));
+
+  const toRow = (d: DevisDocRow, commeFacture: boolean): DocRow => {
+    const base = {
       id: d.id,
       prestationId: d.prestation?.id ?? "",
-      titre: `${d.nom || (d.type === "facture" ? "Facture" : "Devis")}${numero}`,
       client: d.prestation?.client?.nom ?? null,
       lieu: d.prestation?.lieu ?? null,
       date: d.prestation?.date_event_debut ?? (d.created_at ? d.created_at.slice(0, 10) : null),
-      type: d.type,
       montant: montantDevis(d),
-      emis: !!df?.numero,
-      statutPaiement: df?.statut_paiement ?? null,
+    };
+    if (commeFacture) {
+      const df = factureInfo.get(d.id);
+      const numero = df?.numero ? ` · n°${df.numero}` : "";
+      return {
+        ...base,
+        titre: `${d.nom || "Facture"}${numero}`,
+        type: "facture",
+        emis: !!df?.numero,
+        statutPaiement: df?.statut_paiement ?? null,
+        statutSignature: null,
+        // Le doc reste un devis (transformé) → supprimer la facture ≠ supprimer le devis.
+        factureSurDevis: d.type === "devis",
+      };
+    }
+    return {
+      ...base,
+      titre: `${d.nom || "Devis"}`,
+      type: "devis",
+      emis: false,
+      statutPaiement: null,
       statutSignature: d.statut_signature ?? null,
+      factureSurDevis: false,
     };
   };
 
-  const docs = allDocs
-    .filter((d) => d.type === (tab === "factures" ? "facture" : "devis") && d.prestation)
-    .map(toRow);
+  const docs =
+    tab === "factures"
+      ? allDocs.filter((d) => d.prestation && (d.type === "facture" || aEmissionFacture.has(d.id))).map((d) => toRow(d, true))
+      : allDocs.filter((d) => d.prestation && d.type === "devis").map((d) => toRow(d, false));
 
   const action = tab === "factures" ? creerFacture : creerDevis;
 

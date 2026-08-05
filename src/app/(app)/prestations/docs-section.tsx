@@ -5,7 +5,7 @@ import Link from "next/link";
 import { dateFr, euros } from "@/lib/format";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { ConfirmButton } from "@/components/confirm-button";
-import { setStatutPaiement, setStatutSignature } from "./[id]/document/actions";
+import { setStatutPaiement, setStatutSignature, supprimerFacture } from "./[id]/document/actions";
 import { deleteDevis } from "./actions";
 
 export type DocRow = {
@@ -20,6 +20,7 @@ export type DocRow = {
   emis: boolean;                     // facture émise (a un n°)
   statutPaiement: string | null;     // facture
   statutSignature: string | null;    // devis
+  factureSurDevis: boolean;          // facture = émission sur un devis (supprimer ≠ supprimer le devis)
 };
 
 const MOIS_FR = [
@@ -157,9 +158,19 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
                         url={`/apercu/${d.id}?type=${d.type}`}
                         libelle={d.titre}
                       />
-                      <form action={deleteDevis.bind(null, d.id, `/prestations?tab=${d.type === "facture" ? "factures" : "devis"}`)}>
+                      <form
+                        action={
+                          d.type === "facture" && d.factureSurDevis
+                            ? supprimerFacture.bind(null, d.id, d.prestationId, "/prestations?tab=factures")
+                            : deleteDevis.bind(null, d.id, `/prestations?tab=${d.type === "facture" ? "factures" : "devis"}`)
+                        }
+                      >
                         <ConfirmButton
-                          confirm={`Supprimer « ${d.titre} » ? Cette action est définitive.`}
+                          confirm={
+                            d.type === "facture" && d.factureSurDevis
+                              ? `Supprimer définitivement la facture « ${d.titre} » ? Le devis associé est conservé.`
+                              : `Supprimer définitivement « ${d.titre} » ?`
+                          }
                           className="rounded-lg border border-border px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                           title="Supprimer"
                         >

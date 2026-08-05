@@ -299,7 +299,7 @@ export async function DevisBuilder(props: {
             </ModalForm>
           </Modal>
           {plusieurs && (
-            <form action={deleteDevis.bind(null, devis.id)}>
+            <form action={deleteDevis.bind(null, devis.id, undefined)}>
               <ConfirmButton confirm="Supprimer ce devis et ses lignes ?" className="w-full rounded-lg border border-border px-3 py-2 text-sm text-red-600 hover:bg-background">Supprimer</ConfirmButton>
             </form>
           )}

@@ -4,6 +4,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* Contrôles natifs (flèche des <select>, scrollbars, date pickers) rendus en clair. */
+  color-scheme: light;
   --background: #f6f7f9;
   --surface: #ffffff;
   --foreground: #1a1d21;
@@ -15,6 +17,8 @@
 
 /* Thème sombre : on surcharge les variables CSS → tout le site bascule. */
 html.dark {
+  /* → flèche des menus déroulants et contrôles natifs affichés en clair/blanc. */
+  color-scheme: dark;
   --background: #0f1115;
   --surface: #181b20;
   --foreground: #e6e8eb;

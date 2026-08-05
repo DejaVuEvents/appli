@@ -16,19 +16,26 @@ export default async function ClientsPage() {
     supabase.from("client").select("*").order("nom"),
     supabase
       .from("devis_facture")
-      .select("montant_ttc, statut_paiement, prestation:prestation_id(client_id)")
+      .select("numero, montant_ttc, statut_paiement, date_echeance, prestation:prestation_id(client_id)")
       .eq("type", "facture"),
   ]);
   const clients = (data ?? []) as Client[];
 
-  // Agrégats par client : nombre de factures émises + montant total en retard.
-  const stats = new Map<string, { nb: number; retard: number }>();
-  for (const df of (dfData ?? []) as unknown as { montant_ttc: number | null; statut_paiement: string | null; prestation: { client_id: string | null } | null }[]) {
+  // Agrégats par client (même logique que la fiche détaillée) :
+  //  - nb : nombre de factures ; du : total impayé ; retard : au moins une facture
+  //    au statut « retard » OU dont l'échéance est dépassée.
+  const today = new Date().toISOString().slice(0, 10);
+  const stats = new Map<string, { nb: number; du: number; retard: boolean }>();
+  for (const df of (dfData ?? []) as unknown as { numero: string | null; montant_ttc: number | null; statut_paiement: string | null; date_echeance: string | null; prestation: { client_id: string | null } | null }[]) {
     const cid = df.prestation?.client_id;
     if (!cid) continue;
-    const s = stats.get(cid) ?? { nb: 0, retard: 0 };
+    const s = stats.get(cid) ?? { nb: 0, du: 0, retard: false };
     s.nb += 1;
-    if (df.statut_paiement === "retard") s.retard += Number(df.montant_ttc ?? 0);
+    const impayee = !!df.numero && df.statut_paiement !== "paye" && df.statut_paiement !== "annule";
+    if (impayee) {
+      s.du += Number(df.montant_ttc ?? 0);
+      if (df.statut_paiement === "retard" || (df.date_echeance && df.date_echeance < today)) s.retard = true;
+    }
     stats.set(cid, s);
   }
 
@@ -68,9 +75,9 @@ export default async function ClientsPage() {
                 <div className="flex shrink-0 items-center gap-3">
                   {/* Infos synthèse — desktop uniquement */}
                   <div className="hidden items-center gap-3 md:flex">
-                    {(s?.retard ?? 0) > 0 ? (
+                    {s?.retard ? (
                       <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                        {euros(s!.retard)} en retard
+                        {euros(s.du)} en retard
                       </span>
                     ) : (s?.nb ?? 0) > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-300">

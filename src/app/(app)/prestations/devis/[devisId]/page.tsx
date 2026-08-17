@@ -167,6 +167,8 @@ export default async function DevisEditorPage({
             <form action={extraireMaterielDevis.bind(null, devisId)}>
               <ConfirmButton
                 confirm="Lire le PDF avec l'IA et en extraire les lignes de matériel ? Tu pourras corriger le résultat dans l'éditeur ensuite."
+                confirmLabel="Extraire"
+                danger={false}
                 className={`${fullBtn} border border-primary/40 text-primary hover:bg-primary/5`}
               >
                 🤖 Extraire le matériel (IA)
@@ -196,7 +198,7 @@ export default async function DevisEditorPage({
               </>
             ) : (
               <form action={emettreDocument.bind(null, devisId, "facture")}>
-                <ConfirmButton confirm="Transformer ce devis en facture ? Une facture sera émise (n° définitif)." className={`${fullBtn} border border-border hover:bg-surface`}>
+                <ConfirmButton confirm="Transformer ce devis en facture ? Une facture sera émise (n° définitif)." confirmLabel="Transformer" danger={false} className={`${fullBtn} border border-border hover:bg-surface`}>
                   🧾 Transformer en facture
                 </ConfirmButton>
               </form>

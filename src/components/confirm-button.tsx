@@ -11,12 +11,15 @@ export function ConfirmButton({
   title,
   children,
   confirmLabel = "Supprimer",
+  danger = true,
 }: {
   confirm: string;
   className?: string;
   title?: string;
   children: React.ReactNode;
   confirmLabel?: string;
+  /** true (défaut) = action destructive (bouton rouge « Supprimer »). */
+  danger?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -30,7 +33,7 @@ export function ConfirmButton({
         open={open}
         message={confirm}
         confirmLabel={confirmLabel}
-        danger
+        danger={danger}
         onCancel={() => setOpen(false)}
         onConfirm={() => { setOpen(false); ref.current?.form?.requestSubmit(); }}
       />

@@ -16,11 +16,13 @@ function str(v: FormDataEntryValue | null): string | null {
 }
 
 function fromForm(formData: FormData) {
+  const carb = str(formData.get("type_carburant"));
   return {
     nom: String(formData.get("nom") ?? "").trim(),
     type: str(formData.get("type")),
     cout_location_jour: num(formData.get("cout_location_jour")) ?? 0,
-    cout_km: num(formData.get("cout_km")) ?? 0,
+    type_carburant: carb === "essence" || carb === "diesel" ? carb : null,
+    conso_l_100km: num(formData.get("conso_l_100km")),
     capacite_m3: num(formData.get("capacite_m3")),
   };
 }

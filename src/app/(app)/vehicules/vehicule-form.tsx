@@ -1,18 +1,22 @@
 import Link from "next/link";
-import { Field } from "@/components/form";
+import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card } from "@/components/ui";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
+import { CARBURANTS } from "@/lib/vehicule";
 import type { Vehicule } from "@/lib/types";
 
 function Fields({ vehicule }: { vehicule?: Vehicule }) {
   return (
     <div className="space-y-4">
       <Field label="Nom" name="nom" required defaultValue={vehicule?.nom} placeholder="Fourgon 20 m³" />
-      <Field label="Type" name="type" defaultValue={vehicule?.type} placeholder="Utilitaire, PL…" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Type" name="type" defaultValue={vehicule?.type} placeholder="Utilitaire, PL…" />
+        <Select label="Carburant" name="type_carburant" defaultValue={vehicule?.type_carburant} options={[{ value: "", label: "—" }, ...CARBURANTS]} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Coût location / jour (€)" name="cout_location_jour" type="number" step="0.01" defaultValue={vehicule?.cout_location_jour} placeholder="0" />
-        <Field label="Coût / km (€)" name="cout_km" type="number" step="0.001" defaultValue={vehicule?.cout_km} placeholder="0" />
+        <Field label="Consommation (L/100 km)" name="conso_l_100km" type="number" step="0.1" defaultValue={vehicule?.conso_l_100km} placeholder="ex. 9.5" />
       </div>
       <Field label="Capacité (m³)" name="capacite_m3" type="number" step="0.01" defaultValue={vehicule?.capacite_m3} />
     </div>

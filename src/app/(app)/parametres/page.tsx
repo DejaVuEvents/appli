@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { InfoTip } from "@/components/info-tip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte } from "./actions";
-import { updateTresorerieReglages } from "../finance/actions";
+import { updateTresorerieReglages, updatePrixCarburant } from "../finance/actions";
 import { Modal, ModalForm } from "@/components/modal";
 import { getMembreActuel, COMPETENCES, ROLE_LABELS, nomMembre, type RoleMembre } from "@/lib/membre";
 import { urlDocument } from "@/lib/storage";
@@ -286,6 +286,22 @@ export default async function ParametresPage({
                   <Field label="Date du solde initial" name="solde_initial_date" type="date" defaultValue={ent.solde_initial_date} />
                   <Field label="Seuil d'alerte (€)" name="seuil_alerte" type="number" step="0.01" defaultValue={ent.seuil_alerte} />
                   <div className="sm:col-span-3"><SubmitButton>Enregistrer</SubmitButton></div>
+                </form>
+              </Card>
+            </section>
+          )}
+
+          {ent && (
+            <section>
+              <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-muted">
+                Carburant
+                <InfoTip>Prix du litre (à mettre à jour de temps en temps). Sert à estimer les coûts de trajet à partir de la consommation de chaque véhicule.</InfoTip>
+              </h2>
+              <Card className="p-5">
+                <form action={updatePrixCarburant.bind(null, ent.id)} className="grid gap-4 sm:grid-cols-3 sm:items-end">
+                  <Field label="Prix essence (€/L)" name="prix_essence" type="number" step="0.001" defaultValue={ent.prix_essence} placeholder="ex. 1.85" />
+                  <Field label="Prix diesel (€/L)" name="prix_diesel" type="number" step="0.001" defaultValue={ent.prix_diesel} placeholder="ex. 1.75" />
+                  <div><SubmitButton>Enregistrer</SubmitButton></div>
                 </form>
               </Card>
             </section>

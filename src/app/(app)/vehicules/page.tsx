@@ -49,7 +49,10 @@ export default async function VehiculesPage() {
                 </div>
                 <div className="shrink-0 text-right text-sm">
                   <div>{euros(v.cout_location_jour)}<span className="text-muted">/j</span></div>
-                  <div className="text-muted">{euros(v.cout_km)}/km</div>
+                  <div className="text-muted">
+                    {v.conso_l_100km ? `${v.conso_l_100km} L/100km` : "conso —"}
+                    {v.type_carburant ? ` · ${v.type_carburant}` : ""}
+                  </div>
                 </div>
               </Link>
               <form action={deleteVehicule.bind(null, v.id)}>

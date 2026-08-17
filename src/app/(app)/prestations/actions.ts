@@ -8,6 +8,7 @@ import { BUCKET_PRIVE } from "@/lib/storage";
 import { extraireMaterielPdf } from "@/lib/gemini";
 import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
 import { ROLES_MEMBRE } from "@/lib/roles";
+import { coutKmVehicule } from "@/lib/vehicule";
 
 function num(v: FormDataEntryValue | null): number | null {
   if (v === null || String(v).trim() === "") return null;
@@ -646,17 +647,16 @@ export async function addTransport(prestationId: string, devisId: string, formDa
   const nbVehicules = Math.max(1, num(formData.get("nb_vehicules")) ?? 1);
   const km = num(formData.get("km")) ?? 0;
 
-  const { data: v } = await supabase
-    .from("vehicule")
-    .select("cout_location_jour, cout_km")
-    .eq("id", vehiculeId)
-    .single();
+  const [{ data: v }, { data: p }] = await Promise.all([
+    supabase.from("vehicule").select("cout_location_jour, cout_km, conso_l_100km, type_carburant").eq("id", vehiculeId).single(),
+    supabase.from("parametres_entreprise").select("prix_essence, prix_diesel").limit(1).maybeSingle(),
+  ]);
 
   const cout = coutTransport({
     nbVehicules,
     coutJour: Number(v?.cout_location_jour ?? 0),
     km,
-    coutKm: Number(v?.cout_km ?? 0),
+    coutKm: coutKmVehicule(v ?? {}, { essence: Number(p?.prix_essence ?? 0), diesel: Number(p?.prix_diesel ?? 0) }),
   });
 
   const { error } = await supabase.from("transport").insert({

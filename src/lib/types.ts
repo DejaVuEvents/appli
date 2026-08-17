@@ -113,7 +113,9 @@ export interface Vehicule {
   nom: string;
   type: string | null;
   cout_location_jour: number;
-  cout_km: number;
+  cout_km: number; // legacy — conservé comme repli si conso non renseignée
+  type_carburant: string | null; // 'essence' | 'diesel'
+  conso_l_100km: number | null; // consommation moyenne (L/100 km)
   capacite_m3: number | null;
 }
 
@@ -222,6 +224,8 @@ export interface ParametresEntreprise {
   solde_initial: number;
   solde_initial_date: string | null;
   seuil_alerte: number;
+  prix_essence: number | null; // €/L, pour le calcul des coûts de trajet
+  prix_diesel: number | null; // €/L
   qonto_login: string | null;
   qonto_token: string | null;
   qonto_account_slug: string | null;

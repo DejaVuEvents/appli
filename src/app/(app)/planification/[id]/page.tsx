@@ -9,6 +9,7 @@ import { PrintButton } from "@/components/print-button";
 import { dateFr, euros } from "@/lib/format";
 import { addEtape, deleteEtape, toggleEtapeFait, deplacerEtape, calculerItineraire, setVehiculeTournee } from "../actions";
 import { orsConfigured } from "@/lib/ors";
+import { coutKmVehicule } from "@/lib/vehicule";
 import { InfoHint } from "@/components/info-hint";
 import { EventTabBar } from "@/components/event-tab-bar";
 
@@ -23,7 +24,7 @@ type Presta = {
   vehicule_id: string | null;
   client: { nom: string } | null;
 };
-type Vehicule = { id: string; nom: string; cout_location_jour: number | null; cout_km: number | null };
+type Vehicule = { id: string; nom: string; cout_location_jour: number | null; cout_km: number | null; conso_l_100km: number | null; type_carburant: string | null };
 type Etape = {
   id: string;
   ordre: number;
@@ -55,15 +56,17 @@ const TYPE_CLS: Record<string, string> = {
 export default async function PlanificationDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data: prestData }, { data: etapesData }, { data: vehData }] = await Promise.all([
+  const [{ data: prestData }, { data: etapesData }, { data: vehData }, { data: paramData }] = await Promise.all([
     supabase.from("prestation").select("id, nom, lieu, date_prepa, date_event_debut, date_event_fin, date_retour, vehicule_id, client(nom)").eq("id", id).single(),
     supabase.from("etape_logistique").select("*").eq("prestation_id", id).order("ordre", { ascending: true }),
-    supabase.from("vehicule").select("id, nom, cout_location_jour, cout_km").order("nom"),
+    supabase.from("vehicule").select("id, nom, cout_location_jour, cout_km, conso_l_100km, type_carburant").order("nom"),
+    supabase.from("parametres_entreprise").select("prix_essence, prix_diesel").limit(1).maybeSingle(),
   ]);
   if (!prestData) notFound();
   const p = prestData as unknown as Presta;
   const etapes = (etapesData ?? []) as Etape[];
   const vehicules = (vehData ?? []) as Vehicule[];
+  const prixCarb = { essence: Number(paramData?.prix_essence ?? 0), diesel: Number(paramData?.prix_diesel ?? 0) };
 
   const totalKm = Math.round(etapes.reduce((s, e) => s + Number(e.distance_km ?? 0), 0) * 10) / 10;
   const totalMin = etapes.reduce((s, e) => s + Number(e.duree_min ?? 0), 0);
@@ -77,7 +80,8 @@ export default async function PlanificationDetail({ params }: { params: Promise<
     const d = Math.round((new Date(p.date_retour).getTime() - new Date(p.date_prepa).getTime()) / 86400000) + 1;
     return d > 0 ? d : 1;
   })();
-  const coutKm = vehicule ? totalKm * Number(vehicule.cout_km ?? 0) : 0;
+  const coutParKm = vehicule ? coutKmVehicule(vehicule, prixCarb) : 0;
+  const coutKm = vehicule ? totalKm * coutParKm : 0;
   const coutJours = vehicule ? nbJours * Number(vehicule.cout_location_jour ?? 0) : 0;
   const coutTournee = coutKm + coutJours;
 
@@ -150,7 +154,8 @@ export default async function PlanificationDetail({ params }: { params: Promise<
               <div className="text-right text-sm">
                 <div className="font-bold">{euros(coutTournee)}<span className="ml-1 text-xs font-normal text-muted">coût estimé</span></div>
                 <div className="text-xs text-muted">
-                  {totalKm} km × {euros(vehicule.cout_km)}/km{coutJours > 0 ? ` + ${nbJours} j × ${euros(vehicule.cout_location_jour)}/j` : ""}
+                  {totalKm} km × {euros(coutParKm)}/km{coutJours > 0 ? ` + ${nbJours} j × ${euros(vehicule.cout_location_jour)}/j` : ""}
+                  {vehicule.conso_l_100km ? ` (${vehicule.conso_l_100km} L/100km)` : ""}
                 </div>
               </div>
             )}

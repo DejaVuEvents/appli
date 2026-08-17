@@ -295,3 +295,18 @@ export async function updateTresorerieReglages(id: string, formData: FormData) {
   revalidatePath("/parametres");
   revaliderFinance();
 }
+
+/** Tarifs du carburant (€/L) — utilisés pour estimer les coûts de trajet. */
+export async function updatePrixCarburant(id: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const { error } = await supabase
+    .from("parametres_entreprise")
+    .update({
+      prix_essence: num(formData.get("prix_essence")),
+      prix_diesel: num(formData.get("prix_diesel")),
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/parametres");
+  revalidatePath("/planification");
+}

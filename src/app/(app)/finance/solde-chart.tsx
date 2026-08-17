@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { euros } from "@/lib/format";
 
-export type PointSolde = { label: string; value: number };
+export type PointSolde = { key: string; label: string; value: number };
 
 /**
  * Graphe du solde projeté cumulé, fenêtre glissante de 12 mois.
@@ -57,7 +57,7 @@ export function SoldeProjeteChart({
           const h = Math.round((Math.abs(v) / maxAbs) * H);
           const color = v < 0 ? "bg-red-500" : v < seuil ? "bg-amber-500" : "bg-green-500";
           return (
-            <div key={p.label} className="flex-1" title={`${p.label} : ${euros(v)}`}>
+            <div key={p.key} className="flex-1" title={`${p.label} : ${euros(v)}`}>
               <div className="flex items-end justify-center" style={{ height: H }}>
                 {v >= 0 && <div className={`w-3.5 rounded-t ${color}`} style={{ height: `${h}px` }} />}
               </div>

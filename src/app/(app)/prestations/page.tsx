@@ -5,6 +5,7 @@ import { Modal } from "@/components/modal";
 import { PrestationForm } from "./prestation-form";
 import { createPrestation } from "./actions";
 import { DocsSection, type DocRow } from "./docs-section";
+import { ImportPdf } from "./import-pdf";
 import { calculerTotaux, type RemiseType } from "@/lib/devis";
 
 type DevisModeleRow = { id: string; nom: string | null; type: string; prestation: { nom: string } | null };
@@ -31,7 +32,7 @@ async function chargerModales(supabase: Awaited<ReturnType<typeof createClient>>
       <PrestationForm action={createPrestation} clients={clients} cancelHref="/prestations" inModal type="facture" devisModeles={modeles} />
     </Modal>
   );
-  return { creerDevis, creerFacture };
+  return { creerDevis, creerFacture, clients };
 }
 
 type DevisDocRow = {
@@ -55,7 +56,7 @@ export default async function PrestationsPage({
 
   const supabase = await createClient();
 
-  const { creerDevis, creerFacture } = await chargerModales(supabase);
+  const { creerDevis, creerFacture, clients } = await chargerModales(supabase);
 
   // Tous les documents (devis + factures) + statut d'émission + lignes/transport (pour le montant).
   const [{ data: devisData }, { data: dfData }, { data: lignesData }, { data: transData }] = await Promise.all([
@@ -139,7 +140,12 @@ export default async function PrestationsPage({
       ? allDocs.filter((d) => d.prestation && (d.type === "facture" || aEmissionFacture.has(d.id))).map((d) => toRow(d, true))
       : allDocs.filter((d) => d.prestation && d.type === "devis").map((d) => toRow(d, false));
 
-  const action = tab === "factures" ? creerFacture : creerDevis;
+  const action = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {tab === "factures" ? creerFacture : creerDevis}
+      <ImportPdf clients={clients} defaultType={tab === "factures" ? "facture" : "devis"} />
+    </div>
+  );
 
   return (
     <div className="max-w-7xl">

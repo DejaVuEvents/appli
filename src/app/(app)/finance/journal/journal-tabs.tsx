@@ -3,8 +3,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { deleteEcriture, setValideEcriture } from "../actions";
+import { deleteEcriture, setValideEcriture, ajouterJustificatifs } from "../actions";
 import { JustificatifPreview } from "@/components/justificatif-preview";
+import { SubmitButton } from "@/components/submit-button";
 import { typeLabel, categorieManquante, NOMENCLATURE, type Nomenclature } from "@/lib/finance";
 import { euros, dateFr } from "@/lib/format";
 import type { EcritureFinanciere } from "@/lib/types";
@@ -304,6 +305,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
           prestation={selected.prestation_id ? prestMap.get(selected.prestation_id) ?? null : null}
           factures={facturesLiees[selected.id] ?? []}
           catManquante={catFlag(selected)}
+          hasJustif={justifSet.has(selected.id)}
           onClose={() => setSelected(null)}
         />
       )}
@@ -316,17 +318,19 @@ function EcriturePanel({
   prestation,
   factures = [],
   catManquante = false,
+  hasJustif = false,
   onClose,
 }: {
   ecriture: EcritureFinanciere;
   prestation: Prestation | null;
   factures?: FactureLiee[];
   catManquante?: boolean;
+  hasJustif?: boolean;
   onClose: () => void;
 }) {
   const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
   const factureRef = !factureUrl && e.facture ? e.facture : null;
-  const missingDoc = !e.facture && !e.devis_facture_id && factures.length === 0;
+  const missingDoc = !e.facture && !e.devis_facture_id && factures.length === 0 && !hasJustif;
   const apercu = factures.find((f) => f.previewUrl)?.previewUrl ?? null;
 
   // Verrouille le scroll de la page d'arrière-plan tant que le panneau est ouvert.
@@ -387,9 +391,15 @@ function EcriturePanel({
 
           {/* Facture / document */}
           {missingDoc && (
-            <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
-              <span>⚠</span>
-              <span>Aucun document joint — pensez à ajouter la facture.</span>
+            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm text-orange-800 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300">
+              <div className="mb-2 flex items-center gap-2"><span>⚠</span><span>Aucun document joint à cette écriture.</span></div>
+              <form action={ajouterJustificatifs.bind(null, e.id)} className="space-y-2">
+                <input
+                  type="file" name="justificatifs" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  className="block w-full text-xs text-orange-900/80 file:mr-2 file:rounded-lg file:border-0 file:bg-orange-600 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white dark:text-orange-200"
+                />
+                <SubmitButton pendingLabel="Ajout…" className="!py-1.5 !text-xs">📎 Associer un document</SubmitButton>
+              </form>
             </div>
           )}
           {factureUrl && (

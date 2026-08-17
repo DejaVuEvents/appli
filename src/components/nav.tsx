@@ -30,10 +30,6 @@ const ALL_GROUPS: Group[] = [
         <path d="M9.5 13h5M9.5 16.5h5" strokeLinecap="round" />
       </svg>
     ),
-    children: [
-      { href: "/planification", label: "Événements" },
-      { href: "/prestations", label: "Devis & Factures" },
-    ],
   },
   {
     href: "/calendrier",
@@ -76,6 +72,7 @@ const ALL_GROUPS: Group[] = [
     ),
     children: [
       { href: "/finance", label: "Trésorerie" },
+      { href: "/prestations", label: "Devis & Factures" },
       { href: "/notes-frais", label: "Notes de frais" },
     ],
   },

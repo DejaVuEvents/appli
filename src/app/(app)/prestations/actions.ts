@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { montantLigne, coutTransport, periodeReservation, montantRemise, type RemiseType } from "@/lib/devis";
+import { BUCKET_PRIVE } from "@/lib/storage";
 
 function num(v: FormDataEntryValue | null): number | null {
   if (v === null || String(v).trim() === "") return null;
@@ -93,6 +94,63 @@ export async function creerAcompteSolde(devisId: string, formData: FormData) {
 
   revalidatePath(`/prestations/${base.prestation_id}`);
   redirect(`/prestations/devis/${acompteId ?? base.id}`);
+}
+
+/** Importe un devis / facture PDF (document existant, ex. ancien Tiime) en tant que document autonome. */
+export async function importerDocumentPdf(formData: FormData) {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const type = str(formData.get("type")) === "facture" ? "facture" : "devis";
+  const nom = str(formData.get("nom")) ?? (type === "facture" ? "Facture importée" : "Devis importé");
+  const clientId = str(formData.get("client_id"));
+  const date = str(formData.get("date"));
+  const montant = num(formData.get("montant"));
+  const numero = str(formData.get("numero"));
+  const file = formData.get("pdf") as File | null;
+  if (!file || file.size === 0) throw new Error("Sélectionne un fichier PDF.");
+
+  // 1) Upload du PDF dans le bucket privé.
+  const ext = file.name.split(".").pop() ?? "pdf";
+  const path = `imports/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error: upErr } = await supabase.storage.from(BUCKET_PRIVE).upload(path, await file.arrayBuffer(), {
+    contentType: file.type || "application/pdf",
+    upsert: false,
+  });
+  if (upErr) throw new Error(`Upload : ${upErr.message}`);
+
+  // 2) Conteneur (non-événement) + document.
+  const { data: prest, error: pErr } = await supabase
+    .from("prestation")
+    .insert({ nom, client_id: clientId, statut: "devis", est_evenement: false, date_event_debut: date, created_by: user?.id ?? null })
+    .select("id")
+    .single();
+  if (pErr) throw new Error(pErr.message);
+  const { data: devis } = await supabase
+    .from("devis")
+    .insert({ prestation_id: prest.id, nom, type, pdf_import: path, created_by: user?.id ?? null })
+    .select("id")
+    .single();
+
+  // 3) Montant → ligne libre (pour afficher le total dans les listes).
+  if (montant && devis) {
+    await supabase.from("ligne_prestation").insert({
+      prestation_id: prest.id, devis_id: devis.id, designation: nom,
+      quantite: 1, unite: null, prix_unitaire: montant, remise_type: "pct", remise_valeur: 0,
+      prix_total: montant, est_accessoire_auto: false,
+    });
+  }
+  // 4) Facture → émission (apparaît dans la liste Factures avec un statut).
+  if (type === "facture" && devis) {
+    await supabase.from("devis_facture").insert({
+      prestation_id: prest.id, devis_id: devis.id, type: "facture", numero,
+      montant_ht: montant ?? 0, taux_tva: 0, montant_ttc: montant ?? 0,
+      date_emission: date, statut_paiement: "en_attente",
+    });
+  }
+
+  revalidatePath("/prestations");
+  redirect(`/prestations?tab=${type === "facture" ? "factures" : "devis"}`);
 }
 
 // ---------- Prestation (événement) ----------

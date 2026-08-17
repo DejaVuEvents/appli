@@ -142,10 +142,7 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
                       {d.date ? dateFr(d.date) : "—"}
                     </div>
                     <Link href={`/prestations/devis/${d.id}`} className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2 truncate font-medium">
-                        <span>{d.type === "facture" ? "🧾" : "📄"}</span>
-                        <span className="truncate">{d.titre}</span>
-                      </div>
+                      <div className="truncate font-medium">{d.titre}</div>
                       <div className="truncate text-sm text-muted">
                         {d.client ?? "Sans client"}
                         {d.lieu ? ` · ${d.lieu}` : ""}

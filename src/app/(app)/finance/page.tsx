@@ -40,99 +40,75 @@ export default async function FinanceDashboard({
   // Créances : qui nous doit (factures clients impayées) / à qui nous devons (fournisseurs).
   type Cli = { devis_id: string; numero: string | null; montant_ttc: number | null; statut_paiement: string | null; date_echeance: string | null; prestation: { client: { nom: string } | null } | null };
   type Fou = { id: string; fournisseur: string | null; numero: string | null; montant_ttc: number | null; date_echeance: string | null; statut_paiement: string | null };
-  const clients = ((cliDues ?? []) as unknown as Cli[]).sort((a, b) => (a.date_echeance ?? "9999").localeCompare(b.date_echeance ?? "9999"));
+  // Uniquement les FACTURES en retard de paiement (statut « retard » ou échéance dépassée) — pas les devis, pas les factures non échues.
+  const clients = ((cliDues ?? []) as unknown as Cli[])
+    .filter((c) => c.statut_paiement === "retard" || (c.date_echeance != null && c.date_echeance < today))
+    .sort((a, b) => (a.date_echeance ?? "9999").localeCompare(b.date_echeance ?? "9999"));
   const fournisseurs = ((fouDues ?? []) as Fou[]).sort((a, b) => (a.date_echeance ?? "9999").localeCompare(b.date_echeance ?? "9999"));
   const totalDu = clients.reduce((s, c) => s + Number(c.montant_ttc ?? 0), 0);
   const totalAPayer = fournisseurs.reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
 
-  const mainCards = [
-    { label: "Solde actuel (réel)", value: soldeActuelReel, color: soldeActuelReel < 0 ? "text-red-600" : "text-foreground" },
-    { label: "Entrées réelles", value: totaux.entReel, color: "text-green-700 dark:text-green-400" },
-    { label: "Sorties réelles", value: totaux.depReel, color: "text-red-600" },
-  ];
-  const projCards = [
-    { label: "Projeté — fin du mois", value: soldeProjeteFinMois },
-    { label: "Projeté — fin d'année", value: soldeProjete },
-  ];
-
   const maxAbs = Math.max(1, ...months.map((m) => Math.abs(m.soldeProjCum)));
-  const H = 72; // hauteur max d'un bâton (px)
+  const H = 56; // hauteur max d'un bâton (px)
 
   return (
-    <div className="max-w-7xl">
+    <div className="max-w-6xl">
       <PageHeader title="Finance / Trésorerie" />
       <FinanceTabs annee={annee} />
 
-      {/* KPI principaux */}
-      <div className="grid grid-cols-3 gap-3">
-        {mainCards.map((c) => (
-          <Card key={c.label} className="p-4">
-            <div className={`text-xl font-bold ${c.color}`}>{euros(c.value)}</div>
-            <div className="mt-0.5 text-xs text-muted">{c.label}</div>
-          </Card>
-        ))}
-      </div>
-      {/* Projections (plus petites) */}
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        {projCards.map((c) => (
-          <Card key={c.label} className="px-4 py-3">
-            <div className={`text-base font-semibold ${c.value < 0 ? "text-red-600" : "text-foreground"}`}>{euros(c.value)}</div>
-            <div className="mt-0.5 text-xs text-muted">{c.label}</div>
-          </Card>
-        ))}
-      </div>
-
-      {/* Graphe solde projeté — largeur réduite, bâtons plus hauts */}
-      <Card className="mt-6 max-w-2xl p-5">
-        <h2 className="mb-4 text-sm font-semibold">Solde projeté cumulé — {annee}</h2>
-        <div className="flex items-stretch gap-1.5">
-          {months.map((m) => {
-            const v = m.soldeProjCum;
-            const h = Math.round((Math.abs(v) / maxAbs) * H);
-            const color = v < 0 ? "bg-red-500" : v < seuil ? "bg-amber-500" : "bg-green-500";
-            return (
-              <div key={m.mois} className="flex-1" title={`${m.mois} : ${euros(v)}`}>
-                <div className="flex items-end justify-center" style={{ height: H }}>
-                  {v >= 0 && <div className={`w-3.5 rounded-t ${color}`} style={{ height: `${h}px` }} />}
-                </div>
-                <div className="h-px bg-border" />
-                <div className="flex items-start justify-center" style={{ height: H }}>
-                  {v < 0 && <div className={`w-3.5 rounded-b ${color}`} style={{ height: `${h}px` }} />}
-                </div>
-                <div className="mt-1 text-center text-[10px] text-muted">{m.mois.slice(0, 3)}</div>
-              </div>
-            );
-          })}
+      {/* Résumé compact : tout groupé dans une seule carte */}
+      <Card className="p-5">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          <div>
+            <div className="text-xs text-muted">Solde actuel</div>
+            <div className={`text-2xl font-bold ${soldeActuelReel < 0 ? "text-red-600" : "text-foreground"}`}>{euros(soldeActuelReel)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-muted">Entrées réelles</div>
+            <div className="text-lg font-semibold text-green-700 dark:text-green-400">{euros(totaux.entReel)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-muted">Sorties réelles</div>
+            <div className="text-lg font-semibold text-red-600">{euros(totaux.depReel)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-muted">Solde projeté</div>
+            <div className="mt-0.5 flex items-baseline justify-between gap-2 text-sm">
+              <span className="text-muted">fin de mois</span>
+              <span className={`font-semibold ${soldeProjeteFinMois < 0 ? "text-red-600" : "text-foreground"}`}>{euros(soldeProjeteFinMois)}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="text-muted">fin d&apos;année</span>
+              <span className={`font-semibold ${soldeProjete < 0 ? "text-red-600" : "text-foreground"}`}>{euros(soldeProjete)}</span>
+            </div>
+          </div>
         </div>
       </Card>
 
       {/* Créances : qui nous doit / à qui nous devons */}
       <div className="mt-6 grid gap-6 md:grid-cols-2">
-        {/* À encaisser — clients */}
+        {/* Factures clients en retard de paiement */}
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">💰 On nous doit (à encaisser)</h2>
-            <span className="text-sm font-bold text-green-700 dark:text-green-400">{euros(totalDu)}</span>
+            <h2 className="text-sm font-semibold">🔴 Factures en retard</h2>
+            <span className="text-sm font-bold text-red-600">{euros(totalDu)}</span>
           </div>
           {clients.length === 0 ? (
-            <p className="text-sm text-muted">Aucune facture client en attente 👍</p>
+            <p className="text-sm text-muted">Aucune facture en retard 👍</p>
           ) : (
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {clients.map((c) => {
-                const enRetard = c.statut_paiement === "retard" || (c.date_echeance && c.date_echeance < today);
-                return (
-                  <Link key={c.devis_id} href={`/prestations/devis/${c.devis_id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{c.prestation?.client?.nom ?? "Client"}</span>
-                      <span className="text-xs text-muted">Facture n°{c.numero ?? "—"}{c.date_echeance ? ` · échéance ${dateFr(c.date_echeance)}` : ""}</span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block font-semibold tabular-nums">{euros(c.montant_ttc)}</span>
-                      {enRetard && <span className="text-[10px] font-semibold text-red-600">⚠ en retard · relancer</span>}
-                    </span>
-                  </Link>
-                );
-              })}
+              {clients.map((c) => (
+                <Link key={c.devis_id} href={`/prestations/devis/${c.devis_id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{c.prestation?.client?.nom ?? "Client"}</span>
+                    <span className="text-xs text-muted">Facture n°{c.numero ?? "—"}{c.date_echeance ? ` · échéance ${dateFr(c.date_echeance)}` : ""}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block font-semibold tabular-nums">{euros(c.montant_ttc)}</span>
+                    <span className="text-[10px] font-semibold text-red-600">à relancer</span>
+                  </span>
+                </Link>
+              ))}
             </div>
           )}
         </Card>
@@ -166,6 +142,35 @@ export default async function FinanceDashboard({
           )}
         </Card>
       </div>
+
+      {/* Graphe solde projeté — repliable (secondaire) */}
+      <details className="mt-6 group">
+        <summary className="flex w-fit cursor-pointer items-center gap-1.5 text-sm font-semibold text-muted hover:text-foreground">
+          <svg className="h-4 w-4 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Solde projeté cumulé — {annee}
+        </summary>
+        <Card className="mt-3 max-w-2xl p-5">
+          <div className="flex items-stretch gap-1.5">
+            {months.map((m) => {
+              const v = m.soldeProjCum;
+              const h = Math.round((Math.abs(v) / maxAbs) * H);
+              const color = v < 0 ? "bg-red-500" : v < seuil ? "bg-amber-500" : "bg-green-500";
+              return (
+                <div key={m.mois} className="flex-1" title={`${m.mois} : ${euros(v)}`}>
+                  <div className="flex items-end justify-center" style={{ height: H }}>
+                    {v >= 0 && <div className={`w-3.5 rounded-t ${color}`} style={{ height: `${h}px` }} />}
+                  </div>
+                  <div className="h-px bg-border" />
+                  <div className="flex items-start justify-center" style={{ height: H }}>
+                    {v < 0 && <div className={`w-3.5 rounded-b ${color}`} style={{ height: `${h}px` }} />}
+                  </div>
+                  <div className="mt-1 text-center text-[10px] text-muted">{m.mois.slice(0, 3)}</div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </details>
 
       {!ent?.solde_initial && (
         <p className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">

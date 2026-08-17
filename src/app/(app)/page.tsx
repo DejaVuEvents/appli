@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui";
 import { getMembreActuel } from "@/lib/membre";
-import { syntheseMensuelle, MOIS } from "@/lib/finance";
+import { syntheseMensuelle } from "@/lib/finance";
 import { euros, dateFr } from "@/lib/format";
 import { MesTaches, type TachePerso } from "./mes-taches";
 import type { EcritureFinanciere, ParametresEntreprise } from "@/lib/types";
@@ -34,10 +34,9 @@ export default async function Dashboard() {
   const ent = entData as ParametresEntreprise | null;
   const ecritures = (ecrData ?? []) as EcritureFinanciere[];
   const seuil = Number(ent?.seuil_alerte ?? 0);
-  const { months, soldeActuelReel, soldeProjete } = syntheseMensuelle(
+  const { soldeActuelReel, soldeProjete } = syntheseMensuelle(
     ecritures, Number(ent?.solde_initial ?? 0), annee, seuil, ent?.solde_initial_date ?? null,
   );
-  const moisRisque = months.filter((m, i) => m.alerte !== "ok" && i >= new Date().getMonth());
 
   // Prochaine entrée / sortie prévisionnelle à venir
   const prochainesEcheances = ecritures
@@ -108,7 +107,7 @@ export default async function Dashboard() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Brief comptable</h2>
           <Link href="/finance" className="text-sm text-primary hover:underline">Trésorerie →</Link>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3">
           <Card className="p-4">
             <div className={`text-xl font-bold ${soldeActuelReel < 0 ? "text-red-600" : ""}`}>{euros(soldeActuelReel)}</div>
             <div className="mt-0.5 text-xs text-muted">Solde actuel (réel)</div>
@@ -117,21 +116,13 @@ export default async function Dashboard() {
             <div className={`text-xl font-bold ${soldeProjete < 0 ? "text-red-600" : "text-green-600"}`}>{euros(soldeProjete)}</div>
             <div className="mt-0.5 text-xs text-muted">Solde projeté (fin {annee})</div>
           </Card>
-          <Card className="p-4">
-            <div className={`text-xl font-bold ${moisRisque.length > 0 ? "text-red-600" : "text-green-600"}`}>{moisRisque.length}</div>
-            <div className="mt-0.5 text-xs text-muted">
-              {moisRisque.length > 0 ? `Mois « dans le rouge » : ${moisRisque.map((m) => MOIS[months.indexOf(m)]).join(", ")}` : "Aucun mois à risque"}
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-xl font-bold">{prochainesEcheances.length}</div>
-            <div className="mt-0.5 text-xs text-muted">Échéances prévues à venir</div>
-          </Card>
         </div>
 
         {/* Prochaines échéances */}
         {prochainesEcheances.length > 0 && (
-          <Card className="mt-3 divide-y divide-border overflow-hidden">
+          <>
+          <h3 className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-muted">Prochaines échéances</h3>
+          <Card className="divide-y divide-border overflow-hidden">
             {prochainesEcheances.map((e) => (
               <Link key={e.id} href={`/finance/${e.id}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-background">
                 <span className="min-w-0 truncate">
@@ -143,6 +134,7 @@ export default async function Dashboard() {
               </Link>
             ))}
           </Card>
+          </>
         )}
       </section>
 

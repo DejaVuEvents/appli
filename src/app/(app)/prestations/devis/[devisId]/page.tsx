@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement } from "../../actions";
+import { updateStatut, associerDevisAEvenement, extraireMaterielDevis } from "../../actions";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
@@ -163,6 +163,16 @@ export default async function DevisEditorPage({
             </a>
             {mailto && <EnvoyerClientButton mailto={mailto} pdfUrl={pdfUrl} className={halfBtn} />}
           </div>
+          {pdfImportUrl && (
+            <form action={extraireMaterielDevis.bind(null, devisId)}>
+              <ConfirmButton
+                confirm="Lire le PDF avec l'IA et en extraire les lignes de matériel ? Tu pourras corriger le résultat dans l'éditeur ensuite."
+                className={`${fullBtn} border border-primary/40 text-primary hover:bg-primary/5`}
+              >
+                🤖 Extraire le matériel (IA)
+              </ConfirmButton>
+            </form>
+          )}
         </div>
 
         {/* Émission */}

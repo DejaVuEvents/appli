@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { montantLigne, coutTransport, periodeReservation, montantRemise, type RemiseType } from "@/lib/devis";
 import { BUCKET_PRIVE } from "@/lib/storage";
+import { extraireMaterielPdf } from "@/lib/gemini";
 
 function num(v: FormDataEntryValue | null): number | null {
   if (v === null || String(v).trim() === "") return null;
@@ -151,6 +152,51 @@ export async function importerDocumentPdf(formData: FormData) {
 
   revalidatePath("/prestations");
   redirect(`/prestations?tab=${type === "facture" ? "factures" : "devis"}`);
+}
+
+/**
+ * Extrait le matériel d'un devis/facture importé (PDF) via l'IA et crée les lignes
+ * correspondantes (rattachées au catalogue si le nom correspond), pour pouvoir planifier.
+ */
+export async function extraireMaterielDevis(devisId: string) {
+  const supabase = await createSupabase();
+  const { data: devis } = await supabase.from("devis").select("pdf_import, prestation_id").eq("id", devisId).maybeSingle();
+  if (!devis?.pdf_import) throw new Error("Ce document n'a pas de PDF importé.");
+
+  // Télécharge le PDF depuis le bucket privé.
+  const { data: blob, error: dlErr } = await supabase.storage.from(BUCKET_PRIVE).download(devis.pdf_import);
+  if (dlErr || !blob) throw new Error("Impossible de lire le PDF.");
+  const mime = blob.type || (devis.pdf_import.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+  const base64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+
+  const lignes = await extraireMaterielPdf(base64, mime);
+  if (!lignes) throw new Error("Extraction IA indisponible (clé Gemini manquante ou service en échec).");
+  if (lignes.length === 0) throw new Error("Aucune ligne de matériel détectée dans le PDF.");
+
+  // Catalogue pour rattacher chaque ligne à une référence si le nom correspond.
+  const { data: refs } = await supabase.from("materiel_reference").select("id, nom, categorie_id");
+  const references = (refs ?? []) as { id: string; nom: string; categorie_id: string | null }[];
+  const trouverRef = (designation: string) => {
+    const d = designation.toLowerCase();
+    return references.find((r) => r.nom && (d.includes(r.nom.toLowerCase()) || r.nom.toLowerCase().includes(d))) ?? null;
+  };
+
+  const rows = lignes.map((l) => {
+    const ref = trouverRef(l.designation);
+    return {
+      prestation_id: devis.prestation_id, devis_id: devisId,
+      reference_id: ref?.id ?? null, categorie_id: ref?.categorie_id ?? null,
+      designation: l.designation, unite: null,
+      quantite: l.quantite, prix_unitaire: l.prix_unitaire, remise_type: "pct", remise_valeur: 0,
+      prix_total: Math.round(l.quantite * l.prix_unitaire * 100) / 100, est_accessoire_auto: false,
+    };
+  });
+  const { error } = await supabase.from("ligne_prestation").insert(rows);
+  if (error) throw new Error(error.message);
+
+  await toucherDevis(supabase, devisId);
+  revalidatePath(`/prestations/devis/${devisId}`);
+  redirect(`/prestations/devis/${devisId}?edit=1`);
 }
 
 // ---------- Prestation (événement) ----------

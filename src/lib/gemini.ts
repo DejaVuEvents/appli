@@ -13,6 +13,59 @@ export function geminiConfigured(): boolean {
 export type ActionSuggeree = { personne: string; texte: string };
 export type ResumeReunion = { resume: string; actions: ActionSuggeree[] };
 
+export type MaterielLigne = { designation: string; quantite: number; prix_unitaire: number };
+
+/**
+ * Extrait les lignes de matériel/prestation d'un devis ou facture (PDF ou image).
+ * Renvoie null si non configuré / échec (l'appelant gère le fallback).
+ */
+export async function extraireMaterielPdf(base64: string, mime: string): Promise<MaterielLigne[] | null> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || !base64) return null;
+
+  const prompt = [
+    "Ce document est un DEVIS ou une FACTURE d'une association de prestation événementielle (son, lumière, structure).",
+    "Extrais la liste des lignes de MATÉRIEL / PRESTATION facturées.",
+    "Réponds UNIQUEMENT avec un tableau JSON d'objets :",
+    '{"designation": string, "quantite": number, "prix_unitaire": number}  (prix unitaire HT).',
+    "Ignore les lignes de total, sous-total, TVA, remise globale et frais de transport.",
+    "Si une quantité ou un prix est absent, mets 1 et 0. N'invente aucune ligne.",
+  ].join("\n");
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODELE}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ inline_data: { mime_type: mime, data: base64 } }, { text: prompt }] }],
+          generationConfig: { temperature: 0, responseMimeType: "application/json" },
+        }),
+      },
+    );
+    if (!res.ok) {
+      console.error("Gemini PDF HTTP", res.status, await res.text().catch(() => ""));
+      return null;
+    }
+    const data = await res.json();
+    const txt: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!txt) return null;
+    const parsed = JSON.parse(txt);
+    const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.lignes) ? parsed.lignes : [];
+    return arr
+      .map((l: Record<string, unknown>) => ({
+        designation: String(l.designation ?? "").trim(),
+        quantite: Number(l.quantite ?? 1) || 1,
+        prix_unitaire: Number(l.prix_unitaire ?? 0) || 0,
+      }))
+      .filter((l: MaterielLigne) => l.designation);
+  } catch (e) {
+    console.error("Gemini PDF échec :", (e as Error).message);
+    return null;
+  }
+}
+
 /**
  * Résume un transcript de réunion et en extrait des actions par personne.
  * `membres` = noms connus (pour attribuer les actions au bon membre).

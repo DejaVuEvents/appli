@@ -110,14 +110,18 @@ export async function listerEvenementsCalendar(timeMinISO: string, timeMaxISO: s
   if (!calendarConfigured()) return [];
   try {
     const cal = getCalendar();
-    const res = await cal.events.list({
-      calendarId: "primary",
-      timeMin: timeMinISO,
-      timeMax: timeMaxISO,
-      singleEvents: true,
-      orderBy: "startTime",
-      maxResults: 250,
-    });
+    // Garde-fou : ne jamais bloquer le rendu de la page calendrier plus de 4 s si Google traîne.
+    const res = await Promise.race([
+      cal.events.list({
+        calendarId: "primary",
+        timeMin: timeMinISO,
+        timeMax: timeMaxISO,
+        singleEvents: true,
+        orderBy: "startTime",
+        maxResults: 250,
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+    ]);
     const items = res.data.items ?? [];
     const out: GoogleEventLite[] = [];
     for (const e of items) {

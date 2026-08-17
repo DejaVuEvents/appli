@@ -65,14 +65,21 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Contrôle d'accès par rôle (sécurité serveur, non contournable côté client).
+  // Optimisation perf : `peutAcceder` est une fonction pure (sans réseau). On ne fait
+  // la requête DB du rôle QUE si le chemin est réellement restreint (c.-à-d. si un
+  // « membre » ou un « technique » pourrait être bloqué). Sur les pages ouvertes à tous
+  // (accueil, calendrier, équipe, NDF, paramètres…), on économise un aller-retour Supabase.
   if (user && !isPublic) {
-    const { data: membre } = await supabase.from("membre").select("role").eq("id", user.id).maybeSingle();
-    const role = (membre?.role ?? "membre") as RoleMembre;
-    if (!peutAcceder(role, request.nextUrl.pathname)) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      url.search = "";
-      return NextResponse.redirect(url);
+    const cheminRestreint = !peutAcceder("membre", pathname) || !peutAcceder("technique", pathname);
+    if (cheminRestreint) {
+      const { data: membre } = await supabase.from("membre").select("role").eq("id", user.id).maybeSingle();
+      const role = (membre?.role ?? "membre") as RoleMembre;
+      if (!peutAcceder(role, pathname)) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
     }
   }
 

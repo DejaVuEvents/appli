@@ -6,8 +6,8 @@ import { Field, Select, TextArea } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { PrintButton } from "@/components/print-button";
-import { dateFr } from "@/lib/format";
-import { addEtape, deleteEtape, toggleEtapeFait, deplacerEtape, calculerItineraire } from "../actions";
+import { dateFr, euros } from "@/lib/format";
+import { addEtape, deleteEtape, toggleEtapeFait, deplacerEtape, calculerItineraire, setVehiculeTournee } from "../actions";
 import { orsConfigured } from "@/lib/ors";
 import { InfoHint } from "@/components/info-hint";
 import { EventTabBar } from "@/components/event-tab-bar";
@@ -20,8 +20,10 @@ type Presta = {
   date_event_debut: string | null;
   date_event_fin: string | null;
   date_retour: string | null;
+  vehicule_id: string | null;
   client: { nom: string } | null;
 };
+type Vehicule = { id: string; nom: string; cout_location_jour: number | null; cout_km: number | null };
 type Etape = {
   id: string;
   ordre: number;
@@ -53,18 +55,31 @@ const TYPE_CLS: Record<string, string> = {
 export default async function PlanificationDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data: prestData }, { data: etapesData }] = await Promise.all([
-    supabase.from("prestation").select("id, nom, lieu, date_prepa, date_event_debut, date_event_fin, date_retour, client(nom)").eq("id", id).single(),
+  const [{ data: prestData }, { data: etapesData }, { data: vehData }] = await Promise.all([
+    supabase.from("prestation").select("id, nom, lieu, date_prepa, date_event_debut, date_event_fin, date_retour, vehicule_id, client(nom)").eq("id", id).single(),
     supabase.from("etape_logistique").select("*").eq("prestation_id", id).order("ordre", { ascending: true }),
+    supabase.from("vehicule").select("id, nom, cout_location_jour, cout_km").order("nom"),
   ]);
   if (!prestData) notFound();
   const p = prestData as unknown as Presta;
   const etapes = (etapesData ?? []) as Etape[];
+  const vehicules = (vehData ?? []) as Vehicule[];
 
   const totalKm = Math.round(etapes.reduce((s, e) => s + Number(e.distance_km ?? 0), 0) * 10) / 10;
   const totalMin = etapes.reduce((s, e) => s + Number(e.duree_min ?? 0), 0);
   const aDistances = etapes.some((e) => e.distance_km != null);
   const peutCalculer = orsConfigured() && etapes.filter((e) => e.adresse || e.lieu).length >= 2;
+
+  // Coût estimé de la tournée avec le véhicule choisi.
+  const vehicule = vehicules.find((v) => v.id === p.vehicule_id) ?? null;
+  const nbJours = (() => {
+    if (!p.date_prepa || !p.date_retour) return 1;
+    const d = Math.round((new Date(p.date_retour).getTime() - new Date(p.date_prepa).getTime()) / 86400000) + 1;
+    return d > 0 ? d : 1;
+  })();
+  const coutKm = vehicule ? totalKm * Number(vehicule.cout_km ?? 0) : 0;
+  const coutJours = vehicule ? nbJours * Number(vehicule.cout_location_jour ?? 0) : 0;
+  const coutTournee = coutKm + coutJours;
 
   const jalons = [
     { label: "Préparation", date: p.date_prepa },
@@ -117,6 +132,31 @@ export default async function PlanificationDetail({ params }: { params: Promise<
             <form action={calculerItineraire.bind(null, id)} className="print:hidden">
               <SubmitButton pendingLabel="Calcul…">{aDistances ? "Recalculer l'itinéraire" : "Calculer l'itinéraire"}</SubmitButton>
             </form>
+          )}
+        </div>
+
+        {/* Véhicule de la tournée + coût estimé */}
+        <div className="mb-3 rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <form action={setVehiculeTournee.bind(null, id)} className="flex items-center gap-2">
+              <label className="text-sm font-medium">Véhicule :</label>
+              <select name="vehicule_id" defaultValue={p.vehicule_id ?? ""} className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
+                <option value="">— Aucun —</option>
+                {vehicules.map((v) => <option key={v.id} value={v.id}>{v.nom}</option>)}
+              </select>
+              <SubmitButton className="!px-3 !py-1.5 !text-sm">OK</SubmitButton>
+            </form>
+            {vehicule && (
+              <div className="text-right text-sm">
+                <div className="font-bold">{euros(coutTournee)}<span className="ml-1 text-xs font-normal text-muted">coût estimé</span></div>
+                <div className="text-xs text-muted">
+                  {totalKm} km × {euros(vehicule.cout_km)}/km{coutJours > 0 ? ` + ${nbJours} j × ${euros(vehicule.cout_location_jour)}/j` : ""}
+                </div>
+              </div>
+            )}
+          </div>
+          {vehicule && !aDistances && (
+            <p className="mt-1 text-xs text-muted">Calcule l&apos;itinéraire ci-dessus pour estimer le coût kilométrique.</p>
           )}
         </div>
 

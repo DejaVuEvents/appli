@@ -114,6 +114,13 @@ export async function creerDevisLocation(locationId: string, type: "devis" | "fa
   if (devis) redirect(`/prestations/devis/${devis.id}?edit=1`);
 }
 
+/** Associe (ou retire) un véhicule à la tournée logistique d'un événement. */
+export async function setVehiculeTournee(prestationId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  await supabase.from("prestation").update({ vehicule_id: str(formData.get("vehicule_id")) }).eq("id", prestationId);
+  revalidatePath(`/planification/${prestationId}`);
+}
+
 export async function addEtape(prestationId: string, formData: FormData) {
   const supabase = await createSupabase();
   const { data: last } = await supabase

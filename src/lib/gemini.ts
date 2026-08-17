@@ -4,9 +4,9 @@
 // https://aistudio.google.com/apikey — pas de carte bancaire).
 // Sans clé, geminiConfigured() = false → le transcript est stocké mais non résumé.
 
-// Alias glissant « -latest » : suit toujours le modèle Flash courant, ce qui évite
-// les pannes quand Google déprécie une version figée (ex. gemini-2.0-flash retiré).
-const MODELE = process.env.GEMINI_MODEL || "gemini-flash-latest";
+// Modèle « lite » : non-thinking, rapide, quota gratuit plus élevé (moins de 429).
+// Un fallback vers d'autres modèles est géré dans extraireMaterielPdf.
+const MODELE = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 
 export function geminiConfigured(): boolean {
   return !!process.env.GEMINI_API_KEY;
@@ -34,38 +34,64 @@ export async function extraireMaterielPdf(base64: string, mime: string): Promise
     "Si une quantité ou un prix est absent, mets 1 et 0. N'invente aucune ligne.",
   ].join("\n");
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODELE}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ inline_data: { mime_type: mime, data: base64 } }, { text: prompt }] }],
-          generationConfig: { temperature: 0, responseMimeType: "application/json" },
-        }),
-      },
-    );
-    if (!res.ok) {
-      console.error("Gemini PDF HTTP", res.status, await res.text().catch(() => ""));
-      return null;
+  const body = JSON.stringify({
+    contents: [{ parts: [{ inline_data: { mime_type: mime, data: base64 } }, { text: prompt }] }],
+    generationConfig: { temperature: 0, responseMimeType: "application/json" },
+  });
+
+  // Modèles candidats : le modèle configuré (lite, non-thinking, quota élevé) puis un
+  // fallback si celui-ci n'est plus disponible (404). Retry sur rate-limit / erreur serveur.
+  const modeles = [...new Set([MODELE, "gemini-2.5-flash-lite", "gemini-flash-latest"])];
+  const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  for (const modele of modeles) {
+    for (let essai = 0; essai < 3; essai++) {
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${key}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body },
+        );
+      } catch (e) {
+        console.error("Gemini PDF réseau :", (e as Error).message);
+        await attendre(1500);
+        continue; // réessaie
+      }
+
+      if (res.status === 404) break; // modèle indisponible → modèle suivant
+      if (res.status === 429 || res.status >= 500) {
+        // Rate limit / erreur serveur : petite attente puis nouvel essai.
+        console.error("Gemini PDF", res.status, "— retry", essai + 1);
+        await attendre(1500 * (essai + 1));
+        continue;
+      }
+      if (!res.ok) {
+        console.error("Gemini PDF HTTP", res.status, (await res.text().catch(() => "")).slice(0, 300));
+        break; // erreur non récupérable → modèle suivant
+      }
+
+      const data = await res.json().catch(() => null);
+      // Concatène le texte de toutes les parties non-« pensée » (modèles thinking).
+      const parts: { text?: string; thought?: boolean }[] = data?.candidates?.[0]?.content?.parts ?? [];
+      const txt = parts.filter((p) => !p.thought && p.text).map((p) => p.text).join("").trim();
+      if (!txt) { console.error("Gemini PDF : réponse vide"); break; }
+      try {
+        const parsed = JSON.parse(txt);
+        const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.lignes) ? parsed.lignes : [];
+        return arr
+          .map((l: Record<string, unknown>) => ({
+            designation: String(l.designation ?? "").trim(),
+            quantite: Number(l.quantite ?? 1) || 1,
+            prix_unitaire: Number(l.prix_unitaire ?? 0) || 0,
+          }))
+          .filter((l: MaterielLigne) => l.designation);
+      } catch (e) {
+        console.error("Gemini PDF parse :", (e as Error).message, "·", txt.slice(0, 200));
+        break; // JSON invalide → modèle suivant
+      }
     }
-    const data = await res.json();
-    const txt: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!txt) return null;
-    const parsed = JSON.parse(txt);
-    const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.lignes) ? parsed.lignes : [];
-    return arr
-      .map((l: Record<string, unknown>) => ({
-        designation: String(l.designation ?? "").trim(),
-        quantite: Number(l.quantite ?? 1) || 1,
-        prix_unitaire: Number(l.prix_unitaire ?? 0) || 0,
-      }))
-      .filter((l: MaterielLigne) => l.designation);
-  } catch (e) {
-    console.error("Gemini PDF échec :", (e as Error).message);
-    return null;
   }
+  return null;
 }
 
 /**

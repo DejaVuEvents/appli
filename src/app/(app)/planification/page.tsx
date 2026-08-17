@@ -117,7 +117,7 @@ export default async function PlanificationPage({ searchParams }: { searchParams
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title={onglet === "location" ? "Location" : "Activités"}
+        title={onglet === "location" ? "Location" : "Événements"}
         action={onglet === "location" ? ajouterLocation : ajouterEvenement}
       />
 

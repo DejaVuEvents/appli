@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { peutAcceder } from "@/lib/roles";
 import type { RoleMembre } from "@/lib/membre";
@@ -105,18 +105,26 @@ export function groupesVisibles(role: RoleMembre): Group[] {
 
 export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [openDesktop, setOpenDesktop] = useState<string | null>(null);
 
   const groups = groupesVisibles(role);
 
+  // Sous-onglets « Événements » et « Location » partagent le chemin /planification ;
+  // seul le paramètre ?vue=location les distingue (usePathname ne le voit pas).
+  const vueLocation = searchParams?.get("vue") === "location";
+  const estListePlanif = pathname === "/planification";
+  const estFicheLocation = pathname.startsWith("/planification/location");
   // Une fiche événement vit sous /prestations/<id> (ex. /prestations/xxx/technique) — MAIS
   // la liste Devis & Factures (/prestations) et l'éditeur de devis (/prestations/devis/…)
   // appartiennent à Finance. On lève donc l'ambiguïté du préfixe /prestations.
   const estFicheEvenement = pathname.startsWith("/prestations/") && !pathname.startsWith("/prestations/devis");
   const hrefActive = (href: string) => {
     if (href === "/") return pathname === "/";
-    // Événements (Planification) : liste de planif, fiches événement, fiches location
-    if (href === "/planification") return pathname.startsWith("/planification") || estFicheEvenement;
+    // Événements : liste planif (hors vue location) + fiches événement
+    if (href === "/planification") return (estListePlanif && !vueLocation) || estFicheEvenement;
+    // Location : liste planif en vue location + fiches location
+    if (href === "/planification?vue=location") return (estListePlanif && vueLocation) || estFicheLocation;
     // Devis & Factures (Finance) : liste globale + éditeur de devis, PAS les fiches événement
     if (href === "/prestations") return pathname === "/prestations" || pathname.startsWith("/prestations/devis");
     return pathname.startsWith(href);

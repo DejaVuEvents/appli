@@ -59,7 +59,11 @@ type LocationLite = {
   statut: string;
 };
 
-type Cat = "event" | "prepa" | "retour" | "entree" | "sortie" | "reunion" | "location";
+type Cat = "event" | "prepa" | "retour" | "entree" | "sortie" | "reunion" | "location" | "google";
+
+type GoogleEventLite = {
+  id: string; title: string; date: string; dateEnd: string; heure: string | null; lieu: string | null; htmlLink: string | null;
+};
 
 type CalEvent = {
   key: string;
@@ -83,6 +87,7 @@ const CATS: { key: Cat; label: string; dot: string }[] = [
   { key: "location", label: "Location", dot: "bg-teal-500" },
   { key: "entree", label: "Entrée prévisionnelle", dot: "bg-green-400" },
   { key: "sortie", label: "Sortie prévisionnelle", dot: "bg-amber-400" },
+  { key: "google", label: "Google Agenda", dot: "bg-rose-500" },
 ];
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -133,6 +138,7 @@ function buildEvents(
   ecritures: Ecriture[],
   reunions: Reunion[],
   locations: LocationLite[],
+  googleEvents: GoogleEventLite[],
   moiId: string | null,
   mesPrestationIds: Set<string>,
 ): CalEvent[] {
@@ -200,6 +206,21 @@ function buildEvents(
     });
   }
 
+  for (const g of googleEvents) {
+    events.push({
+      key: `gcal-${g.id}`,
+      cat: "google",
+      date: g.date,
+      dateEnd: g.dateEnd || g.date,
+      title: g.title,
+      subtitle: [g.heure, g.lieu].filter(Boolean).join(" · ") || undefined,
+      href: g.htmlLink || "/calendrier",
+      pill: "bg-rose-100 text-rose-800 border border-rose-200",
+      dot: "bg-rose-500",
+      mine: true,
+    });
+  }
+
   return events;
 }
 
@@ -213,6 +234,7 @@ export function CalendarView({
   reunions = [],
   membres = [],
   locations = [],
+  googleEvents = [],
   moiId = null,
   mesPrestationIds = [],
 }: {
@@ -221,6 +243,7 @@ export function CalendarView({
   reunions?: Reunion[];
   membres?: MembreLite2[];
   locations?: LocationLite[];
+  googleEvents?: GoogleEventLite[];
   moiId?: string | null;
   mesPrestationIds?: string[];
 }) {
@@ -235,8 +258,8 @@ export function CalendarView({
   const mesPrestaSet = useMemo(() => new Set(mesPrestationIds), [mesPrestationIds]);
   const reunionMap = useMemo(() => new Map(reunions.map((r) => [r.id, r])), [reunions]);
   const allEvents = useMemo(
-    () => buildEvents(prestations, ecritures, reunions, locations, moiId, mesPrestaSet),
-    [prestations, ecritures, reunions, locations, moiId, mesPrestaSet],
+    () => buildEvents(prestations, ecritures, reunions, locations, googleEvents, moiId, mesPrestaSet),
+    [prestations, ecritures, reunions, locations, googleEvents, moiId, mesPrestaSet],
   );
   const events = useMemo(
     () => allEvents.filter((e) => visible.has(e.cat) && (!onlyMine || e.mine)),

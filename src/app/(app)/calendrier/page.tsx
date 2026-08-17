@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { CalendarView } from "./calendar-view";
 import { getMembreActuel } from "@/lib/membre";
+import { listerEvenementsCalendar } from "@/lib/google-calendar";
 
 type MembreLite = { id: string; prenom: string | null; nom: string | null; email: string | null };
 
@@ -9,7 +10,12 @@ export default async function CalendrierPage() {
   const supabase = await createClient();
   const moi = await getMembreActuel(supabase);
 
-  const [{ data: prestData }, { data: ecrData }, { data: reunionsData }, { data: membresData }, { data: locData }, { data: mesPrestaData }] = await Promise.all([
+  // Fenêtre d'import Google Agenda : ~3 mois avant → ~18 mois après.
+  const now = new Date();
+  const timeMin = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString();
+  const timeMax = new Date(now.getFullYear() + 1, now.getMonth() + 6, 1).toISOString();
+
+  const [{ data: prestData }, { data: ecrData }, { data: reunionsData }, { data: membresData }, { data: locData }, { data: mesPrestaData }, googleEvents] = await Promise.all([
     supabase
       .from("prestation")
       .select("id, nom, statut, date_prepa, date_event_debut, date_event_fin, date_retour, client(nom)")
@@ -26,6 +32,7 @@ export default async function CalendrierPage() {
     supabase.from("membre").select("id, prenom, nom, email").eq("actif", true).order("prenom"),
     supabase.from("location").select("id, titre, sens, client_id, tiers, lieu, date_debut, date_fin, montant, statut").neq("statut", "annule"),
     moi ? supabase.from("prestation_membre").select("prestation_id").eq("membre_id", moi.id) : Promise.resolve({ data: [] }),
+    listerEvenementsCalendar(timeMin, timeMax),
   ]);
 
   const mesPrestationIds = ((mesPrestaData ?? []) as { prestation_id: string }[]).map((r) => r.prestation_id);
@@ -53,6 +60,7 @@ export default async function CalendrierPage() {
         reunions={reunions}
         membres={membres}
         locations={locations}
+        googleEvents={googleEvents}
         moiId={moi?.id ?? null}
         mesPrestationIds={mesPrestationIds}
       />

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { geocode, itineraireMulti } from "@/lib/ors";
 import { copierDevisDans } from "@/lib/devis-copie";
+import { ROLES_MEMBRE } from "@/lib/roles";
 
 function str(v: FormDataEntryValue | null): string | null {
   const s = String(v ?? "").trim();
@@ -113,6 +114,33 @@ export async function creerDevisLocation(locationId: string, type: "devis" | "fa
     .single();
   revalidatePath(`/planification/location/${locationId}`);
   if (devis) redirect(`/prestations/devis/${devis.id}?edit=1`);
+}
+
+/** Change le statut d'une location (sélecteur d'en-tête, comme un événement). */
+export async function updateLocationStatut(id: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const statut = String(formData.get("statut") ?? "prevu");
+  const { error } = await supabase.from("location").update({ statut }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/planification/location/${id}`);
+  revalidatePath("/planification");
+  revalidatePath("/calendrier");
+}
+
+/** Attache une personne à une location (crée la prestation support au besoin), avec rôles. */
+export async function attacherMembreLocation(locationId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const membreId = str(formData.get("membre_id"));
+  if (!membreId) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  const prestationId = await assurerPrestationLocation(supabase, locationId, user?.id ?? null);
+  if (!prestationId) return;
+  const roles = formData.getAll("role").map((v) => String(v)).filter((r) => (ROLES_MEMBRE as readonly string[]).includes(r));
+  const { error } = await supabase
+    .from("prestation_membre")
+    .upsert({ prestation_id: prestationId, membre_id: membreId, role: roles }, { onConflict: "prestation_id,membre_id" });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/planification/location/${locationId}`);
 }
 
 /** Associe (copie) un devis/facture existant à la prestation support d'une location. */

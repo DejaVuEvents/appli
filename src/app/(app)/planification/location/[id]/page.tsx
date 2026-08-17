@@ -3,22 +3,20 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { Modal } from "@/components/modal";
-import { ConfirmButton } from "@/components/confirm-button";
+import { SubmitButton } from "@/components/submit-button";
 import { LocationTabBar, type LocationTab } from "../../location-tab-bar";
 import { LocationForm, type LocationRow } from "../../location-form";
-import { updateLocation, deleteLocation, creerDevisLocation, associerDevisLocation } from "../../actions";
+import { LocationStatutSelect } from "../location-statut-select";
+import { updateLocation, deleteLocation, creerDevisLocation, associerDevisLocation, attacherMembreLocation, updateLocationStatut } from "../../actions";
+import { setRoleMembre, detacherMembre } from "../../../prestations/actions";
 import { AjouterDocPopup } from "../../../prestations/ajouter-doc-popup";
 import { statutFactureAffichage } from "@/lib/facture-statut";
+import { ROLES_MEMBRE } from "@/lib/roles";
 import { euros, dateFr } from "@/lib/format";
 import type { Devis } from "@/lib/types";
 
-const STATUT_CLS: Record<string, string> = {
-  prevu: "bg-gray-200 text-gray-700",
-  confirme: "bg-blue-100 text-blue-700",
-  en_cours: "bg-amber-100 text-amber-800",
-  rendu: "bg-green-100 text-green-700",
-  annule: "bg-red-100 text-red-700",
-};
+type MembreLite = { id: string; prenom: string | null; nom: string | null; email: string | null; competences: string[] | null };
+const nomMembre = (m: MembreLite) => (m.prenom ?? "").trim() || (m.nom ?? "").trim() || m.email?.split("@")[0] || "Membre";
 
 export default async function LocationDetailPage({
   params,
@@ -32,13 +30,15 @@ export default async function LocationDetailPage({
   const tab: LocationTab = tabRaw === "devis" ? "devis" : tabRaw === "preparation" ? "preparation" : "infos";
 
   const supabase = await createClient();
-  const [{ data: locData }, { data: clientsData }] = await Promise.all([
+  const [{ data: locData }, { data: clientsData }, { data: membresData }] = await Promise.all([
     supabase.from("location").select("*").eq("id", id).maybeSingle(),
     supabase.from("client").select("id, nom").order("nom"),
+    supabase.from("membre").select("id, prenom, nom, email, competences").eq("actif", true).order("prenom"),
   ]);
   if (!locData) notFound();
-  const loc = locData as LocationRow & { prestation_id: string | null };
+  const loc = locData as LocationRow & { prestation_id: string | null; created_by: string | null };
   const clients = (clientsData ?? []) as { id: string; nom: string }[];
+  const tousMembres = (membresData ?? []) as MembreLite[];
   const clientNom = loc.client_id ? clients.find((c) => c.id === loc.client_id)?.nom ?? null : null;
   const tiers = loc.sens === "sortie" ? clientNom : loc.tiers;
 
@@ -55,6 +55,17 @@ export default async function LocationDetailPage({
     ? await supabase.from("ligne_prestation").select("id", { count: "exact", head: true }).eq("prestation_id", loc.prestation_id)
     : { count: 0 };
 
+  // Équipe attachée (via la prestation support) + créateur.
+  const { data: attachesData } = loc.prestation_id
+    ? await supabase.from("prestation_membre").select("role, membre:membre_id(id, prenom, nom, email, competences)").eq("prestation_id", loc.prestation_id)
+    : { data: [] };
+  type Attache = { role: string[] | null; membre: MembreLite };
+  const attaches = ((attachesData ?? []) as unknown as { role: string[] | null; membre: MembreLite | null }[])
+    .filter((r) => r.membre).map((r) => ({ role: r.role, membre: r.membre! })) as Attache[];
+  const attachesIds = new Set(attaches.map((a) => a.membre.id));
+  const membresDispo = tousMembres.filter((m) => !attachesIds.has(m.id));
+  const creePar = loc.created_by ? tousMembres.find((m) => m.id === loc.created_by) : null;
+
   // Documents existants (pour la popup « associer un document existant »), chargés en vue Devis.
   const { data: tousDevisData } = tab === "devis"
     ? await supabase.from("devis").select("id, nom, type, prestation:prestation_id(nom)").order("created_at", { ascending: false })
@@ -66,10 +77,11 @@ export default async function LocationDetailPage({
   const btnBorder = "inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface";
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-7xl space-y-6">
       <PageHeader
         title={loc.titre}
         subtitle={loc.sens === "sortie" ? "Location — sortie (mon matériel)" : "Location — entrée (sous-location)"}
+        action={<LocationStatutSelect action={updateLocationStatut.bind(null, id)} statut={loc.statut} />}
       />
       <LocationTabBar locationId={id} active={tab} />
 
@@ -79,24 +91,80 @@ export default async function LocationDetailPage({
           <Card className="p-5">
             <div className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
               <div><span className="text-muted">{loc.sens === "sortie" ? "Client" : "Fournisseur / loueur"} : </span><span className="font-medium">{tiers ?? "—"}</span></div>
-              <div><span className="text-muted">Statut : </span><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUT_CLS[loc.statut] ?? "bg-surface text-muted"}`}>{loc.statut.replace(/_/g, " ")}</span></div>
+              <div><span className="text-muted">Lieu : </span>{loc.lieu ?? "—"}</div>
               <div><span className="text-muted">Du : </span>{dateFr(loc.date_debut)}</div>
               <div><span className="text-muted">Au : </span>{loc.date_fin ? dateFr(loc.date_fin) : "—"}</div>
-              <div><span className="text-muted">Lieu : </span>{loc.lieu ?? "—"}</div>
               <div><span className="text-muted">Montant : </span>{loc.montant != null ? euros(loc.montant) : "—"}</div>
               {loc.notes && <div className="sm:col-span-2"><span className="text-muted">Notes : </span>{loc.notes}</div>}
+              {creePar && <div className="sm:col-span-2 text-muted text-xs">Créé par {nomMembre(creePar)}</div>}
             </div>
-            <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
-              <Modal trigger={<>✎ Modifier</>} title="Modifier la location" triggerClassName={btnBorder}>
+
+            {/* Personnes attachées + rôles + compétences */}
+            <div className="mt-4 pt-3 border-t border-border">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Équipe sur la location</p>
+              <div className="space-y-2">
+                {attaches.length === 0 && <span className="text-sm text-muted">Personne pour l&apos;instant.</span>}
+                {attaches.map((a) => (
+                  <div key={a.membre.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+                    <span className="text-sm font-medium">{nomMembre(a.membre)}</span>
+                    <form action={setRoleMembre.bind(null, loc.prestation_id!, a.membre.id)} className="inline-flex flex-wrap items-center gap-1">
+                      {ROLES_MEMBRE.map((r) => {
+                        const on = (a.role ?? []).includes(r);
+                        return (
+                          <label key={r} className="cursor-pointer">
+                            <input type="checkbox" name="role" value={r} defaultChecked={on} className="peer sr-only" />
+                            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:font-medium peer-checked:text-primary">{r}</span>
+                          </label>
+                        );
+                      })}
+                      <button className="rounded-md border border-border px-1.5 py-0.5 text-xs hover:bg-background" title="Enregistrer les rôles">OK</button>
+                    </form>
+                    {(a.membre.competences ?? []).length > 0 && (
+                      <span className="flex flex-wrap gap-1">
+                        {(a.membre.competences ?? []).map((c) => (
+                          <span key={c} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{c}</span>
+                        ))}
+                      </span>
+                    )}
+                    <form action={detacherMembre.bind(null, loc.prestation_id!, a.membre.id)} className="ml-auto inline">
+                      <button className="text-muted hover:text-red-600" title="Retirer">✕</button>
+                    </form>
+                  </div>
+                ))}
+                {membresDispo.length > 0 && (
+                  <form action={attacherMembreLocation.bind(null, id)} className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2">
+                    <select name="membre_id" required defaultValue="" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm">
+                      <option value="" disabled>+ Ajouter une personne…</option>
+                      {membresDispo.map((m) => (
+                        <option key={m.id} value={m.id}>{nomMembre(m)}</option>
+                      ))}
+                    </select>
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      {ROLES_MEMBRE.map((r) => (
+                        <label key={r} className="cursor-pointer">
+                          <input type="checkbox" name="role" value={r} className="peer sr-only" />
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:font-medium peer-checked:text-primary">{r}</span>
+                        </label>
+                      ))}
+                    </span>
+                    <button className="shrink-0 rounded-lg border border-border px-2 py-1 text-sm hover:bg-background">OK</button>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-border">
+              <Modal trigger={<>✎ Modifier</>} title="Modifier la location" triggerClassName="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">
                 <LocationForm action={updateLocation.bind(null, id)} clients={clients} location={loc} />
               </Modal>
             </div>
           </Card>
 
+          {/* Suppression */}
           <form action={deleteLocation.bind(null, id)}>
-            <ConfirmButton confirm="Supprimer définitivement cette location ?" className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100">
+            <SubmitButton variant="danger" pendingLabel="Suppression…" confirm="Supprimer définitivement cette location ?">
               Supprimer la location
-            </ConfirmButton>
+            </SubmitButton>
           </form>
         </div>
       )}

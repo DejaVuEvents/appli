@@ -30,7 +30,7 @@ export function Field({
   const im = inputMode ?? (type === "number" ? "decimal" : undefined);
   return (
     <div className={className}>
-      <label htmlFor={name} className="block text-sm font-medium mb-1">
+      <label htmlFor={name} className="block text-left text-sm font-medium mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <input
@@ -69,7 +69,7 @@ export function TextArea({
 }) {
   return (
     <div className={className}>
-      <label htmlFor={name} className="block text-sm font-medium mb-1">
+      <label htmlFor={name} className="block text-left text-sm font-medium mb-1">
         {label}
       </label>
       <textarea
@@ -100,7 +100,7 @@ export function Select({
 }) {
   return (
     <div className={className}>
-      <label htmlFor={name} className="block text-sm font-medium mb-1">
+      <label htmlFor={name} className="block text-left text-sm font-medium mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <select

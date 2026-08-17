@@ -30,6 +30,10 @@ const ALL_GROUPS: Group[] = [
         <path d="M9.5 13h5M9.5 16.5h5" strokeLinecap="round" />
       </svg>
     ),
+    children: [
+      { href: "/planification", label: "Événements" },
+      { href: "/planification?vue=location", label: "Location" },
+    ],
   },
   {
     href: "/calendrier",

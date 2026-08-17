@@ -238,9 +238,6 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 {estPredepense ? "Soumettre pour autorisation" : "Soumettre pour validation"}
               </SubmitButton>
             </form>
-            <form action={deleteNoteFrais.bind(null, id)}>
-              <SubmitButton variant="danger" pendingLabel="Suppression…" confirm="Supprimer définitivement cette note de frais ?">Supprimer</SubmitButton>
-            </form>
           </div>
         )}
 
@@ -278,6 +275,15 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
             <button className="text-sm text-primary underline" type="submit">Repasser en brouillon (corriger)</button>
           </form>
         )}
+
+        {/* Suppression — toujours disponible */}
+        <div className="border-t border-border pt-3">
+          <form action={deleteNoteFrais.bind(null, id)}>
+            <SubmitButton variant="danger" pendingLabel="Suppression…" confirm="Supprimer définitivement cette note de frais ?">
+              Supprimer la note de frais
+            </SubmitButton>
+          </form>
+        </div>
       </Card>
     </div>
   );

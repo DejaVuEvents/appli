@@ -44,19 +44,29 @@ export async function previewQonto(): Promise<
       .not("qonto_transaction_id", "is", null);
     const importedIds = new Set((alreadySynced ?? []).map((e) => e.qonto_transaction_id as string));
 
-    // 2. Écritures manuelles/Excel → clé de doublon date+montant+sens
+    // 2. Écritures manuelles/Excel → détection de doublon TOLÉRANTE AUX DATES.
+    // Le règlement Qonto tombe souvent 1-2 jours après la saisie manuelle : on flague
+    // comme doublon toute transaction de même montant+sens à ±5 jours d'une écriture existante.
     const { data: manualEntries } = await supabase
       .from("ecriture_financiere")
       .select("date, montant_ttc, sens")
       .is("qonto_transaction_id", null)
       .eq("statut", "reel");
 
-    // Clé : "YYYY-MM-DD|montant|sens"  (montant arrondi à 2 décimales pour éviter les flottants)
-    const doublonKeys = new Set(
-      (manualEntries ?? []).map(
-        (e) => `${e.date}|${Math.round(Number(e.montant_ttc) * 100)}|${e.sens}`,
-      ),
-    );
+    // Index : "montantCents|sens" -> liste des dates (ms)
+    const manualIdx = new Map<string, number[]>();
+    for (const e of manualEntries ?? []) {
+      const k = `${Math.round(Number(e.montant_ttc) * 100)}|${e.sens}`;
+      if (!manualIdx.has(k)) manualIdx.set(k, []);
+      manualIdx.get(k)!.push(new Date(e.date).getTime());
+    }
+    const TOLERANCE_MS = 5 * 24 * 60 * 60 * 1000;
+    const estDoublon = (date: string, amount: number, sens: string): boolean => {
+      const dates = manualIdx.get(`${Math.round(amount * 100)}|${sens}`);
+      if (!dates) return false;
+      const t = new Date(date).getTime();
+      return dates.some((d) => Math.abs(d - t) <= TOLERANCE_MS);
+    };
 
     // 3. Fetch Qonto
     const txs: QontoTransaction[] = await fetchQontoTransactions(
@@ -76,7 +86,6 @@ export async function previewQonto(): Promise<
         );
         const date = t.settled_at.slice(0, 10);
         const sens = (t.side === "credit" ? "entree" : "sortie") as "entree" | "sortie";
-        const key = `${date}|${Math.round(t.amount * 100)}|${sens}`;
         return {
           transaction_id: t.transaction_id,
           date,
@@ -88,7 +97,7 @@ export async function previewQonto(): Promise<
           reference: t.reference,
           cashflow_cat: t.cashflow_category?.name ?? null,
           cashflow_sub: t.cashflow_subcategory?.name ?? null,
-          doublon: doublonKeys.has(key),
+          doublon: estDoublon(date, t.amount, sens),
           attachment_ids: t.attachment_ids ?? [],
         };
       })

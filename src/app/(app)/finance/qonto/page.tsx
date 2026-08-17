@@ -2,9 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { FinanceTabs } from "../finance-tabs";
 import { fetchQontoOrg } from "@/lib/qonto";
-import { chargerNomenclature } from "@/lib/finance";
+import { chargerNomenclature, syntheseMensuelle } from "@/lib/finance";
 import { QontoSync } from "./qonto-sync";
-import type { ParametresEntreprise } from "@/lib/types";
+import type { ParametresEntreprise, EcritureFinanciere } from "@/lib/types";
 
 export default async function QontoPage({
   searchParams,
@@ -13,17 +13,23 @@ export default async function QontoPage({
 }) {
   const annee = Number((await searchParams)?.annee) || new Date().getFullYear();
   const supabase = await createClient();
-  const { data: entData } = await supabase
-    .from("parametres_entreprise")
-    .select("*")
-    .limit(1)
-    .maybeSingle();
+  const [{ data: entData }, { data: ecrData }] = await Promise.all([
+    supabase.from("parametres_entreprise").select("*").limit(1).maybeSingle(),
+    supabase.from("ecriture_financiere").select("*"),
+  ]);
   const ent = entData as (ParametresEntreprise & {
     qonto_login?: string;
     qonto_token?: string;
     qonto_account_slug?: string;
     qonto_derniere_sync?: string | null;
   }) | null;
+
+  // Solde « outil » (réel) pour le rapprochement avec Qonto.
+  const ecritures = (ecrData ?? []) as EcritureFinanciere[];
+  const { soldeActuelReel: soldeOutil } = syntheseMensuelle(
+    ecritures, Number(ent?.solde_initial ?? 0), new Date().getFullYear(),
+    Number(ent?.seuil_alerte ?? 0), ent?.solde_initial_date ?? null,
+  );
 
   // Solde Qonto en direct (best-effort)
   let balanceQonto: number | null = null;
@@ -57,6 +63,7 @@ export default async function QontoPage({
           derniereSync={ent?.qonto_derniere_sync ?? null}
           compteNom={ent?.qonto_account_slug ?? ""}
           balanceQonto={balanceQonto}
+          soldeOutil={soldeOutil}
           nomenclature={await chargerNomenclature(supabase)}
         />
       )}

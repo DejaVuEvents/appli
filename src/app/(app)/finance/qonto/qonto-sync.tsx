@@ -48,10 +48,11 @@ interface Props {
   derniereSync: string | null;
   compteNom: string;
   balanceQonto: number | null;
+  soldeOutil?: number;
   nomenclature?: Nomenclature;
 }
 
-export function QontoSync({ derniereSync, compteNom, balanceQonto, nomenclature = NOMENCLATURE }: Props) {
+export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, nomenclature = NOMENCLATURE }: Props) {
   const [pending, startTransition] = useTransition();
   const [items, setItems] = useState<QontoPreviewItem[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -109,6 +110,10 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, nomenclature 
 
   const selectedCount = selected.size;
 
+  // Rapprochement : écart entre le solde bancaire Qonto et le solde réel de l'outil.
+  const ecart = balanceQonto !== null && soldeOutil !== undefined ? Math.round((balanceQonto - soldeOutil) * 100) / 100 : null;
+  const valide = ecart !== null && Math.abs(ecart) < 0.01;
+
   return (
     <div className="space-y-4">
       {/* Info compte */}
@@ -129,6 +134,31 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, nomenclature 
           <div className="text-xs text-muted">Solde Qonto actuel</div>
         </div>
       </div>
+
+      {/* Rapprochement Qonto ↔ outil */}
+      {ecart !== null && (
+        <div className={`rounded-xl border p-4 ${valide ? "border-green-300 bg-green-50 dark:border-green-500/40 dark:bg-green-950/20" : "border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/20"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm font-semibold">
+              {valide ? "✅ Trésorerie validée — les soldes correspondent" : "⚠️ Écart entre Qonto et l'outil"}
+            </div>
+            {!valide && (
+              <div className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                Écart : {ecart > 0 ? "+" : ""}{euros(ecart)}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:max-w-md">
+            <div className="flex justify-between gap-2"><span className="text-muted">Solde banque (Qonto)</span><span className="font-semibold tabular-nums">{euros(balanceQonto)}</span></div>
+            <div className="flex justify-between gap-2"><span className="text-muted">Solde outil (réel)</span><span className="font-semibold tabular-nums">{euros(soldeOutil!)}</span></div>
+          </div>
+          {!valide && (
+            <p className="mt-2 text-xs text-muted">
+              Récupère puis importe les transactions manquantes ci-dessous pour aligner l&apos;outil sur la banque.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Bouton sync */}
       <button

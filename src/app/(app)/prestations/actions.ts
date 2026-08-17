@@ -328,12 +328,13 @@ export async function updateStatut(id: string, formData: FormData) {
   revalidatePath(`/prestations/${id}`);
 }
 
-export async function deletePrestation(id: string) {
+export async function deletePrestation(id: string, retour?: string) {
   const supabase = await createSupabase();
   const { error } = await supabase.from("prestation").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/prestations");
-  redirect("/prestations");
+  revalidatePath("/planification");
+  redirect(retour ?? "/planification");
 }
 
 // ---------- Personnes attachées à l'événement ----------

@@ -74,7 +74,6 @@ export default async function LocationDetailPage({
     .map((d) => ({ id: d.id, type: d.type, label: `${d.prestation?.nom ?? "?"} · ${d.nom ?? (d.type === "facture" ? "Facture" : "Devis")}` }));
 
   const btnPrimary = "inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90";
-  const btnBorder = "inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface";
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -172,10 +171,17 @@ export default async function LocationDetailPage({
       {/* ── DEVIS & FACTURES ── */}
       {tab === "devis" && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <form action={creerDevisLocation.bind(null, id, "devis")}><button className={btnPrimary}>+ Créer un devis</button></form>
-            <form action={creerDevisLocation.bind(null, id, "facture")}><button className={btnBorder}>+ Créer une facture</button></form>
-            <AjouterDocPopup docs={tousDocs} associerAction={associerDevisLocation.bind(null, id)} />
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Documents de la location</h2>
+            <AjouterDocPopup
+              docs={tousDocs}
+              associerAction={associerDevisLocation.bind(null, id)}
+              creer={
+                <form action={creerDevisLocation.bind(null, id, "devis")}>
+                  <button className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">+ Créer</button>
+                </form>
+              }
+            />
           </div>
 
           {devisList.length === 0 ? (

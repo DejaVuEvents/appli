@@ -4,7 +4,7 @@ import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { Modal } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { PrestationForm } from "../prestations/prestation-form";
-import { createEvenement } from "../prestations/actions";
+import { createEvenement, deletePrestation } from "../prestations/actions";
 import { LocationForm, type LocationRow } from "./location-form";
 import { createLocation, deleteLocation } from "./actions";
 import { dateFr, euros } from "@/lib/format";
@@ -66,6 +66,16 @@ export default async function PlanificationPage({ searchParams }: { searchParams
   );
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Badge de statut + bouton supprimer, communs aux 2 listes.
+  const Badge = ({ statut }: { statut: string | null }) => (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[statut ?? ""] ?? "bg-surface text-muted"}`}>
+      {(statut ?? "—").replace(/_/g, " ")}
+    </span>
+  );
+  const btnSupprimer = "rounded-lg border border-border px-2 py-1 text-xs text-red-600 hover:bg-surface";
+
+  // ── Événements ──
   const aVenir = prestations
     .filter((p) => (p.date_event_fin ?? p.date_retour ?? refDate(p) ?? "") >= today)
     .sort((a, b) => refDate(a).localeCompare(refDate(b)));
@@ -74,19 +84,28 @@ export default async function PlanificationPage({ searchParams }: { searchParams
     .sort((a, b) => refDate(b).localeCompare(refDate(a)));
 
   const Row = ({ p }: { p: PrestaRow }) => (
-    <Link href={`/prestations/${p.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
-      <div className="min-w-0">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
+      <Link href={`/prestations/${p.id}`} className="min-w-0 flex-1">
         <div className="font-medium truncate">{p.nom}</div>
-        <div className="text-xs text-muted">
-          {p.client?.nom ?? "Sans client"}
-          {refDate(p) ? ` · ${dateFr(refDate(p))}` : ""}
-        </div>
+        <div className="text-xs text-muted">{p.client?.nom ?? "Sans client"}{refDate(p) ? ` · ${dateFr(refDate(p))}` : ""}</div>
+      </Link>
+      <div className="flex shrink-0 items-center gap-2">
+        <Badge statut={p.statut} />
+        <form action={deletePrestation.bind(null, p.id, "/planification")}>
+          <ConfirmButton confirm={`Supprimer l'événement « ${p.nom} » et tous ses devis ?`} className={btnSupprimer}>✕</ConfirmButton>
+        </form>
       </div>
-      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[p.statut ?? ""] ?? "bg-surface text-muted"}`}>
-        {(p.statut ?? "—").replace(/_/g, " ")}
-      </span>
-    </Link>
+    </div>
   );
+
+  // ── Locations ──
+  const refDateLoc = (l: LocationRow) => l.date_fin ?? l.date_debut ?? "";
+  const locAVenir = locations
+    .filter((l) => refDateLoc(l) >= today)
+    .sort((a, b) => refDateLoc(a).localeCompare(refDateLoc(b)));
+  const locPassees = locations
+    .filter((l) => !locAVenir.includes(l))
+    .sort((a, b) => refDateLoc(b).localeCompare(refDateLoc(a)));
 
   const LocRow = ({ l }: { l: LocationRow }) => {
     const tiers = l.sens === "sortie" ? (l.client_id ? clientNom.get(l.client_id) : l.tiers) : l.tiers;
@@ -105,51 +124,45 @@ export default async function PlanificationPage({ searchParams }: { searchParams
           </div>
         </Link>
         <div className="flex shrink-0 items-center gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[l.statut] ?? "bg-surface text-muted"}`}>{l.statut.replace(/_/g, " ")}</span>
+          <Badge statut={l.statut} />
           <form action={deleteLocation.bind(null, l.id)}>
-            <ConfirmButton confirm="Supprimer cette location ?" className="rounded-lg border border-border px-2 py-1 text-xs text-red-600 hover:bg-surface">✕</ConfirmButton>
+            <ConfirmButton confirm="Supprimer cette location ?" className={btnSupprimer}>✕</ConfirmButton>
           </form>
         </div>
       </div>
     );
   };
 
+  // Rendu commun : 2 sections À venir / Passées.
+  const estLoc = onglet === "location";
+  const rowsAVenir = estLoc ? locAVenir.map((l) => <LocRow key={l.id} l={l} />) : aVenir.map((p) => <Row key={p.id} p={p} />);
+  const rowsPassees = estLoc ? locPassees.map((l) => <LocRow key={l.id} l={l} />) : passees.map((p) => <Row key={p.id} p={p} />);
+  const motVide = estLoc ? "location" : "prestation";
+
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title={onglet === "location" ? "Location" : "Événements"}
-        action={onglet === "location" ? ajouterLocation : ajouterEvenement}
+        title={estLoc ? "Location" : "Événements"}
+        action={estLoc ? ajouterLocation : ajouterEvenement}
       />
 
-      {onglet === "location" ? (
-        <section>
-          {locations.length === 0 ? (
-            <EmptyState title="Aucune location" description="Suivez ici les locations de matériel (sorties vers vos clients, ou sous-locations entrantes)." />
-          ) : (
-            <Card className="divide-y divide-border overflow-hidden">{locations.map((l) => <LocRow key={l.id} l={l} />)}</Card>
-          )}
-        </section>
-      ) : (
-        <>
-          <section className="mb-6">
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">À venir</h2>
-            {aVenir.length === 0 ? (
-              <Card className="px-4 py-3 text-sm text-muted">Aucune prestation à venir.</Card>
-            ) : (
-              <Card className="divide-y divide-border overflow-hidden">{aVenir.map((p) => <Row key={p.id} p={p} />)}</Card>
-            )}
-          </section>
+      <section className="mb-6">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">À venir</h2>
+        {rowsAVenir.length === 0 ? (
+          <Card className="px-4 py-3 text-sm text-muted">Aucune {motVide} à venir.</Card>
+        ) : (
+          <Card className="divide-y divide-border overflow-hidden">{rowsAVenir}</Card>
+        )}
+      </section>
 
-          <section>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Passées</h2>
-            {passees.length === 0 ? (
-              <EmptyState title="Aucune prestation passée" description="Les prestations terminées apparaîtront ici." />
-            ) : (
-              <Card className="divide-y divide-border overflow-hidden">{passees.map((p) => <Row key={p.id} p={p} />)}</Card>
-            )}
-          </section>
-        </>
-      )}
+      <section>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Passées</h2>
+        {rowsPassees.length === 0 ? (
+          <EmptyState title={`Aucune ${motVide} passée`} description={estLoc ? "Les locations terminées apparaîtront ici." : "Les prestations terminées apparaîtront ici."} />
+        ) : (
+          <Card className="divide-y divide-border overflow-hidden">{rowsPassees}</Card>
+        )}
+      </section>
     </div>
   );
 }

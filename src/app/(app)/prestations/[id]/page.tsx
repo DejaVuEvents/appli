@@ -199,7 +199,7 @@ export default async function PrestationDetailPage({
           </Card>
 
           {/* Suppression */}
-          <form action={deletePrestation.bind(null, id)}>
+          <form action={deletePrestation.bind(null, id, "/planification")}>
             <SubmitButton variant="danger" pendingLabel="Suppression…" confirm="Supprimer définitivement cet événement (tous ses devis, lignes, transport, réservations) ?">
               Supprimer l&apos;événement
             </SubmitButton>

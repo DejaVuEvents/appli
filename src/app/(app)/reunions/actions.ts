@@ -100,7 +100,9 @@ export async function ajouterTachePerso(formData: FormData) {
   if (!texte) return;
   // Cible : le membre choisi, sinon soi-même
   const membreId = str(formData.get("membre_id")) ?? user?.id ?? null;
-  await supabase.from("tache_perso").insert({ membre_id: membreId, texte, source_type: "manuel", created_by: user?.id ?? null });
+  const prive = formData.get("prive") === "on";
+  await supabase.from("tache_perso").insert({ membre_id: membreId, texte, source_type: "manuel", created_by: user?.id ?? null, prive });
   revalidatePath("/");
   revalidatePath("/reunions");
+  revalidatePath("/avancement");
 }

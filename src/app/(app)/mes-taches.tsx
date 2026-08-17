@@ -37,15 +37,21 @@ export function MesTaches({ taches }: { taches: TachePerso[] }) {
       </div>
 
       {/* Ajout rapide */}
-      <form action={ajouterTachePerso} className="mt-2 flex gap-2">
-        <input
-          name="texte"
-          value={texte}
-          onChange={(e) => setTexte(e.target.value)}
-          placeholder="+ Ajouter une tâche…"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
-        />
-        <button className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">Ajouter</button>
+      <form action={ajouterTachePerso} className="mt-2 space-y-1.5">
+        <div className="flex gap-2">
+          <input
+            name="texte"
+            value={texte}
+            onChange={(e) => setTexte(e.target.value)}
+            placeholder="+ Ajouter une tâche…"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+          />
+          <button className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">Ajouter</button>
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          <input type="checkbox" name="prive" className="h-3.5 w-3.5 rounded border-border" />
+          Privée (ne pas partager dans l&apos;avancement d&apos;équipe)
+        </label>
       </form>
 
       {faites.length > 0 && (

@@ -75,12 +75,16 @@ export default async function AvancementPage({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function ProjetsTab({ supabase, annee, sem, respFiltre, vue }: { supabase: any; annee: number; sem: number; respFiltre: string; vue: string }) {
-  const [{ data: projetsData }, { data: notesData }, { data: infoData }] = await Promise.all([
+  const [{ data: projetsData }, { data: notesData }, { data: infoData }, { data: tachesData }] = await Promise.all([
     supabase.from("projet_suivi").select("*").order("type").order("ordre").order("nom"),
     supabase.from("projet_note").select("projet_id, semaine, note").eq("annee", annee),
     supabase.from("semaine_info").select("*").eq("annee", annee).eq("semaine", sem).maybeSingle(),
+    supabase.from("tache_perso").select("id, texte, membre:membre_id(prenom, nom, email)").eq("prive", false).eq("fait", false).order("created_at", { ascending: false }),
   ]);
   const tous = (projetsData ?? []) as ProjetSuivi[];
+  type TacheEquipe = { id: string; texte: string; membre: { prenom: string | null; nom: string | null; email: string | null } | null };
+  const tachesEquipe = ((tachesData ?? []) as unknown as TacheEquipe[]);
+  const nomCourt = (m: TacheEquipe["membre"]) => (m?.prenom ?? "").trim() || (m?.nom ?? "").trim() || m?.email?.split("@")[0] || "—";
   const notes = (notesData ?? []) as { projet_id: string; semaine: number; note: string | null }[];
   const info = infoData as { note: string | null } | null;
 
@@ -194,6 +198,21 @@ async function ProjetsTab({ supabase, annee, sem, respFiltre, vue }: { supabase:
           <SubmitButton>Enregistrer</SubmitButton>
         </form>
       </Card>
+
+      {/* Tâches de l'équipe (tâches non privées ajoutées depuis l'accueil) */}
+      {tachesEquipe.length > 0 && (
+        <Card className="p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Tâches de l&apos;équipe</h2>
+          <div className="flex flex-wrap gap-2">
+            {tachesEquipe.map((t) => (
+              <span key={t.id} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-sm">
+                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{nomCourt(t.membre)}</span>
+                {t.texte}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Frise hebdomadaire */}
       {projets.length === 0 ? (

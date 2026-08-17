@@ -4,6 +4,7 @@ import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addPont, deletePont, affecterPont } from "./actions";
 import { AssignSelect } from "./assign-select";
+import { ConfirmButton } from "@/components/confirm-button";
 import { niveauAlerte } from "@/lib/technique";
 
 const ALERTE_CLS = { ok: "text-green-600", warn: "text-amber-600", depasse: "text-red-600" } as const;
@@ -78,7 +79,7 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
                 <span className="flex items-center gap-3 text-sm">
                   <span className={ALERTE_CLS[al]}>{kg(p.total)} / {p.capacite_kg ? kg(p.capacite_kg) : "—"}{al === "depasse" && " ⚠ dépassé"}</span>
                   <form action={deletePont.bind(null, prestationId, p.id)}>
-                    <button className="text-muted hover:text-red-600" title="Supprimer" onClick={(e) => { if (!confirm(`Supprimer le pont « ${p.nom} » ?`)) e.preventDefault(); }}>✕</button>
+                    <ConfirmButton confirm={`Supprimer le pont « ${p.nom} » ?`} className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
                   </form>
                 </span>
               </div>

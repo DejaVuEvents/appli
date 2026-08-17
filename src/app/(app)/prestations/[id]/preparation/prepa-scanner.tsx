@@ -4,6 +4,7 @@ import jsQR from "jsqr";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { scannerPourCharger, remplacerUnite, type ResultatScan } from "./actions";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type Feedback = { kind: "ok" | "warn" | "info"; title: string; detail?: string; attendus?: string[] };
 
@@ -177,9 +178,10 @@ export function RemplacerBtn({ prestationId, uniteId }: { prestationId: string; 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function remplacer() {
-    if (!confirm("Remplacer cette unité (cassée / inaccessible) par une autre unité disponible ?")) return;
+    setConfirmOpen(false);
     startTransition(async () => {
       const res = await remplacerUnite(prestationId, uniteId);
       setMsg({ ok: res.ok, text: res.message });
@@ -191,7 +193,7 @@ export function RemplacerBtn({ prestationId, uniteId }: { prestationId: string; 
     <div className="flex flex-col items-end gap-1">
       <button
         type="button"
-        onClick={remplacer}
+        onClick={() => setConfirmOpen(true)}
         disabled={pending}
         title="Remplacer par une autre unité disponible"
         className="rounded-lg border border-border px-2 py-2 text-sm text-muted hover:bg-background disabled:opacity-50"
@@ -199,6 +201,13 @@ export function RemplacerBtn({ prestationId, uniteId }: { prestationId: string; 
         {pending ? "…" : "⇄"}
       </button>
       {msg && <span className={`text-[11px] ${msg.ok ? "text-green-600" : "text-amber-600"}`}>{msg.text}</span>}
+      <ConfirmDialog
+        open={confirmOpen}
+        message="Remplacer cette unité (cassée / inaccessible) par une autre unité disponible ?"
+        confirmLabel="Remplacer"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={remplacer}
+      />
     </div>
   );
 }

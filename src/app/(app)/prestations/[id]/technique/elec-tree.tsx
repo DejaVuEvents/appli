@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { addNoeud, deleteNoeud, deplacerNoeud, affecterCircuit } from "./actions";
 import { AssignSelect } from "./assign-select";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { niveauAlerte } from "@/lib/technique";
 import { PHASE_LABELS, type CircuitElec } from "@/lib/types";
 
@@ -114,6 +115,7 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
   });
   const [, startDel] = useTransition();
   const [, startMove] = useTransition();
+  const [delId, setDelId] = useState<string | null>(null);
 
   // Drag & drop (souris + tactile via Pointer Events)
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -163,9 +165,11 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
     return r;
   };
 
-  const handleDelete = (nodeId: string) => {
-    if (!confirm("Supprimer ce nœud et tous ses sous-circuits ?")) return;
-    startDel(async () => { await deleteNoeud(prestationId, nodeId); router.refresh(); });
+  const handleDelete = (nodeId: string) => setDelId(nodeId);
+  const confirmDelete = () => {
+    const nodeId = delId;
+    setDelId(null);
+    if (nodeId) startDel(async () => { await deleteNoeud(prestationId, nodeId); router.refresh(); });
   };
   const detach = (ligneId: string) => {
     const fd = new FormData(); fd.set("circuit_id", "");
@@ -275,6 +279,14 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
 
   return (
     <div className="lg:flex lg:items-start lg:gap-6">
+      <ConfirmDialog
+        open={delId !== null}
+        message="Supprimer ce nœud et tous ses sous-circuits ?"
+        confirmLabel="Supprimer"
+        danger
+        onCancel={() => setDelId(null)}
+        onConfirm={confirmDelete}
+      />
       {/* Colonne gauche : arborescence */}
       <div className="min-w-0 flex-1">
         {/* Zone racine / détacher (visible pendant un glissement) */}

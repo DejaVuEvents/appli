@@ -6,6 +6,7 @@ import Link from "next/link";
 import { deleteEcriture, setValideEcriture, ajouterJustificatifs } from "../actions";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { SubmitButton } from "@/components/submit-button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { typeLabel, categorieManquante, NOMENCLATURE, type Nomenclature } from "@/lib/finance";
 import { euros, dateFr } from "@/lib/format";
 import type { EcritureFinanciere } from "@/lib/types";
@@ -328,6 +329,7 @@ function EcriturePanel({
   hasJustif?: boolean;
   onClose: () => void;
 }) {
+  const [delOpen, setDelOpen] = useState(false);
   const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
   const factureRef = !factureUrl && e.facture ? e.facture : null;
   const missingDoc = !e.facture && !e.devis_facture_id && factures.length === 0 && !hasJustif;
@@ -340,8 +342,9 @@ function EcriturePanel({
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  const handleDelete = async () => {
-    if (!confirm("Supprimer cette écriture ?")) return;
+  const handleDelete = () => setDelOpen(true);
+  const confirmDelete = async () => {
+    setDelOpen(false);
     onClose();
     await deleteEcriture(e.id);
   };
@@ -352,6 +355,7 @@ function EcriturePanel({
       style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
       onClick={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}
     >
+      <ConfirmDialog open={delOpen} message="Supprimer cette écriture ?" confirmLabel="Supprimer" danger onCancel={() => setDelOpen(false)} onConfirm={confirmDelete} />
       <div className={`relative flex w-full ${apercu ? "max-w-4xl" : "max-w-md"} overflow-hidden rounded-t-2xl bg-background shadow-2xl sm:max-h-[90vh] sm:rounded-2xl`}>
         {/* Colonne gauche : détails */}
         <div className="w-full shrink-0 overflow-y-auto sm:max-h-[90vh] sm:w-[26rem]">

@@ -4,7 +4,9 @@
 // https://aistudio.google.com/apikey — pas de carte bancaire).
 // Sans clé, geminiConfigured() = false → le transcript est stocké mais non résumé.
 
-const MODELE = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+// Alias glissant « -latest » : suit toujours le modèle Flash courant, ce qui évite
+// les pannes quand Google déprécie une version figée (ex. gemini-2.0-flash retiré).
+const MODELE = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
 export function geminiConfigured(): boolean {
   return !!process.env.GEMINI_API_KEY;

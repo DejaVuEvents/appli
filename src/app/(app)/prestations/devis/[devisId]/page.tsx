@@ -24,10 +24,12 @@ export default async function DevisEditorPage({
   searchParams,
 }: {
   params: Promise<{ devisId: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; msg?: string }>;
 }) {
   const { devisId } = await params;
-  const editMode = (await searchParams)?.edit === "1";
+  const sp = await searchParams;
+  const editMode = sp?.edit === "1";
+  const flash = sp?.msg ? decodeURIComponent(sp.msg) : null;
   const supabase = await createClient();
 
   // RBAC : seuls les co-présidents accèdent aux devis / factures.
@@ -121,6 +123,11 @@ export default async function DevisEditorPage({
 
     const recap = (
       <aside className="space-y-3 lg:sticky lg:top-24 lg:w-64 lg:shrink-0">
+        {flash && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+            {flash}
+          </div>
+        )}
         <Card className="p-4">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full bg-surface px-2 py-0.5 font-medium text-muted">{estFacture ? "Facture" : "Devis"}</span>

@@ -160,18 +160,23 @@ export async function importerDocumentPdf(formData: FormData) {
  */
 export async function extraireMaterielDevis(devisId: string) {
   const supabase = await createSupabase();
+  // Petit helper : renvoie l'utilisateur sur la fiche avec un message plutôt que
+  // d'afficher la page « server error » du navigateur en cas de souci IA.
+  const echec = (msg: string): never => redirect(`/prestations/devis/${devisId}?msg=${encodeURIComponent(msg)}`);
+
   const { data: devis } = await supabase.from("devis").select("pdf_import, prestation_id").eq("id", devisId).maybeSingle();
-  if (!devis?.pdf_import) throw new Error("Ce document n'a pas de PDF importé.");
+  if (!devis?.pdf_import) echec("Ce document n'a pas de PDF importé.");
 
   // Télécharge le PDF depuis le bucket privé.
-  const { data: blob, error: dlErr } = await supabase.storage.from(BUCKET_PRIVE).download(devis.pdf_import);
-  if (dlErr || !blob) throw new Error("Impossible de lire le PDF.");
-  const mime = blob.type || (devis.pdf_import.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
-  const base64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+  const { data: blob, error: dlErr } = await supabase.storage.from(BUCKET_PRIVE).download(devis!.pdf_import!);
+  if (dlErr || !blob) echec("Impossible de lire le PDF importé.");
+  const mime = blob!.type || (devis!.pdf_import!.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+  const base64 = Buffer.from(await blob!.arrayBuffer()).toString("base64");
 
   const lignes = await extraireMaterielPdf(base64, mime);
-  if (!lignes) throw new Error("Extraction IA indisponible (clé Gemini manquante ou service en échec).");
-  if (lignes.length === 0) throw new Error("Aucune ligne de matériel détectée dans le PDF.");
+  if (!lignes) echec("Extraction IA momentanément indisponible (service Gemini). Réessaie dans un instant.");
+  if (lignes!.length === 0) echec("Aucune ligne de matériel détectée dans le PDF.");
+  const items = lignes!;
 
   // Catalogue pour rattacher chaque ligne à une référence si le nom correspond.
   const { data: refs } = await supabase.from("materiel_reference").select("id, nom, categorie_id");
@@ -181,10 +186,10 @@ export async function extraireMaterielDevis(devisId: string) {
     return references.find((r) => r.nom && (d.includes(r.nom.toLowerCase()) || r.nom.toLowerCase().includes(d))) ?? null;
   };
 
-  const rows = lignes.map((l) => {
+  const rows = items.map((l) => {
     const ref = trouverRef(l.designation);
     return {
-      prestation_id: devis.prestation_id, devis_id: devisId,
+      prestation_id: devis!.prestation_id, devis_id: devisId,
       reference_id: ref?.id ?? null, categorie_id: ref?.categorie_id ?? null,
       designation: l.designation, unite: null,
       quantite: l.quantite, prix_unitaire: l.prix_unitaire, remise_type: "pct", remise_valeur: 0,

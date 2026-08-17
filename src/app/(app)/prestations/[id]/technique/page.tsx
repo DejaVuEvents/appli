@@ -13,7 +13,7 @@ type LigneRow = {
   id: string;
   designation: string | null;
   quantite: number;
-  reference: { poids_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null } | null;
+  reference: { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null } | null;
 };
 
 export default async function TechniquePage({
@@ -38,7 +38,7 @@ export default async function TechniquePage({
     planId ? supabase.from("circuit_elec").select("*").eq("plan_id", planId).order("nom") : Promise.resolve({ data: [] }),
     supabase
       .from("ligne_prestation")
-      .select("id, designation, quantite, reference:materiel_reference(poids_kg, intensite_a, puissance_w, phase)")
+      .select("id, designation, quantite, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase)")
       .eq("prestation_id", id),
   ]);
 
@@ -130,6 +130,13 @@ export default async function TechniquePage({
             poids: poidsLigne(l.reference?.poids_kg ?? null, l.quantite),
             pontId: pontDeLigne.get(l.id) ?? null,
           }))}
+          lignesLevage={lignes
+            .filter((l) => (l.reference?.charge_max_kg ?? 0) > 0)
+            .map((l) => ({
+              designation: l.designation ?? "Levage",
+              chargeUnitaire: Number(l.reference!.charge_max_kg),
+              quantite: l.quantite,
+            }))}
         />
       </section>
       )}

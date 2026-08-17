@@ -38,3 +38,9 @@ export function peutAcceder(role: RoleMembre, pathname: string): boolean {
 export function peutGererParametres(role: RoleMembre): boolean {
   return role === "co_president";
 }
+
+/**
+ * Rôles possibles pour une personne affectée à un événement (plusieurs cumulables).
+ * Distinct du rôle RBAC (`RoleMembre` dans `@/lib/membre`).
+ */
+export const ROLES_MEMBRE = ["Lead", "Opérateur", "Technicien"] as const;

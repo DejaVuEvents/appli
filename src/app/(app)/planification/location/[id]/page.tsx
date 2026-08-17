@@ -6,7 +6,8 @@ import { Modal } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { LocationTabBar, type LocationTab } from "../../location-tab-bar";
 import { LocationForm, type LocationRow } from "../../location-form";
-import { updateLocation, deleteLocation, creerDevisLocation } from "../../actions";
+import { updateLocation, deleteLocation, creerDevisLocation, associerDevisLocation } from "../../actions";
+import { AjouterDocPopup } from "../../../prestations/ajouter-doc-popup";
 import { statutFactureAffichage } from "@/lib/facture-statut";
 import { euros, dateFr } from "@/lib/format";
 import type { Devis } from "@/lib/types";
@@ -54,6 +55,13 @@ export default async function LocationDetailPage({
     ? await supabase.from("ligne_prestation").select("id", { count: "exact", head: true }).eq("prestation_id", loc.prestation_id)
     : { count: 0 };
 
+  // Documents existants (pour la popup « associer un document existant »), chargés en vue Devis.
+  const { data: tousDevisData } = tab === "devis"
+    ? await supabase.from("devis").select("id, nom, type, prestation:prestation_id(nom)").order("created_at", { ascending: false })
+    : { data: [] };
+  const tousDocs = ((tousDevisData ?? []) as unknown as { id: string; nom: string | null; type: string; prestation: { nom: string } | null }[])
+    .map((d) => ({ id: d.id, type: d.type, label: `${d.prestation?.nom ?? "?"} · ${d.nom ?? (d.type === "facture" ? "Facture" : "Devis")}` }));
+
   const btnPrimary = "inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90";
   const btnBorder = "inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface";
 
@@ -99,6 +107,7 @@ export default async function LocationDetailPage({
           <div className="flex flex-wrap items-center gap-2">
             <form action={creerDevisLocation.bind(null, id, "devis")}><button className={btnPrimary}>+ Créer un devis</button></form>
             <form action={creerDevisLocation.bind(null, id, "facture")}><button className={btnBorder}>+ Créer une facture</button></form>
+            <AjouterDocPopup docs={tousDocs} associerAction={associerDevisLocation.bind(null, id)} />
           </div>
 
           {devisList.length === 0 ? (

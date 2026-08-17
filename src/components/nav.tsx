@@ -109,7 +109,18 @@ export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
 
   const groups = groupesVisibles(role);
 
-  const hrefActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  // Une fiche événement vit sous /prestations/<id> (ex. /prestations/xxx/technique) — MAIS
+  // la liste Devis & Factures (/prestations) et l'éditeur de devis (/prestations/devis/…)
+  // appartiennent à Finance. On lève donc l'ambiguïté du préfixe /prestations.
+  const estFicheEvenement = pathname.startsWith("/prestations/") && !pathname.startsWith("/prestations/devis");
+  const hrefActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    // Événements (Planification) : liste de planif, fiches événement, fiches location
+    if (href === "/planification") return pathname.startsWith("/planification") || estFicheEvenement;
+    // Devis & Factures (Finance) : liste globale + éditeur de devis, PAS les fiches événement
+    if (href === "/prestations") return pathname === "/prestations" || pathname.startsWith("/prestations/devis");
+    return pathname.startsWith(href);
+  };
   const groupActive = (g: Group) =>
     hrefActive(g.href) || (g.children?.some((c) => hrefActive(c.href)) ?? false);
 

@@ -13,7 +13,9 @@ import {
   attacherMembre,
   detacherMembre,
   setRoleMembre,
+  associerDevisExistant,
 } from "../actions";
+import { ROLES_MEMBRE } from "@/lib/roles";
 import { euros, dateFr } from "@/lib/format";
 import { calculerTotaux } from "@/lib/devis";
 import { statutFactureAffichage } from "@/lib/facture-statut";
@@ -92,9 +94,9 @@ export default async function PrestationDetailPage({
     : null;
 
   type MembreLite = { id: string; prenom: string | null; nom: string | null; email: string | null; competences: string[] | null };
-  type Attache = { role: string | null; membre: MembreLite };
+  type Attache = { role: string[] | null; membre: MembreLite };
   const nomMembre = (m: MembreLite) => (m.prenom ?? "").trim() || (m.nom ?? "").trim() || m.email?.split("@")[0] || "Membre";
-  const attaches = ((attachesData ?? []) as unknown as { role: string | null; membre: MembreLite | null }[])
+  const attaches = ((attachesData ?? []) as unknown as { role: string[] | null; membre: MembreLite | null }[])
     .filter((r) => r.membre).map((r) => ({ role: r.role, membre: r.membre! })) as Attache[];
   const attachesIds = new Set(attaches.map((a) => a.membre.id));
   const membresDispo = ((tousMembresData ?? []) as MembreLite[]).filter((m) => !attachesIds.has(m.id));
@@ -139,9 +141,17 @@ export default async function PrestationDetailPage({
                 {attaches.map((a) => (
                   <div key={a.membre.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
                     <span className="text-sm font-medium">{nomMembre(a.membre)}</span>
-                    <form action={setRoleMembre.bind(null, id, a.membre.id)} className="inline-flex items-center gap-1">
-                      <input name="role" defaultValue={a.role ?? ""} placeholder="Rôle (ex. Op. Laser)" className="w-40 rounded-md border border-border bg-background px-2 py-0.5 text-xs" />
-                      <button className="rounded-md border border-border px-1.5 py-0.5 text-xs hover:bg-background" title="Enregistrer le rôle">OK</button>
+                    <form action={setRoleMembre.bind(null, id, a.membre.id)} className="inline-flex flex-wrap items-center gap-1">
+                      {ROLES_MEMBRE.map((r) => {
+                        const on = (a.role ?? []).includes(r);
+                        return (
+                          <label key={r} className="cursor-pointer">
+                            <input type="checkbox" name="role" value={r} defaultChecked={on} className="peer sr-only" />
+                            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:font-medium peer-checked:text-primary">{r}</span>
+                          </label>
+                        );
+                      })}
+                      <button className="rounded-md border border-border px-1.5 py-0.5 text-xs hover:bg-background" title="Enregistrer les rôles">OK</button>
                     </form>
                     {(a.membre.competences ?? []).length > 0 && (
                       <span className="flex flex-wrap gap-1">
@@ -156,14 +166,21 @@ export default async function PrestationDetailPage({
                   </div>
                 ))}
                 {membresDispo.length > 0 && (
-                  <form action={attacherMembre.bind(null, id)} className="flex flex-wrap items-center gap-1">
+                  <form action={attacherMembre.bind(null, id)} className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2">
                     <select name="membre_id" required defaultValue="" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm">
                       <option value="" disabled>+ Ajouter une personne…</option>
                       {membresDispo.map((m) => (
                         <option key={m.id} value={m.id}>{nomMembre(m)}</option>
                       ))}
                     </select>
-                    <input name="role" placeholder="Rôle (optionnel)" className="w-32 shrink-0 rounded-lg border border-border bg-background px-2 py-1 text-sm" />
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      {ROLES_MEMBRE.map((r) => (
+                        <label key={r} className="cursor-pointer">
+                          <input type="checkbox" name="role" value={r} className="peer sr-only" />
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:font-medium peer-checked:text-primary">{r}</span>
+                        </label>
+                      ))}
+                    </span>
                     <button className="shrink-0 rounded-lg border border-border px-2 py-1 text-sm hover:bg-background">OK</button>
                   </form>
                 )}
@@ -195,7 +212,13 @@ export default async function PrestationDetailPage({
         <div className="space-y-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Documents de l&apos;événement</h2>
-            <AjouterDocPopup prestationId={id} docs={tousDocs} />
+            <AjouterDocPopup
+              docs={tousDocs}
+              associerAction={associerDevisExistant.bind(null, id)}
+              creer={
+                <Link href="/prestations" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90" title="Créer un nouveau document">+ Créer</Link>
+              }
+            />
           </div>
 
           {devisList.length === 0 ? (

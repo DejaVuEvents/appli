@@ -85,6 +85,7 @@ async function referenceFromForm(
     connecteurs_puissance: formData.getAll("connecteurs_puissance").map(String),
     connecteurs_data: formData.getAll("connecteurs_data").map(String),
     poids_kg: num(formData.get("poids_kg")),
+    charge_max_kg: num(formData.get("charge_max_kg")),
     dimensions: str(formData.get("dimensions")),
     est_consommable: formData.get("est_consommable") === "on",
   };

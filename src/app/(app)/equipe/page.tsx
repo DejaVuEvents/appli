@@ -6,7 +6,7 @@ import { nomMembre } from "@/lib/membre";
 
 type MembreRow = { id: string; prenom: string | null; nom: string | null; email: string | null; competences: string[] | null };
 type AffectationRow = {
-  role: string | null;
+  role: string[] | null;
   membre_id: string;
   prestation: { id: string; nom: string; date_event_debut: string | null; date_event_fin: string | null; date_prepa: string | null; statut: string | null } | null;
 };
@@ -67,7 +67,7 @@ export default async function EquipePage() {
                   <div className="space-y-1">
                     {aVenir.map((a) => (
                       <Link key={a.prestation!.id} href={`/prestations/${a.prestation!.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">
-                        <span className="min-w-0 truncate">{a.prestation!.nom}{a.role ? <span className="text-muted"> · {a.role}</span> : ""}</span>
+                        <span className="min-w-0 truncate">{a.prestation!.nom}{a.role?.length ? <span className="text-muted"> · {a.role.join(", ")}</span> : ""}</span>
                         <span className="shrink-0 text-xs text-muted">{dateFr(refDate(a.prestation!))}</span>
                       </Link>
                     ))}
@@ -80,7 +80,7 @@ export default async function EquipePage() {
                   <div className="mt-1 space-y-1">
                     {passees.map((a) => (
                       <Link key={a.prestation!.id} href={`/prestations/${a.prestation!.id}`} className="flex items-center justify-between gap-3 px-3 py-1 text-sm text-muted hover:text-foreground">
-                        <span className="min-w-0 truncate">{a.prestation!.nom}{a.role ? ` · ${a.role}` : ""}</span>
+                        <span className="min-w-0 truncate">{a.prestation!.nom}{a.role?.length ? ` · ${a.role.join(", ")}` : ""}</span>
                         <span className="shrink-0 text-xs">{dateFr(refDate(a.prestation!))}</span>
                       </Link>
                     ))}

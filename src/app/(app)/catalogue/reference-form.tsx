@@ -126,6 +126,7 @@ export function ReferenceForm({
               ]}
             />
             <Field label="Poids (kg)" name="poids_kg" type="number" step="0.01" defaultValue={reference?.poids_kg} />
+            <Field label="Charge admissible (kg)" name="charge_max_kg" type="number" step="1" defaultValue={reference?.charge_max_kg} placeholder="CMU — matériel de levage" />
             <Field label="Dimensions" name="dimensions" defaultValue={reference?.dimensions} placeholder="L×l×h" />
             <ConnectorMultiSelect
               name="connecteurs_puissance"

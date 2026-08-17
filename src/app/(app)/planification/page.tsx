@@ -114,21 +114,12 @@ export default async function PlanificationPage({ searchParams }: { searchParams
     );
   };
 
-  const tabCls = (active: boolean) =>
-    `rounded-lg px-4 py-1.5 text-sm font-medium ${active ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`;
-
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Activités"
+        title={onglet === "location" ? "Location" : "Activités"}
         action={onglet === "location" ? ajouterLocation : ajouterEvenement}
       />
-
-      {/* Onglets Événements / Location */}
-      <div className="mb-5 inline-flex gap-1 rounded-xl border border-border bg-surface p-1">
-        <Link href="/planification" className={tabCls(onglet === "evenements")}>Événements</Link>
-        <Link href="/planification?vue=location" className={tabCls(onglet === "location")}>Location</Link>
-      </div>
 
       {onglet === "location" ? (
         <section>

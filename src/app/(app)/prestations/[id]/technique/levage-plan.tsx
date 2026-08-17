@@ -12,13 +12,28 @@ const kg = (n: number) => `${n.toFixed(1)} kg`;
 
 type Pont = { id: string; nom: string; capacite_kg: number | null; total: number };
 type LigneP = { id: string; designation: string | null; poids: number; pontId: string | null };
+type LigneLevage = { designation: string; chargeUnitaire: number; quantite: number };
 
-export function LevagePlan({ prestationId, ponts, lignes }: { prestationId: string; ponts: Pont[]; lignes: LigneP[] }) {
+export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: { prestationId: string; ponts: Pont[]; lignes: LigneP[]; lignesLevage?: LigneLevage[] }) {
   const router = useRouter();
   const [, startT] = useTransition();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
+
+  // Formulaire d'ajout de pont : soit un pied de levage du devis (charge auto), soit « autre matériel » (saisie manuelle).
+  const aDesPieds = lignesLevage.length > 0;
+  const [source, setSource] = useState<"devis" | "autre">(aDesPieds ? "devis" : "autre");
+  const [nom, setNom] = useState("");
+  const [capacite, setCapacite] = useState("");
+  // La charge admissible s'additionne : quantité de pieds × charge admissible unitaire.
+  const choisirPied = (idx: number) => {
+    const l = lignesLevage[idx];
+    if (!l) { setNom(""); setCapacite(""); return; }
+    const total = l.chargeUnitaire * (l.quantite || 1);
+    setNom(l.quantite > 1 ? `${l.designation} (×${l.quantite})` : l.designation);
+    setCapacite(String(total));
+  };
 
   const onDown = (e: React.PointerEvent, ligneId: string) => {
     e.preventDefault(); e.stopPropagation();
@@ -81,10 +96,36 @@ export function LevagePlan({ prestationId, ponts, lignes }: { prestationId: stri
             </div>
           );
         })}
-        <form action={addPont.bind(null, prestationId)} className="grid gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-3 sm:items-end">
-          <label className="block text-sm"><span className="mb-1 block font-medium">Nom du pont</span><input name="nom" placeholder="Pont 1" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
-          <label className="block text-sm"><span className="mb-1 block font-medium">Capacité (kg)</span><input name="capacite_kg" type="number" step="0.1" inputMode="decimal" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
-          <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ Ajouter un pont</button>
+        <form action={addPont.bind(null, prestationId)} className="space-y-3 rounded-xl border border-border bg-surface p-4">
+          {aDesPieds && (
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-background p-1 text-sm">
+              <button type="button" onClick={() => { setSource("devis"); }} className={`rounded-md px-3 py-1 font-medium ${source === "devis" ? "bg-surface shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Pied de levage (devis)</button>
+              <button type="button" onClick={() => { setSource("autre"); setNom(""); setCapacite(""); }} className={`rounded-md px-3 py-1 font-medium ${source === "autre" ? "bg-surface shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Autre matériel</button>
+            </div>
+          )}
+          {source === "devis" && aDesPieds && (
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Pied de levage du devis</span>
+              <select
+                defaultValue=""
+                onChange={(e) => choisirPied(Number(e.target.value))}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="" disabled>Choisir un pied…</option>
+                {lignesLevage.map((l, i) => (
+                  <option key={i} value={i}>
+                    {l.designation}{l.quantite > 1 ? ` ×${l.quantite}` : ""} — {(l.chargeUnitaire * (l.quantite || 1)).toLocaleString("fr-FR")} kg admissibles
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-muted">La charge admissible s&apos;additionne selon la quantité de pieds.</span>
+            </label>
+          )}
+          <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
+            <label className="block text-sm"><span className="mb-1 block font-medium">Nom du pont</span><input name="nom" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Pont 1" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+            <label className="block text-sm"><span className="mb-1 block font-medium">Charge admissible (kg)</span><input name="capacite_kg" value={capacite} onChange={(e) => setCapacite(e.target.value)} type="number" step="0.1" inputMode="decimal" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ Ajouter un pont</button>
+          </div>
         </form>
       </div>
 

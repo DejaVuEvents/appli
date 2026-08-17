@@ -6,6 +6,8 @@ import { createClient as createSupabase } from "@/lib/supabase/server";
 import { montantLigne, coutTransport, periodeReservation, montantRemise, type RemiseType } from "@/lib/devis";
 import { BUCKET_PRIVE } from "@/lib/storage";
 import { extraireMaterielPdf } from "@/lib/gemini";
+import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
+import { ROLES_MEMBRE } from "@/lib/roles";
 
 function num(v: FormDataEntryValue | null): number | null {
   if (v === null || String(v).trim() === "") return null;
@@ -252,51 +254,6 @@ export async function createPrestation(formData: FormData) {
 }
 
 /** Copie un devis (lignes + transport) dans un événement cible. Renvoie l'id du nouveau devis. */
-async function copierDevisDans(
-  supabase: Supa,
-  sourceDevisId: string,
-  prestationId: string,
-  userId: string | null,
-  forcedType?: "devis" | "facture",
-): Promise<string | null> {
-  const { data: src } = await supabase.from("devis").select("*").eq("id", sourceDevisId).single();
-  if (!src) return null;
-
-  const { data: nouveau } = await supabase
-    .from("devis")
-    .insert({
-      prestation_id: prestationId,
-      nom: forcedType === "facture" ? "Facture" : (src.nom ?? "Devis"),
-      type: forcedType ?? src.type,
-      remise_globale_type: src.remise_globale_type,
-      remise_globale_valeur: src.remise_globale_valeur,
-      remise_globale_libelle: src.remise_globale_libelle,
-      source_devis_id: src.id,
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-  if (!nouveau) return null;
-
-  const { data: lignes } = await supabase.from("ligne_prestation").select("*").eq("devis_id", sourceDevisId).order("created_at");
-  const idMap = new Map<string, string>();
-  for (const l of (lignes ?? []).filter((x) => !x.ligne_parent_id)) {
-    const { data: ins } = await supabase.from("ligne_prestation").insert(copieLigne(l, prestationId, nouveau.id, null)).select("id").single();
-    if (ins) idMap.set(l.id, ins.id);
-  }
-  for (const l of (lignes ?? []).filter((x) => x.ligne_parent_id)) {
-    await supabase.from("ligne_prestation").insert(copieLigne(l, prestationId, nouveau.id, idMap.get(l.ligne_parent_id as string) ?? null));
-  }
-  const { data: transports } = await supabase.from("transport").select("*").eq("devis_id", sourceDevisId);
-  for (const t of transports ?? []) {
-    await supabase.from("transport").insert({
-      prestation_id: prestationId, devis_id: nouveau.id, vehicule_id: t.vehicule_id,
-      nb_vehicules: t.nb_vehicules, km: t.km, cout_calcule: t.cout_calcule,
-    });
-  }
-  return nouveau.id;
-}
-
 /** Crée un événement seul (sans devis) depuis la planification → ouvre le hub de planification. */
 export async function createEvenement(formData: FormData) {
   const supabase = await createSupabase();
@@ -380,23 +337,27 @@ export async function deletePrestation(id: string) {
 
 // ---------- Personnes attachées à l'événement ----------
 
+function rolesFromForm(formData: FormData): string[] {
+  return formData.getAll("role").map((v) => String(v)).filter((r) => (ROLES_MEMBRE as readonly string[]).includes(r));
+}
+
 export async function attacherMembre(prestationId: string, formData: FormData) {
   const supabase = await createSupabase();
   const membreId = str(formData.get("membre_id"));
   if (!membreId) return;
   const { error } = await supabase
     .from("prestation_membre")
-    .upsert({ prestation_id: prestationId, membre_id: membreId, role: str(formData.get("role")) }, { onConflict: "prestation_id,membre_id" });
+    .upsert({ prestation_id: prestationId, membre_id: membreId, role: rolesFromForm(formData) }, { onConflict: "prestation_id,membre_id" });
   if (error) throw new Error(error.message);
   revalidatePath(`/prestations/${prestationId}`);
 }
 
-/** Change le rôle d'une personne affectée à l'événement. */
+/** Change les rôles d'une personne affectée à l'événement. */
 export async function setRoleMembre(prestationId: string, membreId: string, formData: FormData) {
   const supabase = await createSupabase();
   const { error } = await supabase
     .from("prestation_membre")
-    .update({ role: str(formData.get("role")) })
+    .update({ role: rolesFromForm(formData) })
     .eq("prestation_id", prestationId)
     .eq("membre_id", membreId);
   if (error) throw new Error(error.message);
@@ -492,29 +453,6 @@ export async function duplicerDevis(devisId: string) {
 
   revalidatePath(`/prestations/${src.prestation_id}`);
   redirect(`/prestations/devis/${nouveau.id}`);
-}
-
-function copieLigne(
-  l: Record<string, unknown>,
-  prestationId: string,
-  devisId: string,
-  parentId: string | null,
-) {
-  return {
-    prestation_id: prestationId,
-    devis_id: devisId,
-    reference_id: l.reference_id,
-    designation: l.designation,
-    unite: l.unite,
-    categorie_id: l.categorie_id,
-    quantite: l.quantite,
-    prix_unitaire: l.prix_unitaire,
-    remise_type: l.remise_type,
-    remise_valeur: l.remise_valeur,
-    prix_total: l.prix_total,
-    est_accessoire_auto: l.est_accessoire_auto,
-    ligne_parent_id: parentId,
-  };
 }
 
 /** Supprime un devis/facture. `retour` fixe la redirection (ex. rester sur la liste globale). */

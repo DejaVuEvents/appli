@@ -73,6 +73,7 @@ export function FicheView({
           <Ligne label="Connecteurs (alimentation)" value={listeOuTiret(r.connecteurs_puissance)} />
           <Ligne label="Connecteurs (données / contrôle)" value={listeOuTiret(r.connecteurs_data)} />
           <Ligne label="Poids" value={r.poids_kg != null ? `${r.poids_kg} kg` : "—"} />
+          <Ligne label="Charge admissible (CMU)" value={r.charge_max_kg != null ? `${r.charge_max_kg} kg` : "—"} />
           <Ligne label="Dimensions" value={r.dimensions ?? "—"} />
           <Ligne label="Type" value={r.est_consommable ? "Consommable (non sérialisé)" : "Sérialisé (suivi par unité)"} />
         </Card>

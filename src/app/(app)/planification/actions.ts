@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { geocode, itineraireMulti } from "@/lib/ors";
+import { copierDevisDans } from "@/lib/devis-copie";
 
 function str(v: FormDataEntryValue | null): string | null {
   const s = String(v ?? "").trim();
@@ -112,6 +113,20 @@ export async function creerDevisLocation(locationId: string, type: "devis" | "fa
     .single();
   revalidatePath(`/planification/location/${locationId}`);
   if (devis) redirect(`/prestations/devis/${devis.id}?edit=1`);
+}
+
+/** Associe (copie) un devis/facture existant à la prestation support d'une location. */
+export async function associerDevisLocation(locationId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const source = str(formData.get("source_devis_id"));
+  if (!source) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  const prestationId = await assurerPrestationLocation(supabase, locationId, user?.id ?? null);
+  if (!prestationId) return;
+  await copierDevisDans(supabase, source, prestationId, user?.id ?? null);
+  revalidatePath(`/planification/location/${locationId}`);
+  // On reste sur la liste des documents de la location (on n'ouvre pas le doc attaché).
+  redirect(`/planification/location/${locationId}?tab=devis`);
 }
 
 /** Associe (ou retire) un véhicule à la tournée logistique d'un événement. */

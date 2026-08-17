@@ -1,14 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Modal, ModalForm } from "@/components/modal";
 import { SubmitButton } from "@/components/submit-button";
-import { associerDevisExistant } from "./actions";
 
 type Doc = { id: string; type: string; label: string };
 
-export function AjouterDocPopup({ prestationId, docs }: { prestationId: string; docs: Doc[] }) {
+/**
+ * Popup unifiée « Ajouter un document » : recherche + association d'un devis/facture
+ * existant (copie dans la cible), avec un bouton de création fourni par l'appelant
+ * (différent selon la cible : événement → lien /prestations, location → server action).
+ */
+export function AjouterDocPopup({
+  docs,
+  associerAction,
+  creer,
+}: {
+  docs: Doc[];
+  /** Server action déjà liée à la cible : (formData) => associe le devis choisi. */
+  associerAction: (formData: FormData) => void | Promise<void>;
+  /** Contrôle(s) de création rendu(s) en haut à droite (lien ou formulaires). */
+  creer?: React.ReactNode;
+}) {
   const [tab, setTab] = useState<"devis" | "facture">("devis");
   const [q, setQ] = useState("");
 
@@ -16,7 +29,7 @@ export function AjouterDocPopup({ prestationId, docs }: { prestationId: string; 
 
   return (
     <Modal trigger={<>+ Ajouter un document</>} title="Ajouter un devis / une facture" panelClassName="max-w-xl">
-      {/* Recherche + créer (lieu unique de création) */}
+      {/* Recherche + créer */}
       <div className="mb-3 flex items-center gap-2">
         <input
           value={q}
@@ -24,13 +37,7 @@ export function AjouterDocPopup({ prestationId, docs }: { prestationId: string; 
           placeholder="Rechercher un document existant…"
           className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
         />
-        <Link
-          href="/prestations"
-          className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-          title="Créer un nouveau document (lieu unique de création)"
-        >
-          + Créer
-        </Link>
+        {creer && <span className="flex shrink-0 items-center gap-2">{creer}</span>}
       </div>
 
       {/* Onglets Devis / Factures */}
@@ -39,15 +46,15 @@ export function AjouterDocPopup({ prestationId, docs }: { prestationId: string; 
         <button onClick={() => setTab("facture")} className={`rounded-lg px-4 py-1.5 text-sm font-medium ${tab === "facture" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Factures</button>
       </div>
 
-      {/* Liste (association = copie dans cet événement) */}
+      {/* Liste (association = copie dans la cible) */}
       {filtres.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface px-4 py-6 text-center text-sm text-muted">
-          Aucun {tab === "facture" ? "facture" : "devis"} existant{q ? " pour cette recherche" : ""}. Clique « + Créer » pour en faire un nouveau.
+          Aucun {tab === "facture" ? "facture" : "devis"} existant{q ? " pour cette recherche" : ""}.
         </p>
       ) : (
         <div className="max-h-80 divide-y divide-border overflow-y-auto rounded-lg border border-border">
           {filtres.map((d) => (
-            <ModalForm key={d.id} action={associerDevisExistant.bind(null, prestationId)} className="flex items-center justify-between gap-3 px-3 py-2">
+            <ModalForm key={d.id} action={associerAction} className="flex items-center justify-between gap-3 px-3 py-2">
               <input type="hidden" name="source_devis_id" value={d.id} />
               <span className="min-w-0 flex-1 truncate text-sm">{d.type === "facture" ? "🧾" : "📄"} {d.label}</span>
               <SubmitButton>Associer</SubmitButton>
@@ -55,7 +62,7 @@ export function AjouterDocPopup({ prestationId, docs }: { prestationId: string; 
           ))}
         </div>
       )}
-      <p className="mt-2 text-xs text-muted">« Associer » copie le document choisi dans cet événement. Pour partir de zéro, utilise « + Créer ».</p>
+      <p className="mt-2 text-xs text-muted">« Associer » copie le document choisi dans cette fiche. Pour partir de zéro, utilise « Créer ».</p>
     </Modal>
   );
 }

@@ -25,6 +25,7 @@ export interface MaterielReference {
   connecteurs_puissance: string[];
   connecteurs_data: string[];
   poids_kg: number | null;
+  charge_max_kg: number | null;
   dimensions: string | null;
   est_consommable: boolean;
   created_at: string;

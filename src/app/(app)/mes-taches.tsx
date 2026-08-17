@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 import { Card } from "@/components/ui";
 import { toggleTache, deleteTache, ajouterTachePerso } from "./reunions/actions";
 
 export type TachePerso = { id: string; texte: string; fait: boolean; source_type: string };
 
 export function MesTaches({ taches }: { taches: TachePerso[] }) {
-  const [texte, setTexte] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
   const aFaire = taches.filter((t) => !t.fait);
   const faites = taches.filter((t) => t.fait);
 
@@ -37,12 +37,14 @@ export function MesTaches({ taches }: { taches: TachePerso[] }) {
       </div>
 
       {/* Ajout rapide */}
-      <form action={ajouterTachePerso} className="mt-2 space-y-1.5">
+      <form
+        ref={formRef}
+        action={async (fd) => { await ajouterTachePerso(fd); formRef.current?.reset(); }}
+        className="mt-2 space-y-1.5"
+      >
         <div className="flex gap-2">
           <input
             name="texte"
-            value={texte}
-            onChange={(e) => setTexte(e.target.value)}
             placeholder="+ Ajouter une tâche…"
             className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
           />

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { fetchQontoTransactions, fetchQontoAttachment, mapQontoCategorie } from "@/lib/qonto";
+import { fetchQontoTransactions, fetchQontoAttachment, fetchQontoOrg, mapQontoCategorie } from "@/lib/qonto";
 import type { QontoTransaction } from "@/lib/qonto";
 import { BUCKET_PRIVE } from "@/lib/storage";
 
@@ -107,6 +107,119 @@ export async function previewQonto(): Promise<
   } catch (e) {
     return { ok: false, error: String(e) };
   }
+}
+
+// ─────────────────────────── Rapport de rapprochement ───────────────────────────
+
+export type RapportRapprochement =
+  | {
+      ok: true;
+      balanceQonto: number;
+      soldeOutil: number;
+      ecart: number;
+      manquantes: QontoPreviewItem[]; // dans Qonto mais absentes de l'outil
+      enTrop: { id: string; date: string; denomination: string; montant: number; sens: string }[]; // dans l'outil mais absentes de Qonto
+      netManquantes: number;
+      netEnTrop: number;
+      ajustementBaseline: number; // part de l'écart expliquée par le solde initial
+      soldeInitial: number;
+      soldeInitialDate: string | null;
+    }
+  | { ok: false; error: string };
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Analyse l'écart entre le solde bancaire Qonto et le solde de l'outil, depuis la date
+ * du solde initial : transactions Qonto manquantes, écritures outil absentes de Qonto,
+ * et écart résiduel imputable au solde initial. Ne modifie rien.
+ */
+export async function rapprochementQonto(): Promise<RapportRapprochement> {
+  try {
+    const supabase = await createClient();
+    const { data: ent } = await supabase
+      .from("parametres_entreprise")
+      .select("qonto_login, qonto_token, qonto_account_slug, solde_initial, solde_initial_date")
+      .limit(1)
+      .maybeSingle();
+    if (!ent?.qonto_login || !ent?.qonto_token || !ent?.qonto_account_slug) {
+      return { ok: false, error: "Identifiants Qonto non configurés (voir Paramètres)." };
+    }
+    const baseline = ent.solde_initial_date ?? "2000-01-01";
+    const soldeInitial = Number(ent.solde_initial ?? 0);
+
+    // Solde bancaire Qonto
+    const org = await fetchQontoOrg(ent.qonto_login, ent.qonto_token);
+    const compte = org.bank_accounts.find((a) => a.slug === ent.qonto_account_slug);
+    const balanceQonto = compte?.balance ?? org.bank_accounts[0]?.balance ?? 0;
+
+    // Transactions Qonto depuis la date du solde initial
+    const txs = (await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, `${baseline}T00:00:00.000Z`))
+      .filter((t) => t.settled_at.slice(0, 10) >= baseline);
+
+    // Écritures « réelles » de l'outil depuis la date du solde initial
+    const { data: toolData } = await supabase
+      .from("ecriture_financiere")
+      .select("id, date, denomination, montant_ttc, sens, qonto_transaction_id")
+      .eq("statut", "reel")
+      .gte("date", baseline);
+    const toolEntries = (toolData ?? []) as { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; qonto_transaction_id: string | null }[];
+
+    const soldeOutil = r2(soldeInitial + toolEntries.reduce((s, e) => s + (e.sens === "entree" ? Number(e.montant_ttc) : -Number(e.montant_ttc)), 0));
+    const ecart = r2(balanceQonto - soldeOutil);
+
+    // Appariement Qonto ↔ outil
+    const linkedIds = new Set(toolEntries.filter((e) => e.qonto_transaction_id).map((e) => e.qonto_transaction_id as string));
+    const manuels = toolEntries
+      .filter((e) => !e.qonto_transaction_id)
+      .map((e) => ({ ...e, used: false, t: new Date(e.date).getTime(), cents: Math.round(Number(e.montant_ttc) * 100) }));
+    const TOL = 5 * 24 * 60 * 60 * 1000;
+
+    const manquantes: QontoPreviewItem[] = [];
+    for (const tx of txs) {
+      if (linkedIds.has(tx.transaction_id)) continue; // déjà importée
+      const sens = (tx.side === "credit" ? "entree" : "sortie") as "entree" | "sortie";
+      const date = tx.settled_at.slice(0, 10);
+      const cents = Math.round(tx.amount * 100);
+      const t = new Date(date).getTime();
+      const jumeau = manuels.find((m) => !m.used && m.sens === sens && m.cents === cents && Math.abs(m.t - t) <= TOL);
+      if (jumeau) { jumeau.used = true; continue; } // correspond à une saisie manuelle
+      const cat = mapQontoCategorie(tx.side, tx.cashflow_category?.name ?? null, tx.cashflow_subcategory?.name ?? null, tx.label);
+      manquantes.push({
+        transaction_id: tx.transaction_id, date, label: tx.label, montant: tx.amount, sens,
+        type: cat.type, specification: cat.specification, reference: tx.reference,
+        cashflow_cat: tx.cashflow_category?.name ?? null, cashflow_sub: tx.cashflow_subcategory?.name ?? null,
+        doublon: false, attachment_ids: tx.attachment_ids ?? [],
+      });
+    }
+    const enTrop = manuels
+      .filter((m) => !m.used)
+      .map((m) => ({ id: m.id, date: m.date, denomination: m.denomination ?? "—", montant: Number(m.montant_ttc), sens: m.sens }));
+
+    const netManquantes = r2(manquantes.reduce((s, m) => s + (m.sens === "entree" ? m.montant : -m.montant), 0));
+    const netEnTrop = r2(enTrop.reduce((s, m) => s + (m.sens === "entree" ? m.montant : -m.montant), 0));
+    // Après import des manquantes et retrait des « en trop », l'écart résiduel = solde initial mal calé.
+    const ajustementBaseline = r2(ecart - (netManquantes - netEnTrop));
+
+    return {
+      ok: true, balanceQonto, soldeOutil, ecart, manquantes, enTrop,
+      netManquantes, netEnTrop, ajustementBaseline, soldeInitial, soldeInitialDate: ent.solde_initial_date ?? null,
+    };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+/** Applique un nouveau solde initial (proposé par le rapport de rapprochement). */
+export async function ajusterSoldeInitial(nouveauSolde: number): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: ent } = await supabase.from("parametres_entreprise").select("id").limit(1).maybeSingle();
+  if (!ent) return { ok: false, error: "Paramètres introuvables." };
+  const { error } = await supabase.from("parametres_entreprise").update({ solde_initial: nouveauSolde }).eq("id", ent.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/finance");
+  revalidatePath("/finance/qonto");
+  return { ok: true };
 }
 
 async function uploadQontoAttachment(

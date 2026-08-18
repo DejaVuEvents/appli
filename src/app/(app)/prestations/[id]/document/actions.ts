@@ -125,7 +125,7 @@ export async function supprimerFacture(devisId: string, prestationId: string, re
 export async function setStatutSignature(devisId: string, prestationId: string, formData: FormData) {
   const supabase = await createSupabase();
   const raw = String(formData.get("statut_signature") ?? "");
-  const statut = raw === "signe" || raw === "refuse" ? raw : null;
+  const statut = raw === "signe" || raw === "refuse" || raw === "valide" ? raw : null;
   const { error } = await supabase.from("devis").update({ statut_signature: statut }).eq("id", devisId);
   if (error) throw new Error(error.message);
   revalidatePath(`/prestations/${prestationId}/document`);

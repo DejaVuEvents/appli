@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement, extraireMaterielDevis } from "../../actions";
+import { updateStatut, associerDevisAEvenement } from "../../actions";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
@@ -118,8 +118,19 @@ export default async function DevisEditorPage({
     const dt = (iso: string | null | undefined): string => (iso ? `${dateFr(iso.slice(0, 10))} à ${iso.slice(11, 16)}` : "—");
     const createur = nomMembre(devis.created_by);
 
+    // Statut du devis (signature) : En attente / Validé / Signé / Refusé.
+    const STATUT_DEVIS: Record<string, { label: string; cls: string }> = {
+      "": { label: "En attente", cls: "bg-surface text-muted" },
+      valide: { label: "Validé", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
+      signe: { label: "Signé", cls: "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300" },
+      refuse: { label: "Refusé", cls: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" },
+    };
+    const sigStatut = devis.statut_signature ?? "";
+    const devisBadge = STATUT_DEVIS[sigStatut] ?? STATUT_DEVIS[""];
+
     const fullBtn = "flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium";
     const halfBtn = "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface";
+    const halfBtnPrimary = "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90";
 
     const recap = (
       <aside className="space-y-3 lg:sticky lg:top-24 lg:w-64 lg:shrink-0">
@@ -129,16 +140,17 @@ export default async function DevisEditorPage({
           </div>
         )}
         <Card className="p-4">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-surface px-2 py-0.5 font-medium text-muted">{estFacture ? "Facture" : "Devis"}</span>
-            {badge && <span className={`rounded-full px-2 py-0.5 font-semibold ${badge.cls}`}>{badge.label}</span>}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold">{titre}{emis && doc?.numero ? ` n° ${doc.numero}` : ""}</span>
+            {estFacture
+              ? badge && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
+              : <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${devisBadge.cls}`}>{devisBadge.label}</span>}
           </div>
-          <div className="mt-2 text-xs text-muted">
-            Créé le <span className="font-medium text-foreground">{dt(devis.created_at)}</span>
-            {createur !== "—" && <> par <span className="font-medium text-foreground">{createur}</span></>}
+          <div className="mt-1.5 text-xs text-muted">
+            Créé le {dateFr(devis.created_at?.slice(0, 10) ?? null)}{createur !== "—" ? ` · ${createur}` : ""}
           </div>
           {(prestation?.date_event_debut || prestation?.date_event_fin) && (
-            <div className="mt-1 text-xs text-muted">Événement : {dateFr(prestation?.date_event_debut ?? null)}{prestation?.date_event_fin ? ` → ${dateFr(prestation.date_event_fin)}` : ""}</div>
+            <div className="mt-0.5 text-xs text-muted">Événement : {dateFr(prestation?.date_event_debut ?? null)}{prestation?.date_event_fin ? ` → ${dateFr(prestation.date_event_fin)}` : ""}</div>
           )}
         </Card>
 
@@ -156,13 +168,15 @@ export default async function DevisEditorPage({
 
         {/* Actions principales */}
         <div className="space-y-2">
-          <Link href={`/prestations/devis/${devisId}?edit=1`} className={`${fullBtn} bg-primary font-semibold text-primary-foreground hover:opacity-90`}>✎ Éditer</Link>
-          <JustificatifPreview
-            url={`/apercu/${devisId}?type=${devis.type}`}
-            libelle={`${titreDoc} — aperçu du document`}
-            label="Aperçu"
-            className={`${fullBtn} border border-border hover:bg-surface`}
-          />
+          <div className="flex gap-2">
+            <Link href={`/prestations/devis/${devisId}?edit=1`} className={halfBtnPrimary}>✎ Éditer</Link>
+            <JustificatifPreview
+              url={`/apercu/${devisId}?type=${devis.type}`}
+              libelle={`${titreDoc} — aperçu du document`}
+              label="Aperçu"
+              className={halfBtn}
+            />
+          </div>
           <div className="flex gap-2">
             <a href={pdfUrl} download className={halfBtn} title="Télécharger le PDF">
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -170,18 +184,6 @@ export default async function DevisEditorPage({
             </a>
             {mailto && <EnvoyerClientButton mailto={mailto} pdfUrl={pdfUrl} className={halfBtn} />}
           </div>
-          {pdfImportUrl && (
-            <form action={extraireMaterielDevis.bind(null, devisId)}>
-              <ConfirmButton
-                confirm="Lire le PDF avec l'IA et en extraire les lignes de matériel ? Tu pourras corriger le résultat dans l'éditeur ensuite."
-                confirmLabel="Extraire"
-                danger={false}
-                className={`${fullBtn} border border-primary/40 text-primary hover:bg-primary/5`}
-              >
-                🤖 Extraire le matériel (IA)
-              </ConfirmButton>
-            </form>
-          )}
         </div>
 
         {/* Émission */}
@@ -228,36 +230,36 @@ export default async function DevisEditorPage({
           </Card>
         )}
 
-        {/* Signature client (devis) */}
+        {/* Statut du devis + signature */}
         {!estFacture && (
           <Card className="p-3 text-sm">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="font-medium">Signature client</span>
-              {devis.statut_signature === "signe" ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">✓ Signé</span>
-              ) : devis.statut_signature === "refuse" ? (
-                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">Refusé</span>
-              ) : (
-                <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted">En attente</span>
-              )}
-            </div>
-            {pdfSigneUrl && (
-              <a href={pdfSigneUrl} target="_blank" rel="noopener noreferrer" className="mb-2 block rounded-lg border border-border px-2 py-1.5 text-center text-xs hover:bg-background">📄 Voir la version signée</a>
-            )}
-            <form action={uploaderDevisSigne.bind(null, devisId, prestationId)} className="space-y-1.5">
-              <input type="file" name="pdf_signe" accept="application/pdf,image/*" className="block w-full text-xs text-muted file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-foreground" />
-              <SubmitButton className="w-full !py-1.5 !text-xs">⬆ Uploader la version signée</SubmitButton>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted">Statut du devis</span>
+            <form action={setStatutSignature.bind(null, devisId, prestationId)} className="flex items-center gap-2">
+              <select name="statut_signature" defaultValue={sigStatut} className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
+                <option value="">En attente</option>
+                <option value="valide">Validé</option>
+                <option value="refuse">Refusé</option>
+                {sigStatut === "signe" && <option value="signe">Signé</option>}
+              </select>
+              <button className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">OK</button>
             </form>
-            <div className="mt-2 flex gap-1.5">
-              <form action={setStatutSignature.bind(null, devisId, prestationId)} className="flex-1">
-                <input type="hidden" name="statut_signature" value="refuse" />
-                <button type="submit" className="w-full rounded-lg border border-border px-2 py-1 text-xs text-muted hover:bg-background">Refusé</button>
+
+            {/* Signé : lien vers la version signée */}
+            {sigStatut === "signe" && (
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">✓ Signé</span>
+                {pdfSigneUrl && <a href={pdfSigneUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">📄 Voir la version signée</a>}
+              </div>
+            )}
+
+            {/* Validé : bouton de dépôt de la signature */}
+            {sigStatut === "valide" && (
+              <form action={uploaderDevisSigne.bind(null, devisId, prestationId)} className="mt-2 space-y-1.5">
+                <span className="block text-xs font-medium">Déposer la signature du client</span>
+                <input type="file" name="pdf_signe" accept="application/pdf,image/*" className="block w-full text-xs text-muted file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-foreground" />
+                <SubmitButton className="w-full !py-1.5 !text-xs">⬆ Déposer la signature</SubmitButton>
               </form>
-              <form action={setStatutSignature.bind(null, devisId, prestationId)} className="flex-1">
-                <input type="hidden" name="statut_signature" value="" />
-                <button type="submit" className="w-full rounded-lg border border-border px-2 py-1 text-xs text-muted hover:bg-background">En attente</button>
-              </form>
-            </div>
+            )}
           </Card>
         )}
 

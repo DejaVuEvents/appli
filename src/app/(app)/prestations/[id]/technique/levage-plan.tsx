@@ -130,8 +130,8 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
         </form>
       </div>
 
-      {/* Colonne droite (étroite) : charges NON affectées à glisser */}
-      <aside className="mt-4 space-y-3 lg:mt-0 lg:w-56 lg:shrink-0">
+      {/* Colonne droite : charges NON affectées à glisser */}
+      <aside className="mt-4 space-y-3 lg:mt-0 lg:w-72 lg:shrink-0">
         <div className="overflow-hidden rounded-xl border border-border">
           <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">À affecter</div>
           {nonAffectees.length === 0 ? (
@@ -153,7 +153,7 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
                       ⠿
                     </button>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate">{l.designation}</span>
+                      <span className="block break-words leading-tight">{l.designation}</span>
                       <span className="text-xs text-muted">{kg(l.poids)}</span>
                     </span>
                     <AssignSelect action={affecterPont.bind(null, prestationId, l.id)} fieldName="pont_id" value={l.pontId} options={pontOptions} />

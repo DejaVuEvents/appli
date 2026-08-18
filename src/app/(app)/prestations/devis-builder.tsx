@@ -69,33 +69,45 @@ export async function DevisBuilder(props: {
     return optRules.filter((r) => r.reference_parent_id === l.reference_id && r.accessoire && !dejaAjoutes.has(r.accessoire.id));
   };
 
-  // Lignes par catégorie
-  const lignesParCat = new Map<string, LignePrestation[]>();
+  // Le devis regroupe le matériel en 4 catégories de TYPE (peu importe la sous-catégorie
+  // fine du catalogue) : Lumière & Effets, Son, Structure, Technique.
+  const B = { LUM: "Lumière & Effets", SON: "Son", STR: "Structure", TECH: "Technique" };
+  const BUCKET_PAR_NOM: Record<string, string> = {
+    "Lumière & Effets": B.LUM, "Barres & Blinders": B.LUM, "Câbles": B.LUM, "Contrôle DMX": B.LUM,
+    "Laser": B.LUM, "Têtes mobiles": B.LUM, "Wash & PAR LED": B.LUM, "Lyres & Robotisés": B.LUM,
+    "Projecteurs": B.LUM, "Effets Scéniques": B.LUM, "Consoles Lumière": B.LUM, "Câbles Lumière": B.LUM,
+    "Son": B.SON, "Amplificateurs": B.SON, "Enceintes": B.SON, "Enceintes & Caissons": B.SON,
+    "Tables de mixage": B.SON, "Consoles de mixage": B.SON, "Platines & DJ": B.SON, "Micros & HF": B.SON,
+    "Câbles Son": B.SON, "Traitement & Divers": B.SON,
+    "Structure & Scène": B.STR, "Structure": B.STR, "Accessoires scène": B.STR, "Accrochage": B.STR,
+    "Praticables": B.STR, "Levage": B.STR,
+    "Technique": B.TECH, "Transport": B.TECH, "Électricité": B.TECH, "Armoires & Distribution": B.TECH,
+    "Câbles & Multiprises": B.TECH, "Câbles Électricité": B.TECH, "Vidéo": B.TECH, "Câbles Vidéo": B.TECH,
+    "Catalogue Externe": B.TECH,
+  };
+  const catNomById = new Map(categories.map((c) => [c.id, c.nom]));
+  const bucketDe = (catId: string | null): string => {
+    const nom = catId ? catNomById.get(catId) : null;
+    return (nom && BUCKET_PAR_NOM[nom]) || B.TECH;
+  };
+  const bucketCatId: Record<string, string | undefined> = {
+    [B.LUM]: categories.find((c) => c.nom === "Lumière & Effets")?.id,
+    [B.SON]: categories.find((c) => c.nom === "Son")?.id,
+    [B.STR]: categories.find((c) => c.nom === "Structure & Scène")?.id,
+    [B.TECH]: categories.find((c) => c.nom === "Technique")?.id,
+  };
+  const lignesParBucket = new Map<string, LignePrestation[]>();
   for (const l of lignes) {
-    const key = l.categorie_id ?? "__divers";
-    if (!lignesParCat.has(key)) lignesParCat.set(key, []);
-    lignesParCat.get(key)!.push(l);
+    const b = bucketDe(l.categorie_id);
+    if (!lignesParBucket.has(b)) lignesParBucket.set(b, []);
+    lignesParBucket.get(b)!.push(l);
   }
-  // Catégories proposées dans le devis (pré-placées, dans cet ordre).
-  const DEVIS_CATS = ["Lumière & Effets", "Son", "Structure & Scène", "Transport", "Technique"];
-  const catsDevis = DEVIS_CATS
-    .map((nom) => categories.find((c) => c.nom === nom))
-    .filter(Boolean) as { id: string; nom: string; ordre: number | null }[];
-  const devisCatIds = new Set(catsDevis.map((c) => c.id));
-
-  // Blocs : les 5 catégories standard (toujours, avec « + ») ; puis les autres catégories
-  // qui ont déjà des lignes (pour ne rien masquer) ; puis « Divers » (sans catégorie).
-  const blocs: { catId: string | null; nom: string; lignes: LignePrestation[] }[] = catsDevis.map((c) => ({
-    catId: c.id, nom: c.nom, lignes: lignesParCat.get(c.id) ?? [],
+  const ORDRE = [B.LUM, B.SON, B.STR, B.TECH];
+  const blocs: { catId: string | null; nom: string; lignes: LignePrestation[] }[] = ORDRE.map((b) => ({
+    catId: bucketCatId[b] ?? null, nom: b, lignes: lignesParBucket.get(b) ?? [],
   }));
-  for (const c of categories) {
-    if (devisCatIds.has(c.id)) continue;
-    const ls = lignesParCat.get(c.id) ?? [];
-    if (ls.length > 0) blocs.push({ catId: c.id, nom: c.nom, lignes: ls });
-  }
-  if ((lignesParCat.get("__divers") ?? []).length > 0) {
-    blocs.push({ catId: null, nom: "Divers", lignes: lignesParCat.get("__divers") ?? [] });
-  }
+  // Catégories proposées dans le formulaire « + Ajouter » = les 4 buckets.
+  const catsDevis = ORDRE.map((b) => ({ id: bucketCatId[b] ?? "", nom: b })).filter((c) => c.id) as { id: string; nom: string }[];
 
   // Données sérialisables pour l'éditeur client (drag-and-drop + édition inline).
   const blocsData: BlocData[] = blocs.map((b) => ({

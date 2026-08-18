@@ -2,15 +2,18 @@
 
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { addNoeud, deleteNoeud, deplacerNoeud, affecterCircuit } from "./actions";
+import { addNoeud, deleteNoeud, deplacerNoeud, affecterCircuitExemplaire } from "./actions";
 import { AssignSelect } from "./assign-select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { niveauAlerte } from "@/lib/technique";
 import { PHASE_LABELS, type CircuitElec } from "@/lib/types";
 
-type LigneElec = {
-  id: string;
-  designation: string | null;
+type Exemplaire = {
+  key: string;
+  ligneId: string;
+  rang: number;
+  uniteId: string | null;
+  designation: string;
   courant: number;
   circuitId: string | null;
 };
@@ -18,7 +21,7 @@ type LigneElec = {
 type Props = {
   prestationId: string;
   circuits: CircuitElec[];
-  lignes: LigneElec[];
+  exemplaires: Exemplaire[];
   noeuds: { id: string; nom: string }[];
 };
 
@@ -102,9 +105,11 @@ function InlineForm({ prestationId, parentId, defaultType, onDone }: { prestatio
   );
 }
 
-type Drag = { kind: "node" | "ligne"; id: string };
+type Drag =
+  | { kind: "node"; id: string }
+  | { kind: "exemplaire"; key: string; ligneId: string; rang: number; uniteId: string | null };
 
-export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
+export function ElecTree({ prestationId, circuits, exemplaires, noeuds }: Props) {
   const router = useRouter();
   const [addAt, setAddAt] = useState<string | "root" | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -142,10 +147,10 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
       const target = over === "root" ? null : over;
       startMove(async () => { await deplacerNoeud(prestationId, d.id, target); router.refresh(); });
     } else {
-      // ligne → circuit (ou détacher si zone racine)
+      // exemplaire → circuit (ou détacher si zone racine)
       const circuitId = over === "root" ? "" : over;
-      const fd = new FormData(); fd.set("circuit_id", circuitId);
-      startMove(async () => { await affecterCircuit(prestationId, d.id, fd); router.refresh(); });
+      const fd = new FormData(); fd.set("circuit_id", circuitId); if (d.uniteId) fd.set("unite_id", d.uniteId);
+      startMove(async () => { await affecterCircuitExemplaire(prestationId, d.ligneId, d.rang, fd); router.refresh(); });
     }
   };
 
@@ -158,7 +163,7 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
   const cacheTotal = new Map<string, number>();
   const totalNoeud = (nodeId: string): number => {
     if (cacheTotal.has(nodeId)) return cacheTotal.get(nodeId)!;
-    const direct = lignes.filter((l) => l.circuitId === nodeId).reduce((s, l) => s + l.courant, 0);
+    const direct = exemplaires.filter((e) => e.circuitId === nodeId).reduce((s, e) => s + e.courant, 0);
     const t = direct + (enfantsDe.get(nodeId) ?? []).reduce((s, e) => s + totalNoeud(e.id), 0);
     const r = Math.round(t * 100) / 100;
     cacheTotal.set(nodeId, r);
@@ -171,9 +176,9 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
     setDelId(null);
     if (nodeId) startDel(async () => { await deleteNoeud(prestationId, nodeId); router.refresh(); });
   };
-  const detach = (ligneId: string) => {
+  const detach = (e: Exemplaire) => {
     const fd = new FormData(); fd.set("circuit_id", "");
-    startMove(async () => { await affecterCircuit(prestationId, ligneId, fd); router.refresh(); });
+    startMove(async () => { await affecterCircuitExemplaire(prestationId, e.ligneId, e.rang, fd); router.refresh(); });
   };
 
   const renderNode = (node: CircuitElec, depth: number): React.ReactNode => {
@@ -182,7 +187,7 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
     const al = niveauAlerte(total, capEff, 0.9);
     const pct = capEff ? Math.min(100, (total / capEff) * 100) : 0;
     const children = enfantsDe.get(node.id) ?? [];
-    const devices = lignes.filter((l) => l.circuitId === node.id);
+    const devices = exemplaires.filter((e) => e.circuitId === node.id);
     const isAddingHere = addAt === node.id;
     const childType = TYPE_DEFAULT_CHILD[node.type ?? "prise"] ?? "prise";
     const estCible = overId === node.id && !(drag?.kind === "node" && drag.id === node.id);
@@ -240,15 +245,15 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
         </div>
         {/* Appareils branchés sur ce nœud */}
         {!isCollapsed && devices.map((d) => {
-          const traine = drag?.kind === "ligne" && drag.id === d.id;
+          const traine = drag?.kind === "exemplaire" && drag.key === d.key;
           return (
             <div
-              key={d.id}
+              key={d.key}
               className={`flex items-center gap-2 border-b border-border/60 py-1.5 pr-3 text-sm ${traine ? "opacity-40" : ""}`}
               style={{ paddingLeft: `${0.75 + (depth + 1) * 1.5}rem` }}
             >
               <button
-                onPointerDown={(e) => onDown(e, { kind: "ligne", id: d.id })}
+                onPointerDown={(e) => onDown(e, { kind: "exemplaire", key: d.key, ligneId: d.ligneId, rang: d.rang, uniteId: d.uniteId })}
                 onPointerMove={onMove}
                 onPointerUp={onUp}
                 title="Glisser vers un autre circuit"
@@ -256,10 +261,10 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
               >
                 ⠿
               </button>
-              
+
               <span className="min-w-0 flex-1 truncate text-muted">{d.designation}</span>
               <span className="shrink-0 text-xs text-muted tabular-nums">{amp(d.courant)}</span>
-              <button onClick={() => detach(d.id)} title="Détacher" className="shrink-0 text-xs text-muted hover:text-red-600">✕</button>
+              <button onClick={() => detach(d)} title="Détacher" className="shrink-0 text-xs text-muted hover:text-red-600">✕</button>
             </div>
           );
         })}
@@ -275,7 +280,7 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
 
   const roots = enfantsDe.get(null) ?? [];
   const isAddingRoot = addAt === "root";
-  const nonBranches = lignes.filter((l) => !l.circuitId);
+  const nonBranches = exemplaires.filter((e) => !e.circuitId);
 
   return (
     <div className="lg:flex lg:items-start lg:gap-6">
@@ -323,17 +328,17 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
       {/* Colonne droite (étroite) : matériel NON branché à glisser + légende */}
       <aside className="mt-4 space-y-3 lg:mt-0 lg:w-72 lg:shrink-0">
         <div className="overflow-hidden rounded-xl border border-border">
-          <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">À brancher</div>
+          <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">À brancher{nonBranches.length > 0 && <span className="ml-1 font-normal normal-case">({nonBranches.length})</span>}</div>
           {nonBranches.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-muted">{lignes.length === 0 ? "Aucun matériel élec." : "Tout est branché ✓"}</p>
+            <p className="px-3 py-4 text-sm text-muted">{exemplaires.length === 0 ? "Aucun matériel élec." : "Tout est branché ✓"}</p>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="max-h-[28rem] divide-y divide-border overflow-y-auto">
               {nonBranches.map((l) => {
-                const estTraine = drag?.kind === "ligne" && drag.id === l.id;
+                const estTraine = drag?.kind === "exemplaire" && drag.key === l.key;
                 return (
-                  <div key={l.id} className={`flex items-center gap-1.5 bg-orange-50/60 px-2 py-2 text-sm dark:bg-orange-950/20 ${estTraine ? "opacity-40" : ""}`}>
+                  <div key={l.key} className={`flex items-center gap-1.5 bg-orange-50/60 px-2 py-2 text-sm dark:bg-orange-950/20 ${estTraine ? "opacity-40" : ""}`}>
                     <button
-                      onPointerDown={(e) => onDown(e, { kind: "ligne", id: l.id })}
+                      onPointerDown={(e) => onDown(e, { kind: "exemplaire", key: l.key, ligneId: l.ligneId, rang: l.rang, uniteId: l.uniteId })}
                       onPointerMove={onMove}
                       onPointerUp={onUp}
                       title="Glisser vers un circuit de l'arbre"
@@ -346,7 +351,7 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
                       <span className="block break-words leading-tight">{l.designation}</span>
                       <span className="text-xs text-muted">{amp(l.courant)}</span>
                     </span>
-                    <AssignSelect action={affecterCircuit.bind(null, prestationId, l.id)} fieldName="circuit_id" value={l.circuitId} options={noeuds} />
+                    <AssignSelect action={affecterCircuitExemplaire.bind(null, prestationId, l.ligneId, l.rang)} fieldName="circuit_id" value={l.circuitId} options={noeuds} />
                   </div>
                 );
               })}

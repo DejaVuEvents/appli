@@ -13,6 +13,7 @@ type LigneRow = {
   id: string;
   designation: string | null;
   quantite: number;
+  reference_id: string | null;
   reference: { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null } | null;
 };
 
@@ -38,7 +39,7 @@ export default async function TechniquePage({
     planId ? supabase.from("circuit_elec").select("*").eq("plan_id", planId).order("nom") : Promise.resolve({ data: [] }),
     supabase
       .from("ligne_prestation")
-      .select("id, designation, quantite, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase)")
+      .select("id, designation, quantite, reference_id, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase)")
       .eq("prestation_id", id),
   ]);
 
@@ -48,19 +49,54 @@ export default async function TechniquePage({
 
   const lineIds = lignes.map((l) => l.id);
   const { data: affData } = lineIds.length
-    ? await supabase.from("affectation").select("ligne_prestation_id, pont_id, circuit_id").in("ligne_prestation_id", lineIds)
+    ? await supabase.from("affectation").select("ligne_prestation_id, pont_id, circuit_id, rang").in("ligne_prestation_id", lineIds)
     : { data: [] };
-  const affectations = (affData ?? []) as { ligne_prestation_id: string; pont_id: string | null; circuit_id: string | null }[];
+  const affectations = (affData ?? []) as { ligne_prestation_id: string; pont_id: string | null; circuit_id: string | null; rang: number | null }[];
 
   const pontDeLigne = new Map<string, string>();
-  const circuitDeLigne = new Map<string, string>();
+  const circuitDeExemplaire = new Map<string, string>(); // clé `${ligneId}:${rang}` → circuit
   for (const a of affectations) {
     if (a.pont_id) pontDeLigne.set(a.ligne_prestation_id, a.pont_id);
-    if (a.circuit_id) circuitDeLigne.set(a.ligne_prestation_id, a.circuit_id);
+    if (a.circuit_id && a.rang != null) circuitDeExemplaire.set(`${a.ligne_prestation_id}:${a.rang}`, a.circuit_id);
+  }
+
+  // Unités réservées pour l'événement → n° de série par référence (pour nommer les exemplaires).
+  const { data: resData } = await supabase
+    .from("reservation_unite")
+    .select("unite:unite(id, reference_id, numero_serie)")
+    .eq("prestation_id", id);
+  const serialsParRef = new Map<string, { id: string; numero_serie: string | null }[]>();
+  for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null } | null }[]) {
+    const u = r.unite;
+    if (!u) continue;
+    const arr = serialsParRef.get(u.reference_id) ?? [];
+    arr.push({ id: u.id, numero_serie: u.numero_serie });
+    serialsParRef.set(u.reference_id, arr);
   }
 
   const lignesPoids = lignes.filter((l) => poidsLigne(l.reference?.poids_kg ?? null, l.quantite) > 0);
   const lignesElec = lignes.filter((l) => courantLigne(l.reference ?? { puissance_w: null, intensite_a: null, phase: null }, l.quantite) > 0);
+
+  // Exemplaires élec : une entrée par unité de chaque ligne (placement individuel sur les circuits).
+  const noValElec = { puissance_w: null, intensite_a: null, phase: null };
+  const exemplairesElec = lignesElec.flatMap((l) => {
+    const q = Math.max(1, Math.floor(l.quantite));
+    const courantUnite = courantLigne(l.reference ?? noValElec, 1);
+    const serials = l.reference_id ? serialsParRef.get(l.reference_id) ?? [] : [];
+    return Array.from({ length: q }, (_, rang) => {
+      const serial = serials[rang]?.numero_serie ?? null;
+      const suffixe = q > 1 ? ` #${serial ?? rang + 1}` : serial ? ` #${serial}` : "";
+      return {
+        key: `${l.id}:${rang}`,
+        ligneId: l.id,
+        rang,
+        uniteId: serials[rang]?.id ?? null,
+        designation: `${l.designation ?? "Appareil"}${suffixe}`,
+        courant: courantUnite,
+        circuitId: circuitDeExemplaire.get(`${l.id}:${rang}`) ?? null,
+      };
+    });
+  });
 
   const totalPont = (pontId: string) =>
     lignes.filter((l) => pontDeLigne.get(l.id) === pontId).reduce((s, l) => s + poidsLigne(l.reference?.poids_kg ?? null, l.quantite), 0);
@@ -72,19 +108,6 @@ export default async function TechniquePage({
     if (!enfantsDe.has(key)) enfantsDe.set(key, []);
     enfantsDe.get(key)!.push(c);
   }
-  // Conso directement branchée sur un nœud
-  const consoDirecte = (nodeId: string) =>
-    lignes
-      .filter((l) => circuitDeLigne.get(l.id) === nodeId)
-      .reduce((s, l) => s + courantLigne(l.reference ?? { puissance_w: null, intensite_a: null, phase: null }, l.quantite), 0);
-  // Conso totale = directe + somme des enfants (remontée)
-  const cacheTotal = new Map<string, number>();
-  const totalNoeud = (nodeId: string): number => {
-    if (cacheTotal.has(nodeId)) return cacheTotal.get(nodeId)!;
-    const t = consoDirecte(nodeId) + (enfantsDe.get(nodeId) ?? []).reduce((s, e) => s + totalNoeud(e.id), 0);
-    cacheTotal.set(nodeId, Math.round(t * 100) / 100);
-    return cacheTotal.get(nodeId)!;
-  };
   // Liste à plat (indentée) pour les menus de sélection
   const noeudsAplatis: { id: string; nom: string }[] = [];
   const aplatir = (parentId: string | null, depth: number) => {
@@ -94,8 +117,6 @@ export default async function TechniquePage({
     }
   };
   aplatir(null, 0);
-
-  const noVal = { puissance_w: null, intensite_a: null, phase: null };
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -153,12 +174,7 @@ export default async function TechniquePage({
           prestationId={id}
           circuits={circuits}
           noeuds={noeudsAplatis}
-          lignes={lignesElec.map((l) => ({
-            id: l.id,
-            designation: l.designation,
-            courant: courantLigne(l.reference ?? noVal, l.quantite),
-            circuitId: circuitDeLigne.get(l.id) ?? null,
-          }))}
+          exemplaires={exemplairesElec}
         />
       </section>
       )}

@@ -155,3 +155,23 @@ export async function affecterCircuit(prestationId: string, ligneId: string, for
   }
   revalider(prestationId);
 }
+
+/** Affecte UN exemplaire d'une ligne (rang = index de l'unité) à un circuit (ou détache si vide). */
+export async function affecterCircuitExemplaire(prestationId: string, ligneId: string, rang: number, formData: FormData) {
+  const supabase = await createSupabase();
+  const circuitId = str(formData.get("circuit_id"));
+  await supabase
+    .from("affectation")
+    .delete()
+    .eq("ligne_prestation_id", ligneId)
+    .eq("rang", rang)
+    .not("circuit_id", "is", null);
+  if (circuitId) {
+    const uniteId = str(formData.get("unite_id"));
+    const { error } = await supabase
+      .from("affectation")
+      .insert({ ligne_prestation_id: ligneId, circuit_id: circuitId, rang, unite_id: uniteId });
+    if (error) throw new Error(error.message);
+  }
+  revalider(prestationId);
+}

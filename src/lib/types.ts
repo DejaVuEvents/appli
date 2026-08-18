@@ -27,6 +27,7 @@ export interface MaterielReference {
   poids_kg: number | null;
   charge_max_kg: number | null;
   dimensions: string | null;
+  lieu_stockage: string | null;
   est_consommable: boolean;
   created_at: string;
 }
@@ -59,6 +60,7 @@ export interface Unite {
   maintenance_intervalle_heures: number | null;
   date_achat: string | null;
   prix_achat: number | null;
+  lieu_stockage: string | null;
   connecteurs_puissance: string[] | null;
   connecteurs_data: string[] | null;
   remarques: string | null;

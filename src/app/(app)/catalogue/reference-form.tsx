@@ -104,6 +104,12 @@ export function ReferenceForm({
             defaultValue={reference?.cout_location_jour ?? undefined}
             placeholder="Sous-location — laisser vide si matériel Déjà Vu"
           />
+          <Field
+            label="Zone de stockage"
+            name="lieu_stockage"
+            defaultValue={reference?.lieu_stockage ?? ""}
+            placeholder="Local 1, Local 2, Entreprise de location…"
+          />
         </div>
 
         <TextArea label="Description" name="description" defaultValue={reference?.description} />

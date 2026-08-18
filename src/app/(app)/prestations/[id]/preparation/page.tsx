@@ -8,6 +8,7 @@ import { chargerUnite, rentrerUnite, annulerSortieUnite, basculerCharge } from "
 import { PrepaScanner, RemplacerBtn } from "./prepa-scanner";
 import type { Prestation } from "@/lib/types";
 import { EventTabBar } from "@/components/event-tab-bar";
+import { IconPrint } from "@/components/icons";
 
 type ResaRow = {
   unite_id: string;
@@ -93,6 +94,7 @@ export default async function PreparationPage({
         action={
           <div className="flex flex-wrap items-center gap-2">
             <PrepaScanner prestationId={id} />
+            <Link href={`/prestations/${id}/preparation/feuille`} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-background"><IconPrint className="h-4 w-4" /> Feuille PDF</Link>
             <Link href={`/prestations/${id}/retour`} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-background">↩ Contrôle de retour</Link>
           </div>
         }

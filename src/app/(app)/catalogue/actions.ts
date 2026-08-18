@@ -87,6 +87,7 @@ async function referenceFromForm(
     poids_kg: num(formData.get("poids_kg")),
     charge_max_kg: num(formData.get("charge_max_kg")),
     dimensions: str(formData.get("dimensions")),
+    lieu_stockage: str(formData.get("lieu_stockage")),
     est_consommable: formData.get("est_consommable") === "on",
   };
 }
@@ -144,6 +145,7 @@ function uniteFromForm(formData: FormData) {
     etat: str(formData.get("etat")) ?? "ok",
     date_achat: str(formData.get("date_achat")),
     prix_achat: num(formData.get("prix_achat")),
+    lieu_stockage: str(formData.get("lieu_stockage")),
     connecteurs_puissance: override
       ? formData.getAll("u_connecteurs_puissance").map(String)
       : null,

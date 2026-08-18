@@ -25,6 +25,7 @@ export function UniteFields({
         <Field label="QR code" name="qr_code" defaultValue={unite?.qr_code} />
         <Field label="Date d'achat" name="date_achat" type="date" defaultValue={unite?.date_achat} />
         <Field label="Prix d'achat (€)" name="prix_achat" type="number" step="0.01" defaultValue={unite?.prix_achat} />
+        <Field label="Zone de stockage" name="lieu_stockage" defaultValue={unite?.lieu_stockage ?? ""} placeholder="Local 1… (défaut : réf.)" />
       </div>
       <UniteConnecteurs
         refPuissance={refPuissance}

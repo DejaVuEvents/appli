@@ -69,14 +69,14 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
     start(async () => { await reordonnerLignes(prestationId, ids); router.refresh(); });
   };
 
-  const InlineNum = ({ l, champ, val, w, suffix }: { l: LigneData; champ: string; val: number; w: string; suffix?: string }) => (
-    <span className="inline-flex items-center">
+  const InlineNum = ({ l, champ, val, w, step = "0.01", suffix }: { l: LigneData; champ: string; val: number; w: string; step?: string; suffix?: string }) => (
+    <span className="inline-flex items-center gap-0.5">
       <input
         key={`${l.id}-${champ}-${val}`}
-        type="number" step="0.01" inputMode="decimal" defaultValue={val}
+        type="number" step={step} min="0" inputMode="decimal" defaultValue={val}
         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         onBlur={(e) => { const v = Number(e.target.value.replace(",", ".")); if (v !== val) inline(l.id, champ, v); }}
-        className={`${w} rounded-md border border-transparent bg-transparent px-1 py-0.5 text-right text-sm hover:border-border focus:border-primary focus:bg-background focus:outline-none`}
+        className={`${w} rounded-md border border-transparent bg-transparent py-0.5 pl-1.5 pr-2 text-right text-sm hover:border-border focus:border-primary focus:bg-background focus:outline-none`}
       />
       {suffix && <span className="text-xs text-muted">{suffix}</span>}
     </span>
@@ -96,57 +96,71 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
               <h3 className="mb-1 text-sm font-semibold">{b.nom}{b.lignes.length > 0 && <span className="text-muted"> · {euros(total)}</span>}</h3>
               {b.lignes.length > 0 && (
                 <Card className="mb-2 divide-y divide-border overflow-hidden">
+                  {/* En-têtes de colonnes */}
+                  <div className="flex items-center gap-2 bg-surface/50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    <span className="w-4 shrink-0" />
+                    <span className="min-w-0 flex-1">Désignation</span>
+                    <span className="w-16 shrink-0 text-right">Qté</span>
+                    <span className="w-24 shrink-0 text-right">P.U. HT</span>
+                    <span className="w-24 shrink-0 text-right">Total</span>
+                    <span className="w-16 shrink-0" />
+                  </div>
                   {b.lignes.map((l) => {
                     const remiseVisible = remiseOpen.has(l.id) || l.remise_valeur > 0;
                     return (
                       <div key={l.id} data-ligne={l.id}
-                        className={`flex items-center gap-2 px-2 py-1.5 ${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId ? "border-t-2 border-primary" : ""}`}>
-                        {/* Poignée */}
-                        <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))} onPointerMove={onMove} onPointerUp={onUp}
-                          className="shrink-0 cursor-grab touch-none px-0.5 text-muted hover:text-foreground active:cursor-grabbing" title="Déplacer" aria-label="Déplacer">⠿</button>
-                        {/* Désignation — cliquable pour la fiche produit si liée au catalogue */}
-                        {l.reference_id && infosRef[l.reference_id] ? (
-                          <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
-                            <Modal
-                              trigger={<span className="inline-flex min-w-0 items-center gap-1"><span className="truncate">{l.designation}</span><IconInfo className="h-3.5 w-3.5 shrink-0 opacity-50" /></span>}
-                              title={infosRef[l.reference_id].nom}
-                              triggerClassName="min-w-0 max-w-full text-left hover:text-primary"
-                            >
-                              <FicheProduit info={infosRef[l.reference_id]} unitePrefix={`/u/`} />
-                            </Modal>
-                            {l.est_accessoire_auto && <span className="ml-0.5 shrink-0 text-xs text-muted">(accessoire)</span>}
+                        className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId ? "border-t-2 border-primary" : ""}`}>
+                        <div className="flex items-center gap-2 px-2 py-1.5">
+                          {/* Poignée */}
+                          <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))} onPointerMove={onMove} onPointerUp={onUp}
+                            className="w-4 shrink-0 cursor-grab touch-none text-center text-muted hover:text-foreground active:cursor-grabbing" title="Déplacer" aria-label="Déplacer">⠿</button>
+                          {/* Désignation — cliquable pour la fiche produit si liée au catalogue */}
+                          {l.reference_id && infosRef[l.reference_id] ? (
+                            <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+                              <Modal
+                                trigger={<span className="inline-flex min-w-0 items-center gap-1"><span className="truncate">{l.designation}</span><IconInfo className="h-3.5 w-3.5 shrink-0 opacity-50" /></span>}
+                                title={infosRef[l.reference_id].nom}
+                                triggerClassName="min-w-0 max-w-full text-left hover:text-primary"
+                              >
+                                <FicheProduit info={infosRef[l.reference_id]} unitePrefix={`/u/`} />
+                              </Modal>
+                              {l.est_accessoire_auto && <span className="ml-0.5 shrink-0 text-xs text-muted">(accessoire)</span>}
+                            </span>
+                          ) : (
+                            <span className="min-w-0 flex-1 truncate text-sm">
+                              {l.designation}
+                              {l.est_accessoire_auto && <span className="ml-1.5 text-xs text-muted">(accessoire)</span>}
+                            </span>
+                          )}
+                          {/* Qté (pas de 1) */}
+                          <span className="flex w-16 shrink-0 justify-end"><InlineNum l={l} champ="quantite" val={l.quantite} w="w-12" step="1" /></span>
+                          {/* P.U. HT */}
+                          <span className="flex w-24 shrink-0 items-center justify-end"><InlineNum l={l} champ="prix_unitaire" val={l.prix_unitaire} w="w-16" suffix="€" /></span>
+                          {/* Total */}
+                          <span className="w-24 shrink-0 text-right text-sm font-medium tabular-nums">{euros(l.prix_total)}</span>
+                          {/* Actions : remise / édition / suppression */}
+                          <span className="flex w-16 shrink-0 items-center justify-end gap-1">
+                            <button type="button" title="Remise" onClick={() => setRemiseOpen((p) => { const n = new Set(p); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })}
+                              className={`rounded px-1 text-xs ${remiseVisible ? "text-primary" : "text-muted hover:text-foreground"}`}>%</button>
+                            <Link href={`/prestations/${prestationId}/lignes/${l.id}?devis=${devisId}`} className="text-muted hover:text-primary" title="Éditer"><IconEdit className="h-4 w-4" /></Link>
+                            <button type="button" onClick={() => setDelId(l.id)} className="text-muted hover:text-red-600" title="Supprimer">✕</button>
                           </span>
-                        ) : (
-                          <span className="min-w-0 flex-1 truncate text-sm">
-                            {l.designation}
-                            {l.est_accessoire_auto && <span className="ml-1.5 text-xs text-muted">(accessoire)</span>}
-                          </span>
-                        )}
-                        {/* Qté × prix */}
-                        <InlineNum l={l} champ="quantite" val={l.quantite} w="w-12" />
-                        <span className="text-xs text-muted">×</span>
-                        <InlineNum l={l} champ="prix_unitaire" val={l.prix_unitaire} w="w-20" suffix="€" />
-                        {/* Remise */}
-                        <button type="button" title="Remise" onClick={() => setRemiseOpen((p) => { const n = new Set(p); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })}
-                          className={`shrink-0 rounded px-1 text-xs ${remiseVisible ? "text-primary" : "text-muted hover:text-foreground"}`}>%</button>
+                        </div>
+                        {/* Remise — ligne dédiée en dessous, indentée */}
                         {remiseVisible && (
-                          <span className="inline-flex items-center gap-0.5">
-                            <input key={`${l.id}-rem-${l.remise_valeur}`} type="number" step="0.01" inputMode="decimal" defaultValue={l.remise_valeur}
+                          <div className="flex items-center gap-1.5 pb-1.5 pl-9 text-xs text-muted">
+                            <span>Remise</span>
+                            <input key={`${l.id}-rem-${l.remise_valeur}`} type="number" step="0.01" min="0" inputMode="decimal" defaultValue={l.remise_valeur}
                               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               onBlur={(e) => { const v = Number(e.target.value.replace(",", ".")); if (v !== l.remise_valeur) inline(l.id, "remise_valeur", v); }}
-                              className="w-12 rounded-md border border-border bg-background px-1 py-0.5 text-right text-xs focus:border-primary focus:outline-none" />
+                              className="w-16 rounded-md border border-border bg-background px-1.5 py-0.5 text-right text-xs focus:border-primary focus:outline-none" />
                             <select defaultValue={l.remise_type} onChange={(e) => inline(l.id, "remise_type", e.target.value)}
-                              className="rounded-md border border-border bg-background px-0.5 py-0.5 text-xs">
+                              className="rounded-md border border-border bg-background px-1 py-0.5 text-xs">
                               <option value="pct">%</option>
                               <option value="montant">€</option>
                             </select>
-                          </span>
+                          </div>
                         )}
-                        {/* Total */}
-                        <span className="w-20 shrink-0 text-right text-sm font-medium tabular-nums">{euros(l.prix_total)}</span>
-                        {/* Édition avancée + suppression */}
-                        <Link href={`/prestations/${prestationId}/lignes/${l.id}?devis=${devisId}`} className="shrink-0 text-muted hover:text-primary" title="Éditer"><IconEdit className="h-4 w-4" /></Link>
-                        <button type="button" onClick={() => setDelId(l.id)} className="shrink-0 text-muted hover:text-red-600" title="Supprimer">✕</button>
                       </div>
                     );
                   })}

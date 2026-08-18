@@ -2,6 +2,7 @@
 // l'émission (archivage PDF) et la route de téléchargement PDF.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { calculerTotaux, type RemiseType } from "@/lib/devis";
+import { ORDRE_BUCKETS, bucketPour } from "@/lib/devis-buckets";
 import type { ParametresEntreprise } from "@/lib/types";
 
 export type DocLigne = {
@@ -61,19 +62,10 @@ export async function assemblerContenuDocument(
     client: { nom: string; adresse: string | null } | null;
   };
   const lignes = (lignesData ?? []) as DocLigne[];
-  // Résout la catégorie RACINE d'une ligne : les sous-catégories (ex. « Laser »,
-  // « Têtes mobiles ») remontent à leur famille (« Lumière & Effets »).
+  // Regroupement en 4 familles (Lumière & Effets / Son / Structure / Technique),
+  // cohérent avec le constructeur — voir src/lib/devis-buckets.ts.
   type CatRow = { id: string; nom: string; parent_id: string | null; ordre: number | null };
   const catById = new Map((cats ?? []).map((c) => [c.id, c as CatRow]));
-  function racine(id: string | null): { nom: string; ordre: number } {
-    let cur = id ? catById.get(id) ?? null : null;
-    const vus = new Set<string>();
-    while (cur && cur.parent_id && catById.has(cur.parent_id) && !vus.has(cur.id)) {
-      vus.add(cur.id);
-      cur = catById.get(cur.parent_id)!;
-    }
-    return cur ? { nom: cur.nom, ordre: cur.ordre ?? 999 } : { nom: "Divers", ordre: 1000 };
-  }
   const transportTotal = (transports ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
   const coefficientDuree = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
   const totaux = calculerTotaux({
@@ -89,19 +81,13 @@ export async function assemblerContenuDocument(
   const taux = Number(ent?.taux_tva ?? 0);
   const montant = Math.round(totaux.totalHT * (taux / 100) * 100) / 100;
 
-  const g = new Map<string, { items: DocLigne[]; ordre: number }>();
+  const g = new Map<string, DocLigne[]>();
   for (const l of lignes) {
-    const { nom, ordre } = racine(l.categorie_id);
-    if (!g.has(nom)) g.set(nom, { items: [], ordre });
-    g.get(nom)!.items.push(l);
+    const nom = bucketPour(l.designation, l.categorie_id ? catById.get(l.categorie_id)?.nom ?? null : null);
+    if (!g.has(nom)) g.set(nom, []);
+    g.get(nom)!.push(l);
   }
-  const groupes = [...g.entries()]
-    .sort((a, b) => {
-      if (a[0] === "Divers") return 1;
-      if (b[0] === "Divers") return -1;
-      return a[1].ordre - b[1].ordre || a[0].localeCompare(b[0]);
-    })
-    .map(([nom, v]) => ({ nom, items: v.items }));
+  const groupes = ORDRE_BUCKETS.filter((b) => g.has(b)).map((nom) => ({ nom, items: g.get(nom)! }));
 
   return {
     ent,

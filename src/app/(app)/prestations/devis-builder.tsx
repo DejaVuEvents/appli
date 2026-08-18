@@ -18,6 +18,7 @@ import {
 } from "./actions";
 import { euros, dateFr } from "@/lib/format";
 import { montantRemise } from "@/lib/devis";
+import { BUCKETS, ORDRE_BUCKETS, bucketPour } from "@/lib/devis-buckets";
 import type { LignePrestation, PrestationStatut, Devis } from "@/lib/types";
 
 export type TransportRow = {
@@ -72,45 +73,26 @@ export async function DevisBuilder(props: {
     return optRules.filter((r) => r.reference_parent_id === l.reference_id && r.accessoire && !dejaAjoutes.has(r.accessoire.id));
   };
 
-  // Le devis regroupe le matériel en 4 catégories de TYPE (peu importe la sous-catégorie
-  // fine du catalogue) : Lumière & Effets, Son, Structure, Technique.
-  const B = { LUM: "Lumière & Effets", SON: "Son", STR: "Structure", TECH: "Technique" };
-  const BUCKET_PAR_NOM: Record<string, string> = {
-    "Lumière & Effets": B.LUM, "Barres & Blinders": B.LUM, "Câbles": B.LUM, "Contrôle DMX": B.LUM,
-    "Laser": B.LUM, "Têtes mobiles": B.LUM, "Wash & PAR LED": B.LUM, "Lyres & Robotisés": B.LUM,
-    "Projecteurs": B.LUM, "Effets Scéniques": B.LUM, "Consoles Lumière": B.LUM, "Câbles Lumière": B.LUM,
-    "Son": B.SON, "Amplificateurs": B.SON, "Enceintes": B.SON, "Enceintes & Caissons": B.SON,
-    "Tables de mixage": B.SON, "Consoles de mixage": B.SON, "Platines & DJ": B.SON, "Micros & HF": B.SON,
-    "Câbles Son": B.SON, "Traitement & Divers": B.SON,
-    "Structure & Scène": B.STR, "Structure": B.STR, "Accessoires scène": B.STR, "Accrochage": B.STR,
-    "Praticables": B.STR, "Levage": B.STR,
-    "Technique": B.TECH, "Transport": B.TECH, "Électricité": B.TECH, "Armoires & Distribution": B.TECH,
-    "Câbles & Multiprises": B.TECH, "Câbles Électricité": B.TECH, "Vidéo": B.TECH, "Câbles Vidéo": B.TECH,
-    "Catalogue Externe": B.TECH,
-  };
+  // Le devis regroupe le matériel en 4 familles (Lumière & Effets, Son, Structure,
+  // Technique) via le classeur partagé (voir src/lib/devis-buckets.ts).
   const catNomById = new Map(categories.map((c) => [c.id, c.nom]));
-  const bucketDe = (catId: string | null): string => {
-    const nom = catId ? catNomById.get(catId) : null;
-    return (nom && BUCKET_PAR_NOM[nom]) || B.TECH;
-  };
   const bucketCatId: Record<string, string | undefined> = {
-    [B.LUM]: categories.find((c) => c.nom === "Lumière & Effets")?.id,
-    [B.SON]: categories.find((c) => c.nom === "Son")?.id,
-    [B.STR]: categories.find((c) => c.nom === "Structure & Scène")?.id,
-    [B.TECH]: categories.find((c) => c.nom === "Technique")?.id,
+    [BUCKETS.LUM]: categories.find((c) => c.nom === "Lumière & Effets")?.id,
+    [BUCKETS.SON]: categories.find((c) => c.nom === "Son")?.id,
+    [BUCKETS.STR]: categories.find((c) => c.nom === "Structure & Scène")?.id,
+    [BUCKETS.TECH]: categories.find((c) => c.nom === "Technique")?.id,
   };
   const lignesParBucket = new Map<string, LignePrestation[]>();
   for (const l of lignes) {
-    const b = bucketDe(l.categorie_id);
+    const b = bucketPour(l.designation, l.categorie_id ? catNomById.get(l.categorie_id) ?? null : null);
     if (!lignesParBucket.has(b)) lignesParBucket.set(b, []);
     lignesParBucket.get(b)!.push(l);
   }
-  const ORDRE = [B.LUM, B.SON, B.STR, B.TECH];
-  const blocs: { catId: string | null; nom: string; lignes: LignePrestation[] }[] = ORDRE.map((b) => ({
+  const blocs: { catId: string | null; nom: string; lignes: LignePrestation[] }[] = ORDRE_BUCKETS.map((b) => ({
     catId: bucketCatId[b] ?? null, nom: b, lignes: lignesParBucket.get(b) ?? [],
   }));
-  // Catégories proposées dans le formulaire « + Ajouter » = les 4 buckets.
-  const catsDevis = ORDRE.map((b) => ({ id: bucketCatId[b] ?? "", nom: b })).filter((c) => c.id) as { id: string; nom: string }[];
+  // Catégories proposées dans le formulaire « + Ajouter » = les 4 familles.
+  const catsDevis = ORDRE_BUCKETS.map((b) => ({ id: bucketCatId[b] ?? "", nom: b })).filter((c) => c.id) as { id: string; nom: string }[];
 
   // Données sérialisables pour l'éditeur client (drag-and-drop + édition inline).
   const blocsData: BlocData[] = blocs.map((b) => ({

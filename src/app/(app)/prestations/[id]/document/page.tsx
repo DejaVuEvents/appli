@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { urlDocument } from "@/lib/storage";
 import { PrintButton } from "@/components/print-button";
 import { calculerTotaux, type RemiseType } from "@/lib/devis";
+import { ORDRE_BUCKETS, bucketPour } from "@/lib/devis-buckets";
 import { euros, dateFr, adresseMultiligne, type DateFormat } from "@/lib/format";
 import { statutFactureAffichage } from "@/lib/facture-statut";
 import type { LignePrestation, ParametresEntreprise, DevisFacture } from "@/lib/types";
@@ -82,27 +83,16 @@ export default async function DocumentPage({
   const montantTva = Math.round(totaux.totalHT * (tauxTva / 100) * 100) / 100;
   const totalTtc = Math.round((totaux.totalHT + montantTva) * 100) / 100;
 
-  // Regroupement par catégorie RACINE (les sous-catégories comme « Laser » remontent
-  // à leur famille « Lumière & Effets »), dans l'ordre personnalisé (categorie.ordre).
+  // Regroupement en 4 familles (Lumière & Effets / Son / Structure / Technique),
+  // cohérent avec le constructeur — voir src/lib/devis-buckets.ts.
   const catById = new Map(categories.map((c) => [c.id, c]));
-  const racine = (id: string | null): { nom: string; ordre: number } => {
-    let cur = id ? catById.get(id) ?? null : null;
-    const vus = new Set<string>();
-    while (cur && cur.parent_id && catById.has(cur.parent_id) && !vus.has(cur.id)) {
-      vus.add(cur.id);
-      cur = catById.get(cur.parent_id)!;
-    }
-    return cur ? { nom: cur.nom, ordre: cur.ordre ?? 0 } : { nom: "Divers", ordre: 1000 };
-  };
-  const groupes = new Map<string, { items: LigneRow[]; ordre: number }>();
+  const groupes = new Map<string, LigneRow[]>();
   for (const l of lignes) {
-    const { nom, ordre } = racine(l.categorie_id);
-    if (!groupes.has(nom)) groupes.set(nom, { items: [], ordre });
-    groupes.get(nom)!.items.push(l);
+    const nom = bucketPour(l.designation, l.categorie_id ? catById.get(l.categorie_id)?.nom ?? null : null);
+    if (!groupes.has(nom)) groupes.set(nom, []);
+    groupes.get(nom)!.push(l);
   }
-  const groupesTries: [string, LigneRow[]][] = [...groupes.entries()]
-    .sort((a, b) => (a[0] === "Divers" ? 1 : b[0] === "Divers" ? -1 : a[1].ordre - b[1].ordre || a[0].localeCompare(b[0])))
-    .map(([nom, v]) => [nom, v.items] as [string, LigneRow[]]);
+  const groupesTries: [string, LigneRow[]][] = ORDRE_BUCKETS.filter((b) => groupes.has(b)).map((nom) => [nom, groupes.get(nom)!] as [string, LigneRow[]]);
 
   const titre = type === "devis" ? "Devis" : "Facture";
   const numero = doc?.numero ?? null;

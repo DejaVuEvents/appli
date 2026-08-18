@@ -64,15 +64,30 @@ export async function addNoeud(prestationId: string, formData: FormData) {
   const supabase = await createSupabase();
   const planId = await ensurePlan(supabase, prestationId);
   const phase = str(formData.get("phase"));
-  const { error } = await supabase.from("circuit_elec").insert({
+  const type = str(formData.get("type"));
+  const intensite = num(formData.get("intensite_max_a"));
+  const { data: cree, error } = await supabase.from("circuit_elec").insert({
     plan_id: planId,
     parent_id: str(formData.get("parent_id")),
-    type: str(formData.get("type")),
+    type,
     nom: String(formData.get("nom") ?? "").trim() || "Circuit",
-    intensite_max_a: num(formData.get("intensite_max_a")),
+    intensite_max_a: intensite,
     phase: phase === "mono" || phase === "tri" ? phase : null,
-  });
+  }).select("id").single();
   if (error) throw new Error(error.message);
+
+  // Armoire triphasée : création automatique des phases 16A (3 par phase de 16A → 3 total,
+  // 32A → 2 circuits par phase → 6 total). Nommage « Phase <phase>-<circuit> ».
+  if (cree && type === "armoire" && phase === "tri" && intensite && intensite % 16 === 0) {
+    const parCircuit = Math.min(4, Math.max(1, Math.floor(intensite / 16))); // 16→1, 32→2, 48→3, 64→4
+    const enfants: { plan_id: string; parent_id: string; type: string; nom: string; intensite_max_a: number; phase: string }[] = [];
+    for (let ph = 1; ph <= 3; ph++) {
+      for (let c = 1; c <= parCircuit; c++) {
+        enfants.push({ plan_id: planId, parent_id: cree.id, type: "phase", nom: `Phase ${ph}-${c}`, intensite_max_a: 16, phase: "mono" });
+      }
+    }
+    if (enfants.length) await supabase.from("circuit_elec").insert(enfants);
+  }
   revalider(prestationId);
 }
 

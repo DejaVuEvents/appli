@@ -13,6 +13,7 @@ const base = (p: P) => ({
 });
 
 export const IconEdit = (p: P) => (<svg {...base(p)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>);
+export const IconInfo = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg>);
 export const IconEye = (p: P) => (<svg {...base(p)}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg>);
 export const IconDownload = (p: P) => (<svg {...base(p)}><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>);
 export const IconUpload = (p: P) => (<svg {...base(p)}><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14" /></svg>);

@@ -7,21 +7,28 @@ import { Card } from "@/components/ui";
 import { Modal } from "@/components/modal";
 import { LigneForm } from "./ligne-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { IconEdit } from "@/components/icons";
+import { IconEdit, IconInfo } from "@/components/icons";
 import { euros } from "@/lib/format";
 import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel } from "./actions";
 
 export type LigneData = {
-  id: string; designation: string | null; quantite: number; unite: string | null;
+  id: string; reference_id: string | null; designation: string | null; quantite: number; unite: string | null;
   prix_unitaire: number; prix_total: number | null; remise_type: string; remise_valeur: number;
   est_accessoire_auto: boolean; options: { ruleId: string; nom: string }[];
 };
 export type BlocData = { catId: string | null; nom: string; lignes: LigneData[] };
+export type RefInfo = {
+  nom: string; description: string | null;
+  puissance_w: number | null; intensite_a: number | null; phase: string | null;
+  connecteurs_puissance: string[]; connecteurs_data: string[];
+  poids_kg: number | null; dimensions: string | null;
+  reserves: { id: string; numero_serie: string | null }[];
+};
 type Ref = { id: string; nom: string; prix_location_jour: number; cout_location_jour: number | null; categorie_id: string | null; est_consommable: boolean };
 type Cat = { id: string; nom: string; ordre?: number | null };
 
-export function LignesEditor({ prestationId, devisId, blocs, references, categories }: {
-  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[];
+export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef }: {
+  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -97,11 +104,24 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                         {/* Poignée */}
                         <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))} onPointerMove={onMove} onPointerUp={onUp}
                           className="shrink-0 cursor-grab touch-none px-0.5 text-muted hover:text-foreground active:cursor-grabbing" title="Déplacer" aria-label="Déplacer">⠿</button>
-                        {/* Désignation */}
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {l.designation}
-                          {l.est_accessoire_auto && <span className="ml-1.5 text-xs text-muted">(accessoire)</span>}
-                        </span>
+                        {/* Désignation — cliquable pour la fiche produit si liée au catalogue */}
+                        {l.reference_id && infosRef[l.reference_id] ? (
+                          <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+                            <Modal
+                              trigger={<span className="inline-flex min-w-0 items-center gap-1"><span className="truncate">{l.designation}</span><IconInfo className="h-3.5 w-3.5 shrink-0 opacity-50" /></span>}
+                              title={infosRef[l.reference_id].nom}
+                              triggerClassName="min-w-0 max-w-full text-left hover:text-primary"
+                            >
+                              <FicheProduit info={infosRef[l.reference_id]} unitePrefix={`/u/`} />
+                            </Modal>
+                            {l.est_accessoire_auto && <span className="ml-0.5 shrink-0 text-xs text-muted">(accessoire)</span>}
+                          </span>
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate text-sm">
+                            {l.designation}
+                            {l.est_accessoire_auto && <span className="ml-1.5 text-xs text-muted">(accessoire)</span>}
+                          </span>
+                        )}
                         {/* Qté × prix */}
                         <InlineNum l={l} champ="quantite" val={l.quantite} w="w-12" />
                         <span className="text-xs text-muted">×</span>
@@ -152,5 +172,51 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
         })}
       </section>
     </>
+  );
+}
+
+/** Fiche produit affichée au clic sur une ligne : specs techniques + unités réservées pour l'événement. */
+function FicheProduit({ info, unitePrefix }: { info: RefInfo; unitePrefix: string }) {
+  const specs: { label: string; valeur: string }[] = [];
+  if (info.puissance_w != null) specs.push({ label: "Puissance", valeur: `${info.puissance_w} W` });
+  if (info.intensite_a != null) specs.push({ label: "Intensité", valeur: `${info.intensite_a} A${info.phase ? ` (${info.phase})` : ""}` });
+  else if (info.phase) specs.push({ label: "Phase", valeur: info.phase });
+  if (info.poids_kg != null) specs.push({ label: "Poids", valeur: `${info.poids_kg} kg` });
+  if (info.dimensions) specs.push({ label: "Dimensions", valeur: info.dimensions });
+  if (info.connecteurs_puissance.length) specs.push({ label: "Connecteurs puissance", valeur: info.connecteurs_puissance.join(", ") });
+  if (info.connecteurs_data.length) specs.push({ label: "Connecteurs data", valeur: info.connecteurs_data.join(", ") });
+
+  return (
+    <div className="space-y-4 text-sm">
+      {info.description && <p className="text-muted">{info.description}</p>}
+
+      {specs.length > 0 ? (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
+          {specs.map((s) => (
+            <div key={s.label} className="contents">
+              <dt className="text-muted">{s.label}</dt>
+              <dd className="font-medium">{s.valeur}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        !info.description && <p className="text-muted">Aucune caractéristique technique renseignée.</p>
+      )}
+
+      <div>
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Unités réservées pour cet événement</div>
+        {info.reserves.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {info.reserves.map((u) => (
+              <Link key={u.id} href={`${unitePrefix}${u.id}`} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:underline">
+                {u.numero_serie || "unité"}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted">Aucune unité encore réservée (vérifie la disponibilité / les dates de l&apos;événement).</p>
+        )}
+      </div>
+    </div>
   );
 }

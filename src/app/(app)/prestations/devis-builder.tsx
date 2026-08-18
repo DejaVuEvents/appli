@@ -4,7 +4,7 @@ import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Modal, ModalForm } from "@/components/modal";
-import { LignesEditor, type BlocData } from "./lignes-editor";
+import { LignesEditor, type BlocData, type RefInfo } from "./lignes-editor";
 import { StatutSelect } from "./[id]/statut-select";
 import {
   addTransport,
@@ -116,13 +116,47 @@ export async function DevisBuilder(props: {
   const blocsData: BlocData[] = blocs.map((b) => ({
     catId: b.catId, nom: b.nom,
     lignes: b.lignes.map((l) => ({
-      id: l.id, designation: l.designation, quantite: l.quantite, unite: l.unite,
+      id: l.id, reference_id: l.reference_id, designation: l.designation, quantite: l.quantite, unite: l.unite,
       prix_unitaire: Number(l.prix_unitaire ?? 0), prix_total: l.prix_total,
       remise_type: (l.remise_type as string) ?? "pct", remise_valeur: Number(l.remise_valeur ?? 0),
       est_accessoire_auto: l.est_accessoire_auto,
       options: optionsPourLigne(l).map((o) => ({ ruleId: o.id, nom: o.accessoire?.nom ?? "" })),
     })),
   }));
+
+  // Fiche produit au clic sur une ligne : specs techniques + unités réservées pour l'événement.
+  const ligneRefIds = [...new Set(lignes.filter((l) => l.reference_id).map((l) => l.reference_id as string))];
+  const [{ data: specsData }, { data: resData }] = ligneRefIds.length
+    ? await Promise.all([
+        supabase
+          .from("materiel_reference")
+          .select("id, nom, description, puissance_w, intensite_a, phase, connecteurs_puissance, connecteurs_data, poids_kg, dimensions")
+          .in("id", ligneRefIds),
+        supabase
+          .from("reservation_unite")
+          .select("unite:unite(id, reference_id, numero_serie)")
+          .eq("prestation_id", prestationId),
+      ])
+    : [{ data: [] }, { data: [] }];
+  type SpecRow = { id: string; nom: string; description: string | null; puissance_w: number | null; intensite_a: number | null; phase: string | null; connecteurs_puissance: string[] | null; connecteurs_data: string[] | null; poids_kg: number | null; dimensions: string | null };
+  const reservesParRef = new Map<string, { id: string; numero_serie: string | null }[]>();
+  for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null } | null }[]) {
+    const u = r.unite;
+    if (!u) continue;
+    const arr = reservesParRef.get(u.reference_id) ?? [];
+    arr.push({ id: u.id, numero_serie: u.numero_serie });
+    reservesParRef.set(u.reference_id, arr);
+  }
+  const infosRef: Record<string, RefInfo> = {};
+  for (const s of (specsData ?? []) as SpecRow[]) {
+    infosRef[s.id] = {
+      nom: s.nom, description: s.description,
+      puissance_w: s.puissance_w, intensite_a: s.intensite_a, phase: s.phase,
+      connecteurs_puissance: s.connecteurs_puissance ?? [], connecteurs_data: s.connecteurs_data ?? [],
+      poids_kg: s.poids_kg, dimensions: s.dimensions,
+      reserves: reservesParRef.get(s.id) ?? [],
+    };
+  }
 
   // Coefficient multi-jours appliqué au matériel (le transport n'est pas multiplié).
   const coeff = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
@@ -157,7 +191,7 @@ export async function DevisBuilder(props: {
       {/* Colonne principale : catégories + transport + remise + marge */}
       <div className="min-w-0 flex-1 space-y-6">
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
-        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} />
+        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} />
 
         {/* Transport */}
         <section>

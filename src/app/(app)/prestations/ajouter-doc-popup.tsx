@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Modal, ModalForm } from "@/components/modal";
 import { SubmitButton } from "@/components/submit-button";
+import { IconReceipt, IconFile } from "@/components/icons";
 
 type Doc = { id: string; type: string; label: string };
 
@@ -56,7 +57,7 @@ export function AjouterDocPopup({
           {filtres.map((d) => (
             <ModalForm key={d.id} action={associerAction} className="flex items-center justify-between gap-3 px-3 py-2">
               <input type="hidden" name="source_devis_id" value={d.id} />
-              <span className="min-w-0 flex-1 truncate text-sm">{d.type === "facture" ? "🧾" : "📄"} {d.label}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm">{d.type === "facture" ? <IconReceipt className="h-4 w-4 shrink-0 text-muted" /> : <IconFile className="h-4 w-4 shrink-0 text-muted" />} {d.label}</span>
               <SubmitButton>Associer</SubmitButton>
             </ModalForm>
           ))}

@@ -17,6 +17,7 @@ import {
 } from "../actions";
 import { ROLES_MEMBRE } from "@/lib/roles";
 import { euros, dateFr } from "@/lib/format";
+import { IconReceipt, IconFile } from "@/components/icons";
 import { calculerTotaux } from "@/lib/devis";
 import { statutFactureAffichage } from "@/lib/facture-statut";
 import type { LignePrestation, Prestation, PrestationStatut, Devis } from "@/lib/types";
@@ -231,7 +232,7 @@ export default async function PrestationDetailPage({
                 return (
                   <Link key={d.id} href={`/prestations/devis/${d.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
                     <span className="flex min-w-0 items-center gap-2">
-                      <span>{d.type === "facture" ? "🧾" : "📄"}</span>
+                      {d.type === "facture" ? <IconReceipt className="h-4 w-4 shrink-0 text-muted" /> : <IconFile className="h-4 w-4 shrink-0 text-muted" />}
                       <span className="truncate">{d.nom || (d.type === "facture" ? "Facture" : "Devis")}{df?.numero ? ` · n°${df.numero}` : ""}</span>
                       {badge && <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>{badge.label}</span>}
                     </span>

@@ -8,6 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
 import { updateStatut, associerDevisAEvenement } from "../../actions";
+import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
@@ -169,7 +170,7 @@ export default async function DevisEditorPage({
         {/* Actions principales */}
         <div className="space-y-2">
           <div className="flex gap-2">
-            <Link href={`/prestations/devis/${devisId}?edit=1`} className={halfBtnPrimary}>✎ Éditer</Link>
+            <Link href={`/prestations/devis/${devisId}?edit=1`} className={halfBtnPrimary}><IconEdit /> Éditer</Link>
             <JustificatifPreview
               url={`/apercu/${devisId}?type=${devis.type}`}
               libelle={`${titreDoc} — aperçu du document`}
@@ -190,14 +191,14 @@ export default async function DevisEditorPage({
         <div className="space-y-2">
           <form action={emettreDocument.bind(null, devisId, devis.type)}>
             <button className={`${fullBtn} border border-border hover:bg-surface`}>
-              {emis ? "🔄 Mettre à jour les montants" : `📌 Émettre le ${titre.toLowerCase()}`}
+              {emis ? <><IconRefresh /> Mettre à jour les montants</> : <><IconFile /> Émettre le {titre.toLowerCase()}</>}
             </button>
           </form>
           {!estFacture && (
             factureEmise ? (
               <>
                 <Link href={`/prestations/${prestationId}/document?devis=${devisId}&type=facture`} className={`${fullBtn} border border-border hover:bg-surface`}>
-                  🧾 Voir la facture{facEmise?.numero ? ` n° ${facEmise.numero}` : ""}
+                  <IconReceipt /> Voir la facture{facEmise?.numero ? ` n° ${facEmise.numero}` : ""}
                 </Link>
                 <form action={supprimerFacture.bind(null, devisId, prestationId, `/prestations/devis/${devisId}`)}>
                   <ConfirmButton confirm="Supprimer la facture ? Le devis est conservé ; seule l'émission de facture (et son entrée de trésorerie) est supprimée." className={`${fullBtn} border border-border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30`}>
@@ -208,7 +209,7 @@ export default async function DevisEditorPage({
             ) : (
               <form action={emettreDocument.bind(null, devisId, "facture")}>
                 <ConfirmButton confirm="Transformer ce devis en facture ? Une facture sera émise (n° définitif)." confirmLabel="Transformer" danger={false} className={`${fullBtn} border border-border hover:bg-surface`}>
-                  🧾 Transformer en facture
+                  <IconReceipt /> Transformer en facture
                 </ConfirmButton>
               </form>
             )
@@ -247,8 +248,8 @@ export default async function DevisEditorPage({
             {/* Signé : lien vers la version signée */}
             {sigStatut === "signe" && (
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">✓ Signé</span>
-                {pdfSigneUrl && <a href={pdfSigneUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">📄 Voir la version signée</a>}
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300"><IconCheck className="h-3.5 w-3.5" /> Signé</span>
+                {pdfSigneUrl && <a href={pdfSigneUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><IconFile className="h-3.5 w-3.5" /> Voir la version signée</a>}
               </div>
             )}
 
@@ -257,7 +258,7 @@ export default async function DevisEditorPage({
               <form action={uploaderDevisSigne.bind(null, devisId, prestationId)} className="mt-2 space-y-1.5">
                 <span className="block text-xs font-medium">Déposer la signature du client</span>
                 <input type="file" name="pdf_signe" accept="application/pdf,image/*" className="block w-full text-xs text-muted file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-foreground" />
-                <SubmitButton className="w-full !py-1.5 !text-xs">⬆ Déposer la signature</SubmitButton>
+                <SubmitButton className="w-full gap-1 !py-1.5 !text-xs"><IconUpload className="h-3.5 w-3.5" /> Déposer la signature</SubmitButton>
               </form>
             )}
           </Card>
@@ -266,7 +267,7 @@ export default async function DevisEditorPage({
         {/* Rattachement événement */}
         <div>
           {prestation?.est_evenement ? (
-            <Link href={`/prestations/${prestationId}`} className={`${fullBtn} border border-border hover:bg-surface`}>🗂️ Fiche de l&apos;événement</Link>
+            <Link href={`/prestations/${prestationId}`} className={`${fullBtn} border border-border hover:bg-surface`}><IconFolder /> Fiche de l&apos;événement</Link>
           ) : (
             <AssocierEvenement devisId={devisId} events={events} action={associerDevisAEvenement} triggerClassName={`${fullBtn} border border-border hover:bg-surface`} />
           )}

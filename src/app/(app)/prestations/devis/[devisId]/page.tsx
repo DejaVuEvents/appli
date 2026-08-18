@@ -97,7 +97,9 @@ export default async function DevisEditorPage({
   // ─────────────────────────── VUE LECTURE (par défaut) ───────────────────────────
   if (!editMode) {
     const pdfImportUrl = devis.pdf_import ? await urlDocument(supabase, devis.pdf_import) : null;
-    const contenu = pdfImportUrl ? null : await assemblerContenuDocument(supabase, devisId);
+    // Toujours calculer le contenu : un devis importé peut avoir des lignes extraites à afficher.
+    const contenu = await assemblerContenuDocument(supabase, devisId);
+    const aDesLignes = !!contenu && contenu.groupes.some((g) => g.items.length > 0);
 
     // Création + historique des modifications (qui / quand)
     const { data: histData } = await supabase
@@ -155,7 +157,7 @@ export default async function DevisEditorPage({
           )}
         </Card>
 
-        {contenu && (
+        {contenu && aDesLignes && (
           <Card className="p-4">
             <div className="space-y-1 text-sm">
               <div className="flex justify-between"><span className="text-muted">Sous-total HT</span><span>{euros(contenu.totaux.sousTotalHT)}</span></div>
@@ -290,12 +292,13 @@ export default async function DevisEditorPage({
       </aside>
     );
 
-    const contenuLecture = pdfImportUrl ? (
-      <Card className="overflow-hidden p-0">
-        <iframe src={pdfImportUrl} title={titreDoc} className="h-[80vh] w-full bg-white" />
-      </Card>
-    ) : contenu ? (
+    const contenuLecture = contenu && aDesLignes ? (
       <div className="space-y-4">
+        {pdfImportUrl && (
+          <a href={pdfImportUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface">
+            <IconFile className="h-3.5 w-3.5" /> Voir le PDF d&apos;origine
+          </a>
+        )}
         {contenu.groupes.map((g) => (
           <Card key={g.nom} className="overflow-hidden">
             <div className="border-b border-border bg-surface px-4 py-2 text-sm font-semibold">{g.nom}</div>
@@ -319,6 +322,10 @@ export default async function DevisEditorPage({
           </Card>
         )}
       </div>
+    ) : pdfImportUrl ? (
+      <Card className="overflow-hidden p-0">
+        <iframe src={pdfImportUrl} title={titreDoc} className="h-[80vh] w-full bg-white" />
+      </Card>
     ) : (
       <Card className="px-4 py-6 text-sm text-muted">Devis vide. Clique « Éditer » pour ajouter des éléments.</Card>
     );

@@ -4,6 +4,7 @@ import { MobileMenu } from "@/components/mobile-menu";
 import { ProfileMenu } from "@/components/profile-menu";
 import { SetupNotice } from "@/components/setup-notice";
 import { NotificationBell } from "@/components/notification-bell";
+import { AutoLogout } from "@/components/auto-logout";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfigured } from "@/lib/supabase/config";
 import { getMembreActuel, nomMembre } from "@/lib/membre";
@@ -31,6 +32,7 @@ export default async function AppLayout({
     <div className="min-h-dvh">
       {/* Décalage du contenu / largeur sidebar — inline pour être insensible au cache du bundler. */}
       <style>{`@media (min-width:768px){.app-shift{padding-left:13rem}.app-sidebar{width:13rem}}`}</style>
+      <AutoLogout />
       <Nav role={moi?.role ?? "membre"} />
       <div className="app-shift print:pl-0">
         {/* Header */}

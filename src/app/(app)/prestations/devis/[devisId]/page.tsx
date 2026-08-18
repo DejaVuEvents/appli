@@ -342,7 +342,7 @@ export default async function DevisEditorPage({
 
   const [{ data: lignesDevis }, { data: lignesEvent }, { data: cats }, { data: refs }, { data: transportsData }, { data: vehs }, { data: entData }, { count: nbDevis }] =
     await Promise.all([
-      supabase.from("ligne_prestation").select("*").eq("devis_id", devisId).order("created_at"),
+      supabase.from("ligne_prestation").select("*").eq("devis_id", devisId).order("ordre", { nullsFirst: false }).order("created_at"),
       supabase.from("ligne_prestation").select("*").eq("prestation_id", prestationId),
       supabase.from("categorie").select("id, nom, ordre").order("ordre", { ascending: true }).order("nom"),
       supabase.from("materiel_reference").select("id, nom, designation, prix_location_jour, cout_location_jour, categorie_id, est_consommable").order("nom"),

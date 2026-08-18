@@ -1,19 +1,15 @@
 import Link from "next/link";
-import { IconEdit } from "@/components/icons";
 import { Card } from "@/components/ui";
 import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Modal, ModalForm } from "@/components/modal";
-import { LigneForm } from "./ligne-form";
+import { LignesEditor, type BlocData } from "./lignes-editor";
 import { StatutSelect } from "./[id]/statut-select";
 import {
-  addLigne,
-  deleteLigne,
   addTransport,
   deleteTransport,
   updateRemiseGlobale,
-  ajouterAccessoireOptionnel,
   duplicerDevis,
   deleteDevis,
   renameDevis,
@@ -31,11 +27,6 @@ export type TransportRow = {
   cout_calcule: number | null;
   vehicule: { nom: string } | null;
 };
-
-function remiseLabel(l: LignePrestation): string | null {
-  if (!l.remise_valeur) return null;
-  return l.remise_type === "montant" ? `remise ${euros(l.remise_valeur)}` : `remise −${l.remise_valeur}%`;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function DevisBuilder(props: {
@@ -106,6 +97,18 @@ export async function DevisBuilder(props: {
     blocs.push({ catId: null, nom: "Divers", lignes: lignesParCat.get("__divers") ?? [] });
   }
 
+  // Données sérialisables pour l'éditeur client (drag-and-drop + édition inline).
+  const blocsData: BlocData[] = blocs.map((b) => ({
+    catId: b.catId, nom: b.nom,
+    lignes: b.lignes.map((l) => ({
+      id: l.id, designation: l.designation, quantite: l.quantite, unite: l.unite,
+      prix_unitaire: Number(l.prix_unitaire ?? 0), prix_total: l.prix_total,
+      remise_type: (l.remise_type as string) ?? "pct", remise_valeur: Number(l.remise_valeur ?? 0),
+      est_accessoire_auto: l.est_accessoire_auto,
+      options: optionsPourLigne(l).map((o) => ({ ruleId: o.id, nom: o.accessoire?.nom ?? "" })),
+    })),
+  }));
+
   // Marge sous-location
   const coutFournisseurTotal = lignes.reduce((s, l) => {
     if (!l.reference_id) return s;
@@ -131,66 +134,12 @@ export async function DevisBuilder(props: {
 
   const totalTtc = Math.round(totalHT * (1 + tauxTva / 100) * 100) / 100;
 
-  const ligneRow = (l: LignePrestation) => {
-    const opts = optionsPourLigne(l);
-    return (
-      <div key={l.id} className="px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="font-medium truncate">
-              {l.designation}
-              {l.est_accessoire_auto && <span className="ml-2 text-xs text-muted">(accessoire)</span>}
-            </div>
-            <div className="text-xs text-muted">
-              {l.quantite}{l.unite ? ` ${l.unite}` : ""} × {euros(l.prix_unitaire)}
-              {remiseLabel(l) ? ` · ${remiseLabel(l)}` : ""}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="font-medium">{euros(l.prix_total)}</span>
-            <Link href={`/prestations/${id}/lignes/${l.id}?devis=${devis.id}`} className="text-sm text-primary hover:underline"><IconEdit className="h-4 w-4" /></Link>
-            <form action={deleteLigne.bind(null, id, l.id)}>
-              <button className="text-sm text-muted hover:text-red-600" title="Supprimer">✕</button>
-            </form>
-          </div>
-        </div>
-        {opts.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Accessoires optionnels :</span>
-            {opts.map((o) => (
-              <form key={o.id} action={ajouterAccessoireOptionnel.bind(null, id, devis.id, l.id, o.id)}>
-                <button className="rounded-full border border-border px-2 py-0.5 text-xs hover:bg-background">+ {o.accessoire?.nom}</button>
-              </form>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="lg:flex lg:items-start lg:gap-6">
       {/* Colonne principale : catégories + transport + remise + marge */}
       <div className="min-w-0 flex-1 space-y-6">
-        {/* Catégories pré-placées, chacune avec un « + » */}
-        <section className="space-y-4">
-          {blocs.map((b) => (
-            <div key={b.catId ?? "divers"}>
-              <h3 className="mb-1 text-sm font-semibold">{b.nom}{b.lignes.length > 0 && <span className="text-muted"> · {euros(b.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0))}</span>}</h3>
-              {b.lignes.length > 0 && (
-                <Card className="mb-2 divide-y divide-border overflow-hidden">{b.lignes.map(ligneRow)}</Card>
-              )}
-              <Modal
-                trigger={<>+ Ajouter un élément</>}
-                title={`Ajouter — ${b.nom}`}
-                triggerClassName="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-muted hover:border-primary hover:text-primary"
-              >
-                <LigneForm action={addLigne.bind(null, id, devis.id)} references={references} categories={catsDevis} defaultCategorieId={b.catId ?? undefined} />
-                <p className="mt-2 text-xs text-muted">Choisis une référence du catalogue (prix + accessoires auto) ou laisse vide pour une ligne libre.</p>
-              </Modal>
-            </div>
-          ))}
-        </section>
+        {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
+        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} />
 
         {/* Transport */}
         <section>

@@ -630,6 +630,54 @@ export async function updateLigne(prestationId: string, ligneId: string, formDat
   redirect(updated?.devis_id ? `/prestations/devis/${updated.devis_id}?edit=1` : `/prestations/${prestationId}`);
 }
 
+/** Édition inline d'une ligne (prix, quantité, remise) depuis le constructeur — sans quitter la page. */
+export async function setLigneInline(prestationId: string, ligneId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const { data: l } = await supabase
+    .from("ligne_prestation")
+    .select("prix_unitaire, quantite, remise_type, remise_valeur, devis_id")
+    .eq("id", ligneId)
+    .maybeSingle();
+  if (!l) return;
+  const champ = str(formData.get("champ"));
+  const valeur = num(formData.get("valeur")) ?? 0;
+  const patch: Record<string, number | string> = {
+    prix_unitaire: Number(l.prix_unitaire ?? 0),
+    quantite: Number(l.quantite ?? 1),
+    remise_type: (l.remise_type as string) ?? "pct",
+    remise_valeur: Number(l.remise_valeur ?? 0),
+  };
+  if (champ === "prix_unitaire") patch.prix_unitaire = valeur;
+  else if (champ === "quantite") patch.quantite = Math.max(0, valeur);
+  else if (champ === "remise_valeur") patch.remise_valeur = Math.max(0, valeur);
+  else if (champ === "remise_type") patch.remise_type = remiseType(formData.get("valeur"));
+  else return;
+
+  const { net } = montantLigne({
+    prixUnitaire: Number(patch.prix_unitaire), quantite: Number(patch.quantite),
+    remiseType: patch.remise_type as RemiseType, remiseValeur: Number(patch.remise_valeur),
+  });
+  const { error } = await supabase.from("ligne_prestation").update({ ...patch, prix_total: net }).eq("id", ligneId);
+  if (error) throw new Error(error.message);
+  if (l.devis_id) await toucherDevis(supabase, l.devis_id);
+  revalidatePath(`/prestations/${prestationId}`);
+}
+
+/** Réordonne les lignes d'une catégorie (nouvel ordre = position dans la liste). Peut aussi
+ *  déplacer une ligne vers une autre catégorie (categorieId fourni pour la ligne déplacée). */
+export async function reordonnerLignes(prestationId: string, ligneIds: string[], categorieId?: string | null, ligneDeplacee?: string) {
+  const supabase = await createSupabase();
+  let devisId: string | null = null;
+  for (let i = 0; i < ligneIds.length; i++) {
+    const patch: Record<string, number | string | null> = { ordre: i + 1 };
+    if (categorieId !== undefined && ligneIds[i] === ligneDeplacee) patch.categorie_id = categorieId;
+    const { data: l } = await supabase.from("ligne_prestation").update(patch).eq("id", ligneIds[i]).select("devis_id").maybeSingle();
+    if (l?.devis_id) devisId = l.devis_id;
+  }
+  if (devisId) await toucherDevis(supabase, devisId);
+  revalidatePath(`/prestations/${prestationId}`);
+}
+
 export async function deleteLigne(prestationId: string, ligneId: string) {
   const supabase = await createSupabase();
   const { data: ligne } = await supabase.from("ligne_prestation").select("devis_id").eq("id", ligneId).maybeSingle();

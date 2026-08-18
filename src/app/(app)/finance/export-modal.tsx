@@ -14,7 +14,7 @@ export function ExportModal({ annee }: { annee: number }) {
 
   return (
     <Modal
-      trigger={<>⬇ Exporter</>}
+      trigger={<>Exporter</>}
       title="Exporter le journal"
       panelClassName="max-w-md"
       triggerClassName="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-background"
@@ -39,7 +39,7 @@ export function ExportModal({ annee }: { annee: number }) {
               onClick={() => setFormat("csv")}
               className={`rounded-lg border px-3 py-2.5 text-sm font-medium ${format === "csv" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-background"}`}
             >
-              📊 CSV (Excel)
+              CSV (Excel)
             </button>
             <button
               type="button"
@@ -55,7 +55,7 @@ export function ExportModal({ annee }: { annee: number }) {
           href={href}
           className="block w-full rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
-          ⬇ Télécharger
+          Télécharger
         </a>
         <p className="text-xs text-muted">
           Le {format === "pdf" ? "PDF" : "fichier CSV"} inclut le solde cumulé projeté. Le CSV s&apos;ouvre dans Excel / Google Sheets.

@@ -79,7 +79,7 @@ export default async function SessionInventairePage({
           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <QrScanner label="📷 Scanner une unité" />
+          <QrScanner label="Scanner une unité" />
           <span className="text-xs text-muted">
             Scanne les étiquettes QR à la suite pour ouvrir chaque fiche et la pointer dans cette session.
           </span>

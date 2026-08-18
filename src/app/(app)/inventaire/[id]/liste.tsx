@@ -63,7 +63,7 @@ export function InventaireListe({ sessionId, lignes }: { sessionId: string; lign
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="🔎 Rechercher (référence, n° de série)…"
+            placeholder="Rechercher (référence, n° de série)…"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-8 text-sm"
           />
           {q && (
@@ -106,7 +106,7 @@ export function InventaireListe({ sessionId, lignes }: { sessionId: string; lign
                       placeholder="Remarque / maintenance…"
                       className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
-                    <button className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-background" title="Enregistrer la remarque">💾</button>
+                    <button className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-background" title="Enregistrer la remarque">OK</button>
                   </form>
                 </div>
               ))}

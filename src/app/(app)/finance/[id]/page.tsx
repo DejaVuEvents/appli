@@ -88,10 +88,10 @@ export default async function EditEcriturePage({
                 <div key={j.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                   {lien ? (
                     <a href={lien} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-primary hover:underline">
-                      📎 {j.nom || "Justificatif"}
+                      {j.nom || "Justificatif"}
                     </a>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate">🔖 {j.nom || j.url}</span>
+                    <span className="min-w-0 flex-1 truncate">{j.nom || j.url}</span>
                   )}
                   <form action={supprimerJustificatif.bind(null, j.id, id)}>
                     <ConfirmButton confirm="Supprimer ce justificatif ?" className="shrink-0 text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>

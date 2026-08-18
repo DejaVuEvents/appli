@@ -66,7 +66,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         subtitle={`${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
         action={
           <div className="flex items-center gap-2">
-            <a href={`/notes-frais/${id}/pdf`} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">⬇ PDF</a>
+            <a href={`/notes-frais/${id}/pdf`} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">PDF</a>
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>{STATUT_NDF_LABELS[ndf.statut]}</span>
           </div>
         }
@@ -96,7 +96,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         <section>
           <Card className="border-primary/30 bg-primary/5 p-4 text-sm">
             <p className="mb-2 text-xs text-muted">
-              📋 <strong>Pré-dépense</strong> — demande d&apos;autorisation pour un achat supérieur à 500 €, à valider par un co-président <strong>avant</strong> l&apos;engagement de la dépense.
+              <strong>Pré-dépense</strong> — demande d&apos;autorisation pour un achat supérieur à 500 €, à valider par un co-président <strong>avant</strong> l&apos;engagement de la dépense.
             </p>
             <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
               <div><span className="text-muted">Montant estimé : </span><span className="font-semibold">{ndf.montant_estime != null ? euros(ndf.montant_estime) : "—"}</span></div>
@@ -134,8 +134,8 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 {l.depart && l.arrivee && (
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-muted">Relevé d&apos;itinéraire :</span>
-                    <a href={mappyUrl(l.depart, l.arrivee)} target="_blank" rel="noopener noreferrer" className="rounded border border-border px-1.5 py-0.5 hover:bg-background">📍 Mappy</a>
-                    <a href={googleMapsUrl(l.depart, l.arrivee)} target="_blank" rel="noopener noreferrer" className="rounded border border-border px-1.5 py-0.5 hover:bg-background">🗺️ Google Maps</a>
+                    <a href={mappyUrl(l.depart, l.arrivee)} target="_blank" rel="noopener noreferrer" className="rounded border border-border px-1.5 py-0.5 hover:bg-background">Mappy</a>
+                    <a href={googleMapsUrl(l.depart, l.arrivee)} target="_blank" rel="noopener noreferrer" className="rounded border border-border px-1.5 py-0.5 hover:bg-background">Google Maps</a>
                     {l.distance_km != null && <span className="text-muted">{l.distance_km} km</span>}
                   </div>
                 )}
@@ -185,7 +185,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
       )}
       {editable && ndf.type_ndf === "km" && orsConfigured() && (
         <Card className="p-4">
-          <h3 className="mb-1 text-sm font-semibold">🚗 Frais de déplacement (véhicule perso)</h3>
+          <h3 className="mb-1 text-sm font-semibold">Frais de déplacement (véhicule perso)</h3>
           <p className="mb-3 text-xs text-muted">Distance calculée automatiquement (OpenRouteService) puis appliquée au barème kilométrique.</p>
           <form action={ajouterTrajetNDF.bind(null, id)} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -217,7 +217,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
             <p className="text-sm text-green-700">✓ Tu as signé cette note le {dateFr(ndf.demandeur_signe_le)} (« lu et approuvé »).</p>
           ) : membre?.signature_url ? (
             <form action={signerNDF.bind(null, id)} className="flex flex-wrap items-center gap-3">
-              <SubmitButton confirm="Confirmes-tu signer cette note de frais « lu et approuvé » ? Ta signature enregistrée sera apposée sur le document PDF.">✍️ Signer (lu et approuvé)</SubmitButton>
+              <SubmitButton confirm="Confirmes-tu signer cette note de frais « lu et approuvé » ? Ta signature enregistrée sera apposée sur le document PDF.">Signer (lu et approuvé)</SubmitButton>
               <span className="text-xs text-muted">Appose ta signature enregistrée sur le document.</span>
             </form>
           ) : (

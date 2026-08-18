@@ -90,7 +90,7 @@ export function FicheEdit({
                         download
                         className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
                       >
-                        ⬇ Télécharger le QR
+                        Télécharger le QR
                       </a>
                       <Link href={`/u/${u.qr_code}`} className="text-primary hover:underline">
                         Ouvrir la fiche

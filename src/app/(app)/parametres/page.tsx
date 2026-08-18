@@ -229,7 +229,7 @@ export default async function ParametresPage({
               {/* Connexion bancaire Qonto (pour Finance → Sync Qonto) */}
               <div className="border-t border-border pt-4">
                 <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-                  🏦 Connexion Qonto (banque)
+                  Connexion Qonto (banque)
                   <InfoTip>
                     Identifiants API Qonto pour importer les transactions dans la trésorerie.
                     À générer dans Qonto : <span className="font-medium">Paramètres → Intégrations / API</span> (login d&apos;organisation + clé secrète).

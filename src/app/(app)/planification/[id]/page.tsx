@@ -188,7 +188,7 @@ export default async function PlanificationDetail({ params }: { params: Promise<
                   <span className="font-medium">{e.lieu ?? "—"}</span>
                 </div>
                 {e.adresse && <div className="text-xs text-muted">{e.adresse}</div>}
-                {e.materiel && <div className="mt-0.5 text-sm">📦 {e.materiel}</div>}
+                {e.materiel && <div className="mt-0.5 text-sm">{e.materiel}</div>}
                 {e.notes && <div className="text-xs text-muted">{e.notes}</div>}
               </div>
               <div className="flex shrink-0 items-center gap-2">

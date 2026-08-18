@@ -17,7 +17,7 @@ export function ImportPdf({ clients, defaultType }: { clients: { id: string; nom
 
   return (
     <Modal
-      trigger={<>⬆ Importer un PDF</>}
+      trigger={<>Importer un PDF</>}
       title="Importer un devis / facture (PDF)"
       triggerClassName="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-background"
     >

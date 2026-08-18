@@ -85,7 +85,7 @@ export default async function Dashboard() {
   return (
     <div className="max-w-7xl space-y-8">
       <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">Bonjour{prenom ? ` ${prenom}` : ""} 👋</h1>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">Bonjour{prenom ? ` ${prenom}` : ""}</h1>
         <p className="mt-0.5 text-sm text-muted">Voici l&apos;essentiel du moment.</p>
       </div>
 
@@ -94,7 +94,7 @@ export default async function Dashboard() {
         <section className="space-y-2">
           {notifs.map((n, i) => (
             <Link key={i} href={n.href} className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm hover:opacity-90 ${n.cls}`}>
-              <span>{n.icon} {n.text}</span>
+              <span>{n.text}</span>
               <span className="font-semibold">→</span>
             </Link>
           ))}

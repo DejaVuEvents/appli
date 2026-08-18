@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
  * Décodage via jsQR (fonctionne sur iOS Safari, contrairement à BarcodeDetector).
  * Fallback : saisie manuelle du code. Nécessite HTTPS (OK sur Vercel).
  */
-export function QrScanner({ label = "📷 Scanner une étiquette QR" }: { label?: string }) {
+export function QrScanner({ label = "Scanner une étiquette QR" }: { label?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

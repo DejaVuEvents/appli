@@ -67,7 +67,7 @@ export default async function ReferenceDetailPage({
               href={`/catalogue/${id}?edit=1`}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
-              ✎ Modifier
+              Modifier
             </Link>
           )
         }

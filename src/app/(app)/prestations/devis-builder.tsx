@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconEdit } from "@/components/icons";
 import { Card } from "@/components/ui";
 import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
@@ -147,7 +148,7 @@ export async function DevisBuilder(props: {
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <span className="font-medium">{euros(l.prix_total)}</span>
-            <Link href={`/prestations/${id}/lignes/${l.id}?devis=${devis.id}`} className="text-sm text-primary hover:underline">✎</Link>
+            <Link href={`/prestations/${id}/lignes/${l.id}?devis=${devis.id}`} className="text-sm text-primary hover:underline"><IconEdit className="h-4 w-4" /></Link>
             <form action={deleteLigne.bind(null, id, l.id)}>
               <button className="text-sm text-muted hover:text-red-600" title="Supprimer">✕</button>
             </form>

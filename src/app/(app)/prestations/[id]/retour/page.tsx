@@ -14,11 +14,11 @@ type ResaRow = {
 type ControleRow = { unite_id: string | null; etat: string; remarque: string | null; photo_url: string | null; controle: boolean };
 
 const ETAT_OPTIONS = [
-  { value: "ok", label: "✅ OK" },
-  { value: "a_verifier", label: "🔎 À vérifier" },
-  { value: "casse", label: "🛠 Cassé / à réparer" },
-  { value: "manquant", label: "❓ Manquant" },
-  { value: "hs", label: "❌ Hors service" },
+  { value: "ok", label: "OK" },
+  { value: "a_verifier", label: "À vérifier" },
+  { value: "casse", label: "Cassé / à réparer" },
+  { value: "manquant", label: "Manquant" },
+  { value: "hs", label: "Hors service" },
 ];
 const ETAT_CLS: Record<string, string> = {
   ok: "text-green-600", a_verifier: "text-amber-600", casse: "text-red-600", manquant: "text-red-600", hs: "text-red-600",

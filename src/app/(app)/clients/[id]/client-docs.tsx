@@ -32,7 +32,7 @@ export function ClientDocs({ docs }: { docs: DocRow[] }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={`🔎 Rechercher dans mes ${tab === "facture" ? "factures" : "devis"}…`}
+          placeholder={`Rechercher dans mes ${tab === "facture" ? "factures" : "devis"}…`}
           className="min-w-[12rem] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
         />
         <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">

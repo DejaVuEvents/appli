@@ -154,7 +154,7 @@ export default async function LocationDetailPage({
             </div>
 
             <div className="mt-4 pt-3 border-t border-border">
-              <Modal trigger={<>✎ Modifier</>} title="Modifier la location" triggerClassName="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">
+              <Modal trigger={<>Modifier</>} title="Modifier la location" triggerClassName="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background">
                 <LocationForm action={updateLocation.bind(null, id)} clients={clients} location={loc} />
               </Modal>
             </div>

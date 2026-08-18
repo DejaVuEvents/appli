@@ -25,7 +25,7 @@ export function AssocierEvenement({
 
   return (
     <Modal
-      trigger={<>🔗 Associer à un événement</>}
+      trigger={<>Associer à un événement</>}
       title="Associer à un événement"
       triggerClassName={triggerClassName ?? "flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface"}
     >

@@ -32,7 +32,7 @@ export default async function ReunionsPage() {
 
       {!geminiOk && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-          💡 Le <strong>résumé automatique</strong> (et l&apos;extraction d&apos;actions) s&apos;active dès qu&apos;une clé <strong>Gemini gratuite</strong> est configurée
+          Le <strong>résumé automatique</strong> (et l&apos;extraction d&apos;actions) s&apos;active dès qu&apos;une clé <strong>Gemini gratuite</strong> est configurée
           (<code>GEMINI_API_KEY</code>, à créer sur <em>aistudio.google.com/apikey</em>). En attendant, tu peux déjà déposer et conserver les transcripts.
         </div>
       )}

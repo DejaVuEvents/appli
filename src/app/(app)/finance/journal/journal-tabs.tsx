@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { IconPaperclip } from "@/components/icons";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { deleteEcriture, setValideEcriture, ajouterJustificatifs } from "../actions";
@@ -89,9 +90,9 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
   const expandAll = () => setCollapsed(new Set());
 
   const tabDefs: { key: Tab; label: string }[] = [
-    { key: "entrees", label: "✅ Entrées" },
-    { key: "sorties", label: "🔴 Sorties" },
-    { key: "previsionnel", label: "📋 Prévisionnel" },
+    { key: "entrees", label: "Entrées" },
+    { key: "sorties", label: "Sorties" },
+    { key: "previsionnel", label: "Prévisionnel" },
   ];
 
   const prestMap = new Map(prestations.map((p) => [p.id, p]));
@@ -243,7 +244,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                               {e.denomination ?? "(sans libellé)"}
                               {missingDoc && (
                                 <span className="shrink-0 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700" title="Document manquant">
-                                  📎?
+                                  <IconPaperclip className="h-3 w-3" />
                                 </span>
                               )}
                               {!e.valide && (
@@ -273,7 +274,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                                 title="Aperçu du document joint"
                                 onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                               >
-                                📎
+                                <IconPaperclip className="h-4 w-4" />
                               </button>
                             )}
                             <span className={e.sens === "entree" ? "font-medium text-green-600" : "font-medium text-red-600"}>
@@ -402,13 +403,13 @@ function EcriturePanel({
                   type="file" name="justificatifs" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"
                   className="block w-full text-xs text-orange-900/80 file:mr-2 file:rounded-lg file:border-0 file:bg-orange-600 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white dark:text-orange-200"
                 />
-                <SubmitButton pendingLabel="Ajout…" className="!py-1.5 !text-xs">📎 Associer un document</SubmitButton>
+                <SubmitButton pendingLabel="Ajout…" className="!py-1.5 !text-xs">Associer un document</SubmitButton>
               </form>
             </div>
           )}
           {factureUrl && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-              <span className="min-w-0 truncate text-muted">📎 Document joint</span>
+              <span className="min-w-0 truncate text-muted">Document joint</span>
               <div className="flex shrink-0 items-center gap-2">
                 {/* Aperçu en popup centrée */}
                 <JustificatifPreview url={factureUrl} libelle={e.denomination ?? "Document"} />
@@ -434,7 +435,7 @@ function EcriturePanel({
               )}
               <div className="mt-2 flex gap-3">
                 <Link href={`/prestations/${prestation.id}`} className="text-xs text-primary hover:underline">
-                  🔗 Prestation
+                  Prestation
                 </Link>
               </div>
             </div>
@@ -480,7 +481,7 @@ function EcriturePanel({
               href={`/finance/${e.id}`}
               className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground"
             >
-              ✎ Modifier
+              Modifier
             </Link>
             <button
               type="button"

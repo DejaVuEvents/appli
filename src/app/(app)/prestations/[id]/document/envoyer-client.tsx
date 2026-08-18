@@ -1,5 +1,7 @@
 "use client";
 
+import { IconSend } from "@/components/icons";
+
 /** Télécharge le PDF puis ouvre le brouillon d'email (le PDF est ainsi prêt à être joint). */
 export function EnvoyerClientButton({ mailto, pdfUrl, className }: { mailto: string; pdfUrl: string; className?: string }) {
   function onClick() {
@@ -15,7 +17,7 @@ export function EnvoyerClientButton({ mailto, pdfUrl, className }: { mailto: str
   if (className) {
     return (
       <button type="button" onClick={onClick} className={className} title="Télécharge le PDF puis ouvre l'email pré-rempli">
-        ✉️ Envoyer
+        Envoyer
       </button>
     );
   }
@@ -25,7 +27,7 @@ export function EnvoyerClientButton({ mailto, pdfUrl, className }: { mailto: str
       onClick={onClick}
       className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left text-sm font-medium hover:border-primary/40 hover:shadow-sm"
     >
-      <span className="text-lg">✉️</span>
+      <IconSend className="h-4 w-4" />
       <span>
         Envoyer au client
         <span className="block text-xs font-normal text-muted">PDF téléchargé + email pré-rempli</span>

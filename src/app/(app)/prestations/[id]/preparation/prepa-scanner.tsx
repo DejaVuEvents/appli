@@ -126,7 +126,7 @@ export function PrepaScanner({ prestationId }: { prestationId: string }) {
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
       >
-        📷 Scanner au chargement
+        Scanner au chargement
       </button>
 
       {open && (

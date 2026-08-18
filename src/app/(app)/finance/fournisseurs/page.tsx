@@ -65,7 +65,7 @@ export default async function FournisseursPage({
           <div className="text-xs text-muted">
             Échéance : {dateFr(f.date_echeance)}
             {f.date_facture ? ` · facturé le ${dateFr(f.date_facture)}` : ""}
-            {fichierUrl.get(f.id) ? <> · <a href={fichierUrl.get(f.id)!} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">📎 justificatif</a></> : ""}
+            {fichierUrl.get(f.id) ? <> · <a href={fichierUrl.get(f.id)!} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">justificatif</a></> : ""}
           </div>
           {f.notes && <div className="text-[11px] italic text-muted">{f.notes}</div>}
         </div>

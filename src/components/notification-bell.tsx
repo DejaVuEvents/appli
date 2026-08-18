@@ -75,7 +75,7 @@ export function NotificationBell({ notifications }: { notifications: Notif[] }) 
                   onClick={() => setOpen(false)}
                   className={`flex items-start gap-2 border-b border-border/60 px-4 py-3 text-sm last:border-0 hover:opacity-90 ${n.cls}`}
                 >
-                  <span className="shrink-0">{n.icon}</span>
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.cls?.includes("red") ? "bg-red-500" : n.cls?.includes("amber") ? "bg-amber-500" : "bg-primary"}`} />
                   <span className="min-w-0">{n.text}</span>
                 </Link>
               ))}

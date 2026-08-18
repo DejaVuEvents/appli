@@ -180,7 +180,7 @@ function buildEvents(
       cat: "reunion",
       date: r.date,
       dateEnd: r.date,
-      title: `📅 ${r.titre}`,
+      title: `${r.titre}`,
       subtitle: r.heure_debut ? `${r.heure_debut}${r.heure_fin ? `–${r.heure_fin}` : ""}` : undefined,
       href: `/calendrier`,
       pill: "bg-indigo-100 text-indigo-800 border border-indigo-200",
@@ -366,7 +366,7 @@ export function CalendarView({
           <div className="rounded-xl border border-border bg-surface p-3">
             <label className="mb-3 flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 text-sm font-medium">
               <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} className="h-4 w-4 rounded border-border" />
-              <span>👤 Ce qui me concerne</span>
+              <span>Ce qui me concerne</span>
             </label>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">Afficher</p>
             <div className="space-y-1.5">
@@ -405,7 +405,7 @@ export function CalendarView({
       {/* Filtres mobile */}
       <div className="mt-4 flex flex-wrap gap-2 lg:hidden">
         <button onClick={() => setOnlyMine((v) => !v)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${onlyMine ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface"}`}>
-          👤 Me concerne
+          Me concerne
         </button>
         {CATS.map((c) => (
           <button key={c.key} onClick={() => toggleCat(c.key)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${visible.has(c.key) ? "border-border bg-surface" : "border-border/50 text-muted line-through"}`}>
@@ -442,21 +442,21 @@ export function CalendarView({
 function ReunionDetail({ r }: { r: Reunion }) {
   return (
     <div className="space-y-2">
-      {r.lieu && <p className="text-xs text-muted">📍 {r.lieu}</p>}
+      {r.lieu && <p className="text-xs text-muted">{r.lieu}</p>}
       {r.description && <p className="text-xs">{r.description}</p>}
       {r.participants.length > 0 && (
-        <p className="text-xs text-muted">👥 {r.participants.map(nomMembre).join(", ")}</p>
+        <p className="text-xs text-muted">{r.participants.map(nomMembre).join(", ")}</p>
       )}
       {r.meet_url && (
-        <a href={r.meet_url} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg border border-border px-3 py-2 text-center text-sm hover:bg-surface">🎥 Rejoindre le Meet</a>
+        <a href={r.meet_url} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg border border-border px-3 py-2 text-center text-sm hover:bg-surface">Rejoindre le Meet</a>
       )}
       {r.google_html_link ? (
-        <a href={r.google_html_link} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground">📅 Voir dans Google Agenda</a>
+        <a href={r.google_html_link} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground">Voir dans Google Agenda</a>
       ) : (
-        <a href={googleCalUrl(r)} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground">📅 Ajouter à Google Agenda</a>
+        <a href={googleCalUrl(r)} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground">Ajouter à Google Agenda</a>
       )}
       {r.participants.some((p) => p.email) && (
-        <a href={mailtoInvit(r)} className="block w-full rounded-lg border border-border px-3 py-2 text-center text-sm hover:bg-surface">✉️ Envoyer l&apos;invitation</a>
+        <a href={mailtoInvit(r)} className="block w-full rounded-lg border border-border px-3 py-2 text-center text-sm hover:bg-surface">Envoyer l&apos;invitation</a>
       )}
       <form action={deleteReunion.bind(null, r.id)}>
         <ConfirmButton confirm="Supprimer cette réunion ?" className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-600 hover:bg-red-100">Supprimer la réunion</ConfirmButton>

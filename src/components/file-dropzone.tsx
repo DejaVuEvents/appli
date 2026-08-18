@@ -34,7 +34,7 @@ export function FileDropzone({ name, accept }: { name: string; accept?: string }
         onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
       />
       {fileName ? (
-        <span className="font-medium">📎 {fileName}</span>
+        <span className="font-medium">{fileName}</span>
       ) : (
         <span className="text-muted">Glisser un justificatif ici, ou cliquer pour choisir (photo / PDF)</span>
       )}

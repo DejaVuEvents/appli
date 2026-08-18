@@ -102,7 +102,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
       const r = await importQontoTransactions(toImport);
       if (!r.ok) { setError(r.error); return; }
       const attMsg = r.withAttachment > 0 ? ` · ${r.withAttachment} pièce${r.withAttachment > 1 ? "s" : ""} jointe${r.withAttachment > 1 ? "s" : ""} importée${r.withAttachment > 1 ? "s" : ""}.` : "";
-      setResult(`✅ ${r.count} transaction${r.count > 1 ? "s" : ""} importée${r.count > 1 ? "s" : ""} dans le journal.${attMsg}`);
+      setResult(`${r.count} transaction${r.count > 1 ? "s" : ""} importée${r.count > 1 ? "s" : ""} dans le journal.${attMsg}`);
       setItems(null);
       setSelected(new Set());
     });
@@ -140,7 +140,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
         <div className={`rounded-xl border p-4 ${valide ? "border-green-300 bg-green-50 dark:border-green-500/40 dark:bg-green-950/20" : "border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/20"}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm font-semibold">
-              {valide ? "✅ Trésorerie validée — les soldes correspondent" : "⚠️ Écart entre Qonto et l'outil"}
+              {valide ? "Trésorerie validée — les soldes correspondent" : "⚠️ Écart entre Qonto et l'outil"}
             </div>
             {!valide && (
               <div className="text-sm font-bold text-amber-700 dark:text-amber-400">
@@ -166,7 +166,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
         disabled={pending}
         className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
       >
-        {pending ? "Chargement…" : "🔄 Récupérer les nouvelles transactions"}
+        {pending ? "Chargement…" : "Récupérer les nouvelles transactions"}
       </button>
 
       {error && (
@@ -254,7 +254,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
                               <div className="text-amber-600 font-medium">⚠ doublon probable</div>
                             )}
                             {item.attachment_ids?.length > 0 && (
-                              <div className="text-blue-600 text-xs">📎 {item.attachment_ids.length} pièce{item.attachment_ids.length > 1 ? "s" : ""} jointe{item.attachment_ids.length > 1 ? "s" : ""}</div>
+                              <div className="text-blue-600 text-xs">{item.attachment_ids.length} pièce{item.attachment_ids.length > 1 ? "s" : ""} jointe{item.attachment_ids.length > 1 ? "s" : ""}</div>
                             )}
                           </td>
                           <td className={`px-3 py-2 text-right font-semibold whitespace-nowrap ${item.sens === "entree" ? "text-green-600" : "text-red-600"}`}>

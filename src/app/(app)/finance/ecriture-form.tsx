@@ -126,7 +126,7 @@ export function EcritureForm({
         {factureUrl ? (
           <div className="mb-1.5 flex items-center gap-2 text-sm">
             <a href={factureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              📎 Voir le fichier existant
+              Voir le fichier existant
             </a>
             <span className="text-muted text-xs">(remplacer ci-dessous)</span>
           </div>

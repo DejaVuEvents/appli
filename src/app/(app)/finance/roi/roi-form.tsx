@@ -31,7 +31,7 @@ export function RoiForm({ action, item, references, inModal = false }: Props) {
             !estAchete ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-background"
           }`}
         >
-          📋 Projet d'achat
+          Projet d'achat
         </button>
         <button
           type="button"
@@ -40,7 +40,7 @@ export function RoiForm({ action, item, references, inModal = false }: Props) {
             estAchete ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-background"
           }`}
         >
-          ✅ Déjà acheté
+          Déjà acheté
         </button>
       </div>
 

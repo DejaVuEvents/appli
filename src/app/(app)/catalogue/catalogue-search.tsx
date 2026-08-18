@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { IconBox } from "@/components/icons";
 import Link from "next/link";
 import { euros } from "@/lib/format";
 
@@ -154,7 +155,7 @@ export function CatalogueSearch({
                         />
                       ) : (
                         <div className="h-16 w-16 shrink-0 rounded-lg border border-border bg-surface flex items-center justify-center text-2xl text-muted/40">
-                          📦
+                          <IconBox className="h-8 w-8" />
                         </div>
                       )}
                     </Link>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconEdit } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { Modal } from "@/components/modal";
@@ -159,7 +160,7 @@ function TableSection({
                   {/* Actions */}
                   <td className="px-3 py-3 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <Link href={`/finance/roi/${item.id}`} className="text-primary hover:underline">✎</Link>
+                      <Link href={`/finance/roi/${item.id}`} className="text-primary hover:underline"><IconEdit className="h-4 w-4" /></Link>
                       <form action={deleteRoiItem.bind(null, item.id)}>
                         <button className="text-muted hover:text-red-600" title="Supprimer">✕</button>
                       </form>
@@ -285,7 +286,7 @@ export default async function RoiPage({
 
       {/* Section acheté */}
       <TableSection
-        title="✅ Matériel acheté"
+        title="Matériel acheté"
         items={achetes}
         annee={annee}
         showReel={true}
@@ -293,7 +294,7 @@ export default async function RoiPage({
 
       {/* Section projets */}
       <TableSection
-        title="📋 Projets d'achat"
+        title="Projets d'achat"
         items={projets}
         annee={annee}
         showReel={false}

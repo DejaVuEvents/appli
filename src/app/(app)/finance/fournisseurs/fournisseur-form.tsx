@@ -51,7 +51,7 @@ export function FournisseurForm({
           className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-background"
         />
         {facture?.fichier_url && (
-          <a href={facture.fichier_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-primary hover:underline">📎 Justificatif actuel</a>
+          <a href={facture.fichier_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-primary hover:underline">Justificatif actuel</a>
         )}
       </div>
       <div className="flex items-center gap-3 pt-1">

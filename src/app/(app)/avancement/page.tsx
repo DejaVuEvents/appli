@@ -164,7 +164,7 @@ async function ProjetsTab({ supabase, annee, sem, respFiltre, vue }: { supabase:
         <div className="flex w-max gap-1 rounded-xl border border-border bg-surface p-1">
           {sousOnglet("general", "Général")}
           {evenements.map((e) => sousOnglet(e, e))}
-          {sousOnglet("archives", "🗄️ Archivés")}
+          {sousOnglet("archives", "Archivés")}
         </div>
       </div>
 
@@ -258,7 +258,7 @@ async function ProjetsTab({ supabase, annee, sem, respFiltre, vue }: { supabase:
                               className={`rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${AV_SELECT_CLS[p.avancement] ?? ""}`}
                             />
                             <form action={archiverProjet.bind(null, p.id, !p.archive)}>
-                              <button className="text-muted hover:text-foreground" title={p.archive ? "Désarchiver" : "Archiver"}>{p.archive ? "↩" : "🗄️"}</button>
+                              <button className="text-muted hover:text-foreground" title={p.archive ? "Désarchiver" : "Archiver"}>{p.archive ? "Rétablir" : "Archiver"}</button>
                             </form>
                             <form action={deleteProjet.bind(null, p.id)}>
                               <ConfirmButton confirm={`Supprimer « ${p.nom} » et tout son historique ?`} className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>

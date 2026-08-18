@@ -194,7 +194,7 @@ export default async function PrestationDetailPage({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background"
                 title="Modifier l'événement"
               >
-                ✎ Modifier
+                Modifier
               </Link>
             </div>
           </Card>

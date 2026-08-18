@@ -95,7 +95,7 @@ export function ReunionCard({ reunion, geminiOk }: { reunion: Reunion; geminiOk:
             ) : reunion.transcript ? (
               <form action={genererResume.bind(null, reunion.id)}>
                 <SubmitButton pendingLabel="Génération…">
-                  ✨ {reunion.resume ? "Régénérer" : "Générer"} le résumé + actions
+                  {reunion.resume ? "Régénérer" : "Générer"} le résumé + actions
                 </SubmitButton>
               </form>
             ) : (

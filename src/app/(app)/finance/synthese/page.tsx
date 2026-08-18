@@ -130,7 +130,7 @@ function MensuellePage({
         <span>Solde réel : <strong className={soldeActuelReel < 0 ? "text-red-600" : "text-green-700"}>{euros(soldeActuelReel)}</strong></span>
         <span className="text-muted">·</span>
         <span>Solde projeté fin d&apos;année : <strong className={soldeProjete < 0 ? "text-red-600" : "text-green-700"}>{euros(soldeProjete)}</strong></span>
-        <a href={`/finance/bilan/pdf?annee=${annee}`} className="ml-auto rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">⬇ Compte de résultat + bilan {annee} (PDF)</a>
+        <a href={`/finance/bilan/pdf?annee=${annee}`} className="ml-auto rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">Compte de résultat + bilan {annee} (PDF)</a>
       </div>
 
       <Card className="mb-8 overflow-x-auto">
@@ -148,7 +148,7 @@ function MensuellePage({
                 return (
                   <tr key={`sep-${i}`}>
                     <td className="sticky left-0 z-10 bg-blue-50 px-3 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-blue-600/70 dark:bg-blue-950/40 dark:text-blue-300/70">
-                      📋 {row.label}
+                      {row.label}
                     </td>
                     <td colSpan={13} className="bg-blue-50 border-t border-blue-100 dark:bg-blue-950/40 dark:border-blue-900/40" />
                   </tr>

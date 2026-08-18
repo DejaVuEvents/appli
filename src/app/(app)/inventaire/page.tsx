@@ -21,7 +21,7 @@ export default async function InventairePage() {
       <PageHeader
         title="Inventaire"
         subtitle={`${sessions.length} session${sessions.length > 1 ? "s" : ""}`}
-        action={<QrScanner label="📷 Scanner une unité" />}
+        action={<QrScanner label="Scanner une unité" />}
       />
 
       {/* Nouvelle session */}

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { IconSearch } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 import Link from "next/link";
 import { CatalogueSearch } from "./catalogue-search";
@@ -168,7 +169,7 @@ export default async function CataloguePage({
               href={`/catalogue?cat=${cat.id}`}
               className={tabCls(cat.id === activeCatId)}
             >
-              {cat.id === EXTERNE_ID ? "🔗 " : ""}
+              {cat.id === EXTERNE_ID ? "" : ""}
               {cat.nom}
             </Link>
           ))}
@@ -200,7 +201,7 @@ export default async function CataloguePage({
 function GlobalSearchForm({ q }: { q: string }) {
   return (
     <form method="get" action="/catalogue" className="relative mb-6">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">🔍</span>
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted"><IconSearch className="h-4 w-4" /></span>
       <input
         type="search"
         name="q"

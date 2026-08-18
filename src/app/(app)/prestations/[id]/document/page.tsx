@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconDownload } from "@/components/icons";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { urlDocument } from "@/lib/storage";
@@ -137,7 +138,7 @@ export default async function DocumentPage({
         </div>
 
         <a href={`/prestations/${id}/document/pdf?devis=${devisId}&type=${type}`} download className={card}>
-          <span className="text-lg">⬇️</span> Télécharger le PDF
+          <IconDownload className="h-4 w-4" /> Télécharger le PDF
         </a>
 
         <PrintButton label="Imprimer" />

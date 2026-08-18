@@ -110,10 +110,10 @@ export default async function TechniquePage({
       {/* Sous-onglets Charge utile / Électricité */}
       <div className="flex w-fit gap-1 rounded-xl border border-border bg-surface p-1">
         <Link href={`/prestations/${id}/technique?sous=levage`} className={`rounded-lg px-4 py-1.5 text-sm font-medium ${sous === "levage" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>
-          🏗️ Charge utile
+          Charge utile
         </Link>
         <Link href={`/prestations/${id}/technique?sous=elec`} className={`rounded-lg px-4 py-1.5 text-sm font-medium ${sous === "elec" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>
-          ⚡ Électricité
+          Électricité
         </Link>
       </div>
 

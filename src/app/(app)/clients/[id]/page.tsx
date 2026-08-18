@@ -129,9 +129,9 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
           <div className="mt-3 grid gap-x-10 gap-y-1.5 text-sm sm:grid-cols-2">
             <div><span className="text-muted">@ </span>{client.email ?? "—"}</div>
             <div><span className="text-muted">SIRET : </span>{client.siret ?? "—"}</div>
-            <div><span className="text-muted">☎ </span>{client.telephone ?? "—"}</div>
+            <div><span className="text-muted"></span>{client.telephone ?? "—"}</div>
             <div><span className="text-muted">TVA : </span>{client.tva_intra ?? "—"}</div>
-            <div className="sm:col-span-1"><span className="text-muted">📍 </span>{villeLigne}</div>
+            <div className="sm:col-span-1"><span className="text-muted"></span>{villeLigne}</div>
             <div><span className="text-muted">IBAN : </span>{client.iban ?? "—"}</div>
             {client.tarif_preferentiel_pct > 0 && <div className="text-muted text-xs">Tarif préférentiel : −{client.tarif_preferentiel_pct}%</div>}
             <div><span className="text-muted">BIC : </span>{client.bic ?? "—"}</div>
@@ -140,18 +140,18 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
 
         {/* Actions : Modifier / Notes / Contacts */}
         <div className="flex flex-row gap-3 lg:flex-col">
-          <Modal trigger={<>✎ Modifier</>} title="Modifier le client" triggerClassName="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm font-medium hover:bg-background">
+          <Modal trigger={<>Modifier</>} title="Modifier le client" triggerClassName="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm font-medium hover:bg-background">
             <ClientForm action={updateClientFiche.bind(null, id)} client={client} inModal />
           </Modal>
 
-          <Modal trigger={<>💬 Notes</>} title="Notes client" triggerClassName="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm font-medium hover:bg-background">
+          <Modal trigger={<>Notes</>} title="Notes client" triggerClassName="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm font-medium hover:bg-background">
             <ModalForm action={updateClientNotes.bind(null, id)} className="space-y-3">
               <TextArea label="Notes" name="notes" rows={6} defaultValue={client.notes} />
               <SubmitButton>Enregistrer</SubmitButton>
             </ModalForm>
           </Modal>
 
-          <Modal trigger={<>👤 Contacts{contacts.length > 0 ? ` (${contacts.length})` : ""}</>} title="Contacts du client" triggerClassName="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm font-medium hover:bg-background">
+          <Modal trigger={<>Contacts{contacts.length > 0 ? ` (${contacts.length})` : ""}</>} title="Contacts du client" triggerClassName="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm font-medium hover:bg-background">
             <div className="space-y-3">
               {contacts.length === 0 ? (
                 <p className="text-sm text-muted">Aucun contact enregistré.</p>

@@ -93,11 +93,11 @@ export default async function FinanceDashboard({
         {/* Factures clients en retard de paiement */}
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">🔴 Factures en retard</h2>
+            <h2 className="text-sm font-semibold">Factures en retard</h2>
             <span className="text-sm font-bold text-red-600">{euros(totalDu)}</span>
           </div>
           {clients.length === 0 ? (
-            <p className="text-sm text-muted">Aucune facture en retard 👍</p>
+            <p className="text-sm text-muted">Aucune facture en retard</p>
           ) : (
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {clients.map((c) => (
@@ -119,11 +119,11 @@ export default async function FinanceDashboard({
         {/* À payer — fournisseurs */}
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">🧾 On doit (à payer)</h2>
+            <h2 className="text-sm font-semibold">On doit (à payer)</h2>
             <span className="text-sm font-bold text-red-600">{euros(totalAPayer)}</span>
           </div>
           {fournisseurs.length === 0 ? (
-            <p className="text-sm text-muted">Aucune facture fournisseur en attente 👍</p>
+            <p className="text-sm text-muted">Aucune facture fournisseur en attente</p>
           ) : (
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {fournisseurs.map((f) => {
@@ -136,7 +136,7 @@ export default async function FinanceDashboard({
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-semibold tabular-nums">{euros(f.montant_ttc)}</span>
-                      {enRetard && <span className="text-[10px] font-semibold text-red-600">⚠ en retard</span>}
+                      {enRetard && <span className="text-[10px] font-semibold text-red-600">en retard</span>}
                     </span>
                   </Link>
                 );
@@ -153,7 +153,7 @@ export default async function FinanceDashboard({
 
       {!ent?.solde_initial && (
         <p className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          💡 Renseigne le <strong>solde initial</strong> dans ⚙️ Paramètres → Trésorerie pour des soldes exacts.
+          Renseigne le <strong>solde initial</strong> dans Paramètres → Trésorerie pour des soldes exacts.
         </p>
       )}
     </div>

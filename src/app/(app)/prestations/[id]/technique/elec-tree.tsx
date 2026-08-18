@@ -256,7 +256,7 @@ export function ElecTree({ prestationId, circuits, lignes, noeuds }: Props) {
               >
                 ⠿
               </button>
-              <span className="shrink-0 text-xs">🔌</span>
+              
               <span className="min-w-0 flex-1 truncate text-muted">{d.designation}</span>
               <span className="shrink-0 text-xs text-muted tabular-nums">{amp(d.courant)}</span>
               <button onClick={() => detach(d.id)} title="Détacher" className="shrink-0 text-xs text-muted hover:text-red-600">✕</button>

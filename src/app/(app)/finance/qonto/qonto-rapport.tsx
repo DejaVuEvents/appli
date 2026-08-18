@@ -25,7 +25,7 @@ export function QontoRapport() {
     startTransition(async () => {
       const r = await importQontoTransactions(rap.manquantes);
       if (!r.ok) { setError(r.error); return; }
-      setMsg(`✅ ${r.count} transaction${r.count > 1 ? "s" : ""} manquante${r.count > 1 ? "s" : ""} importée${r.count > 1 ? "s" : ""}.`);
+      setMsg(`${r.count} transaction${r.count > 1 ? "s" : ""} manquante${r.count > 1 ? "s" : ""} importée${r.count > 1 ? "s" : ""}.`);
       generer(); // recalcule le rapport
     });
   };
@@ -36,7 +36,7 @@ export function QontoRapport() {
     startTransition(async () => {
       const r = await ajusterSoldeInitial(nouveau);
       if (!r.ok) { setError(r.error ?? "Erreur"); return; }
-      setMsg(`✅ Solde initial ajusté à ${euros(nouveau)}.`);
+      setMsg(`Solde initial ajusté à ${euros(nouveau)}.`);
       generer();
     });
   };
@@ -48,7 +48,7 @@ export function QontoRapport() {
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Rapport de rapprochement</h2>
         <button onClick={generer} disabled={pending} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface disabled:opacity-50">
-          {pending ? "Analyse…" : rap ? "Rafraîchir" : "🔍 Analyser l'écart"}
+          {pending ? "Analyse…" : rap ? "Rafraîchir" : "Analyser l'écart"}
         </button>
       </div>
 
@@ -67,7 +67,7 @@ export function QontoRapport() {
           </div>
 
           {valide ? (
-            <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">✅ Tout est aligné, les soldes correspondent.</p>
+            <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">Tout est aligné, les soldes correspondent.</p>
           ) : (
             <>
               {/* Explication */}
@@ -84,7 +84,7 @@ export function QontoRapport() {
               {rap.manquantes.length > 0 && (
                 <div className="rounded-xl border border-border p-4">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-sm font-semibold">🟢 {rap.manquantes.length} transaction(s) Qonto à importer</div>
+                    <div className="text-sm font-semibold">{rap.manquantes.length} transaction(s) Qonto à importer</div>
                     <button onClick={importerManquantes} disabled={pending} className="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
                       Importer les {rap.manquantes.length}
                     </button>
@@ -103,7 +103,7 @@ export function QontoRapport() {
               {/* Correction 2 : écritures en trop */}
               {rap.enTrop.length > 0 && (
                 <div className="rounded-xl border border-border p-4">
-                  <div className="mb-2 text-sm font-semibold">🟠 {rap.enTrop.length} écriture(s) de l&apos;outil absente(s) de Qonto — à vérifier</div>
+                  <div className="mb-2 text-sm font-semibold">{rap.enTrop.length} écriture(s) de l&apos;outil absente(s) de Qonto — à vérifier</div>
                   <p className="mb-2 text-xs text-muted">Erreurs de saisie, doublons, ou mouvements hors banque (espèces). Clique pour ouvrir et corriger.</p>
                   <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border">
                     {rap.enTrop.map((e) => (
@@ -121,7 +121,7 @@ export function QontoRapport() {
                 <div className="rounded-xl border border-border p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm">
-                      <div className="font-semibold">⚖️ Ajuster le solde initial</div>
+                      <div className="font-semibold">Ajuster le solde initial</div>
                       <div className="text-xs text-muted">Passer de {euros(rap.soldeInitial)} à <strong>{euros(rap.soldeInitial + rap.ajustementBaseline)}</strong> ({rap.ajustementBaseline > 0 ? "+" : ""}{euros(rap.ajustementBaseline)}).</div>
                     </div>
                     <button onClick={ajusterBaseline} disabled={pending} className="rounded-lg border border-border px-4 py-1.5 text-sm font-medium hover:bg-surface disabled:opacity-50">

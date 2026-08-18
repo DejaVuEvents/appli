@@ -70,21 +70,21 @@ export default async function NotesFraisPage() {
             <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3 hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input type="radio" name="type_ndf" value="depense" defaultChecked className="mt-0.5" />
               <span>
-                <span className="block text-sm font-medium">🧾 Dépenses (justificatifs)</span>
+                <span className="block text-sm font-medium">Dépenses (justificatifs)</span>
                 <span className="block text-xs text-muted">Achats matériel, repas… avec photo/PDF du justificatif.</span>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3 hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input type="radio" name="type_ndf" value="km" className="mt-0.5" />
               <span>
-                <span className="block text-sm font-medium">🚗 Frais kilométriques</span>
+                <span className="block text-sm font-medium">Frais kilométriques</span>
                 <span className="block text-xs text-muted">Déplacements en véhicule perso (distance calculée automatiquement).</span>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3 hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input type="radio" name="type_ndf" value="predepense" className="mt-0.5" />
               <span>
-                <span className="block text-sm font-medium">📋 Pré-dépense</span>
+                <span className="block text-sm font-medium">Pré-dépense</span>
                 <span className="block text-xs text-muted">Dépense &gt; 500 € : demande d&apos;autorisation <strong>avant</strong> l&apos;achat.</span>
               </span>
             </label>

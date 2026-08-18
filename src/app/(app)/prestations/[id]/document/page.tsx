@@ -33,7 +33,7 @@ export default async function DocumentPage({
 
   const { data: devisRow } = await supabase
     .from("devis")
-    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur, pdf_import, statut_signature, pdf_signe")
+    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur, coefficient_duree, pdf_import, statut_signature, pdf_signe")
     .eq("id", devisId)
     .single();
   if (!devisRow) notFound();
@@ -67,12 +67,17 @@ export default async function DocumentPage({
   const fmt = (ent?.format_date ?? "fr") as DateFormat;
 
   const transportTotal = (transports ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
+  const coeffDuree = Number(devisRow.coefficient_duree ?? 0) > 0 ? Number(devisRow.coefficient_duree) : 1;
   const totaux = calculerTotaux({
     lignes,
     transportTotal,
     remiseGlobaleType: devisRow.remise_globale_type as RemiseType,
     remiseGlobaleValeur: Number(devisRow.remise_globale_valeur ?? 0),
+    coefficientDuree: coeffDuree,
   });
+  // Surcharge multi-jours affichée comme ligne du tableau (pour que le tableau réconcilie avec le sous-total).
+  const materielBrut1j = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
+  const surchargeDuree = Math.round(materielBrut1j * (coeffDuree - 1) * 100) / 100;
   const tauxTva = Number(ent?.taux_tva ?? 0);
   const montantTva = Math.round(totaux.totalHT * (tauxTva / 100) * 100) / 100;
   const totalTtc = Math.round((totaux.totalHT + montantTva) * 100) / 100;
@@ -206,6 +211,15 @@ export default async function DocumentPage({
             {groupesTries.map(([nom, items]) => (
               <DocGroup key={nom} nom={nom} items={items} />
             ))}
+            {coeffDuree !== 1 && surchargeDuree !== 0 && (
+              <tr className="border-b border-border/60">
+                <td className="py-1.5">Location sur plusieurs jours (coefficient ×{coeffDuree})</td>
+                <td className="py-1.5 text-right">1</td>
+                <td className="py-1.5">forfait</td>
+                <td className="py-1.5 text-right">{euros(surchargeDuree)}</td>
+                <td className="py-1.5 text-right">{euros(surchargeDuree)}</td>
+              </tr>
+            )}
             {transportTotal > 0 && (
               <tr className="border-b border-border/60">
                 <td className="py-1.5">Transport / logistique</td>

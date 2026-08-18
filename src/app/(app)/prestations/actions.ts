@@ -511,6 +511,20 @@ export async function updateRemiseGlobale(devisId: string, formData: FormData) {
   if (d) revalidatePath(`/prestations/${d.prestation_id}`);
 }
 
+/** Coefficient multi-jours appliqué au total matériel (null/1 = tarif 1 jour). */
+export async function updateCoefficientDuree(devisId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: d } = await supabase.from("devis").select("prestation_id").eq("id", devisId).single();
+  const c = num(formData.get("coefficient_duree"));
+  const { error } = await supabase
+    .from("devis")
+    .update({ coefficient_duree: c && c > 0 ? c : null, updated_by: user?.id ?? null })
+    .eq("id", devisId);
+  if (error) throw new Error(error.message);
+  if (d) revalidatePath(`/prestations/${d.prestation_id}`);
+}
+
 // ---------- Lignes ----------
 
 /** Résout les champs d'une ligne (avec valeurs par défaut depuis le catalogue). */

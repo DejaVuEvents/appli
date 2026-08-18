@@ -99,6 +99,7 @@ export async function setStatutPaiement(devisId: string, prestationId: string, f
   revalidatePath(`/prestations/${prestationId}/document`);
   revalidatePath(`/prestations/${prestationId}`);
   revalidatePath("/prestations");
+  revalidatePath("/clients/[id]", "page");
   revaliderFinance();
 }
 
@@ -131,6 +132,7 @@ export async function setStatutSignature(devisId: string, prestationId: string, 
   revalidatePath(`/prestations/${prestationId}/document`);
   revalidatePath(`/prestations/${prestationId}`);
   revalidatePath("/prestations");
+  revalidatePath("/clients/[id]", "page");
 }
 
 /** Upload de la version du devis signée par le client (PDF/image) → marque le devis « signé ». */

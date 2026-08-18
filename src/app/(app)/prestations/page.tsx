@@ -43,6 +43,7 @@ type DevisDocRow = {
   created_at: string | null;
   remise_globale_type: RemiseType;
   remise_globale_valeur: number;
+  coefficient_duree: number | null;
   prestation: { id: string; nom: string; lieu: string | null; date_event_debut: string | null; client: { nom: string } | null } | null;
 };
 
@@ -62,7 +63,7 @@ export default async function PrestationsPage({
   const [{ data: devisData }, { data: dfData }, { data: lignesData }, { data: transData }] = await Promise.all([
     supabase
       .from("devis")
-      .select("id, nom, type, statut_signature, created_at, remise_globale_type, remise_globale_valeur, prestation:prestation_id(id, nom, lieu, date_event_debut, client(nom))")
+      .select("id, nom, type, statut_signature, created_at, remise_globale_type, remise_globale_valeur, coefficient_duree, prestation:prestation_id(id, nom, lieu, date_event_debut, client(nom))")
       .order("created_at", { ascending: false }),
     supabase.from("devis_facture").select("devis_id, type, numero, statut_paiement, montant_ttc"),
     supabase.from("ligne_prestation").select("devis_id, prix_unitaire, quantite, prix_total"),
@@ -94,6 +95,7 @@ export default async function PrestationsPage({
       transportTotal: transByDevis.get(d.id) ?? 0,
       remiseGlobaleType: d.remise_globale_type,
       remiseGlobaleValeur: Number(d.remise_globale_valeur ?? 0),
+      coefficientDuree: Number(d.coefficient_duree ?? 0) > 0 ? Number(d.coefficient_duree) : 1,
     }).totalHT;
     return ht !== 0 ? ht : (emisMontant.get(d.id) ?? 0);
   };

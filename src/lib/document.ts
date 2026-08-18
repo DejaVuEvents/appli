@@ -22,6 +22,8 @@ export type DocContenu = {
   prestationNom: string;
   groupes: { nom: string; items: DocLigne[] }[];
   transportTotal: number;
+  coefficientDuree: number;
+  surchargeDuree: number;
   totaux: { sousTotalHT: number; remiseHT: number; totalHT: number };
   tva: { taux: number; montant: number; totalTtc: number };
 };
@@ -32,7 +34,7 @@ export async function assemblerContenuDocument(
 ): Promise<DocContenu | null> {
   const { data: devisData } = await supabase
     .from("devis")
-    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur")
+    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur, coefficient_duree")
     .eq("id", devisId)
     .single();
   if (!devisData) return null;
@@ -41,6 +43,7 @@ export async function assemblerContenuDocument(
     nom: string | null;
     remise_globale_type: RemiseType;
     remise_globale_valeur: number;
+    coefficient_duree: number | null;
   };
 
   const [{ data: prest }, { data: lignesData }, { data: cats }, { data: transports }, { data: entData }] =
@@ -72,12 +75,16 @@ export async function assemblerContenuDocument(
     return cur ? { nom: cur.nom, ordre: cur.ordre ?? 999 } : { nom: "Divers", ordre: 1000 };
   }
   const transportTotal = (transports ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
+  const coefficientDuree = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
   const totaux = calculerTotaux({
     lignes,
     transportTotal,
     remiseGlobaleType: devis.remise_globale_type,
     remiseGlobaleValeur: Number(devis.remise_globale_valeur ?? 0),
+    coefficientDuree,
   });
+  const materielBrut1j = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
+  const surchargeDuree = Math.round(materielBrut1j * (coefficientDuree - 1) * 100) / 100;
   const ent = entData as ParametresEntreprise | null;
   const taux = Number(ent?.taux_tva ?? 0);
   const montant = Math.round(totaux.totalHT * (taux / 100) * 100) / 100;
@@ -102,6 +109,8 @@ export async function assemblerContenuDocument(
     prestationNom: devis.nom && devis.nom !== "Devis" && devis.nom !== "Facture" ? `${prestation.nom} — ${devis.nom}` : prestation.nom,
     groupes,
     transportTotal,
+    coefficientDuree,
+    surchargeDuree,
     totaux,
     tva: { taux, montant, totalTtc: Math.round((totaux.totalHT + montant) * 100) / 100 },
   };

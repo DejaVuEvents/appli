@@ -42,7 +42,7 @@ function eur(n: number | null | undefined) {
 }
 
 function DocPDF({ contenu, doc }: { contenu: DocContenu; doc: { type: "devis" | "facture"; numero: string | null; dateEmission: string | null; dateEcheance: string | null } }) {
-  const { ent, client, prestationNom, groupes, transportTotal, totaux, tva } = contenu;
+  const { ent, client, prestationNom, groupes, transportTotal, coefficientDuree, surchargeDuree, totaux, tva } = contenu;
   const titre = doc.type === "devis" ? "Devis" : "Facture";
   const villeLigne = [ent?.code_postal, ent?.ville].filter(Boolean).join(" ");
 
@@ -109,6 +109,16 @@ function DocPDF({ contenu, doc }: { contenu: DocContenu; doc: { type: "devis" | 
               })}
             </View>
           ))}
+
+          {coefficientDuree !== 1 && surchargeDuree !== 0 ? (
+            <View style={s.tr}>
+              <Text style={s.cDes}>Location sur plusieurs jours (coefficient ×{coefficientDuree})</Text>
+              <Text style={s.cQte}>1</Text>
+              <Text style={s.cUni}>forfait</Text>
+              <Text style={s.cPu}>{eur(surchargeDuree)}</Text>
+              <Text style={s.cMt}>{eur(surchargeDuree)}</Text>
+            </View>
+          ) : null}
 
           {transportTotal > 0 ? (
             <View style={s.tr}>

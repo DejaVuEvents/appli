@@ -76,12 +76,16 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
     }
     return {
       id: d.id, type: d.type,
+      prestationId: d.prestation_id,
       intitule: d.nom || prestNom.get(d.prestation_id) || (d.type === "facture" ? "Facture" : "Devis"),
       numero: df?.numero ?? null,
       date: df?.date_emission ?? null,
       montant,
       statutLabel, statutCls,
-      href: `/prestations/${d.prestation_id}/document?devis=${d.id}&type=${d.type}`,
+      // Valeur brute du statut, et si le document est éditable en statut (facture émise, ou devis).
+      statutValue: d.type === "facture" ? (df?.statut_paiement ?? "en_attente") : (d.statut_signature ?? ""),
+      statutEditable: d.type === "facture" ? emis : true,
+      href: `/prestations/devis/${d.id}`,
     };
   });
 

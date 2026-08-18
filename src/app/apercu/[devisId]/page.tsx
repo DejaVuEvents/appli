@@ -109,6 +109,15 @@ export default async function ApercuDevisPage({
                   ))}
                 </Fragment>
               ))}
+              {c.coefficientDuree !== 1 && c.surchargeDuree !== 0 && (
+                <tr className="border-b border-border/60">
+                  <td className="py-1.5">Location sur plusieurs jours (coefficient ×{c.coefficientDuree})</td>
+                  <td className="py-1.5 text-right">1</td>
+                  <td className="py-1.5">forfait</td>
+                  <td className="py-1.5 text-right">{euros(c.surchargeDuree)}</td>
+                  <td className="py-1.5 text-right">{euros(c.surchargeDuree)}</td>
+                </tr>
+              )}
               {c.transportTotal > 0 && (
                 <tr className="border-b border-border/60">
                   <td className="py-1.5">Transport / logistique</td>

@@ -3,18 +3,62 @@
 import { useState } from "react";
 import Link from "next/link";
 import { euros, dateFr } from "@/lib/format";
+import { setStatutPaiement, setStatutSignature } from "../../prestations/[id]/document/actions";
 
 export type DocRow = {
   id: string;
   type: "devis" | "facture";
+  prestationId: string;
   intitule: string;
   numero: string | null;
   date: string | null;
   montant: number;
   statutLabel: string;
   statutCls: string;
+  statutValue: string;
+  statutEditable: boolean;
   href: string;
 };
+
+// Options du sélecteur de statut, selon le type de document.
+const OPTIONS_FACTURE: { value: string; label: string }[] = [
+  { value: "en_attente", label: "En attente" },
+  { value: "paye", label: "Payée" },
+  { value: "retard", label: "En retard" },
+  { value: "annule", label: "Annulée" },
+];
+const OPTIONS_DEVIS: { value: string; label: string }[] = [
+  { value: "", label: "Envoyé" },
+  { value: "valide", label: "Validé" },
+  { value: "signe", label: "Signé" },
+  { value: "refuse", label: "Refusé" },
+];
+
+function StatutCell({ d }: { d: DocRow }) {
+  if (!d.statutEditable) {
+    return <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.statutCls}`}>{d.statutLabel}</span>;
+  }
+  const options = d.type === "facture" ? OPTIONS_FACTURE : OPTIONS_DEVIS;
+  const field = d.type === "facture" ? "statut_paiement" : "statut_signature";
+  const action = d.type === "facture"
+    ? setStatutPaiement.bind(null, d.id, d.prestationId)
+    : setStatutSignature.bind(null, d.id, d.prestationId);
+  return (
+    <form action={action} className="inline-flex">
+      <select
+        name={field}
+        defaultValue={d.statutValue}
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        className={`cursor-pointer rounded-full border-0 px-2 py-0.5 text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-primary ${d.statutCls}`}
+        title="Changer le statut"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-background text-foreground">{o.label}</option>
+        ))}
+      </select>
+    </form>
+  );
+}
 
 export function ClientDocs({ docs }: { docs: DocRow[] }) {
   const [tab, setTab] = useState<"facture" | "devis">("facture");
@@ -67,7 +111,7 @@ export function ClientDocs({ docs }: { docs: DocRow[] }) {
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums">{euros(d.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.statutCls}`}>{d.statutLabel}</span>
+                    <StatutCell d={d} />
                   </td>
                 </tr>
               ))}

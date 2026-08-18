@@ -10,6 +10,7 @@ import {
   addTransport,
   deleteTransport,
   updateRemiseGlobale,
+  updateCoefficientDuree,
   duplicerDevis,
   deleteDevis,
   renameDevis,
@@ -45,10 +46,12 @@ export async function DevisBuilder(props: {
   updatedAt: string | null;
   statut: PrestationStatut;
   statutAction: (formData: FormData) => void | Promise<void>;
+  nbJoursEvenement: number;
+  coefficientAuto: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any;
 }) {
-  const { prestationId, devis, lignes, transports, references, categories, refMap, vehicules, tauxTva, plusieurs, createur, modificateur, updatedAt, statut, statutAction, supabase } = props;
+  const { prestationId, devis, lignes, transports, references, categories, refMap, vehicules, tauxTva, plusieurs, createur, modificateur, updatedAt, statut, statutAction, nbJoursEvenement, coefficientAuto, supabase } = props;
   const id = prestationId;
 
   // Accessoires optionnels disponibles par référence parente
@@ -121,13 +124,16 @@ export async function DevisBuilder(props: {
     })),
   }));
 
-  // Marge sous-location
-  const coutFournisseurTotal = lignes.reduce((s, l) => {
+  // Coefficient multi-jours appliqué au matériel (le transport n'est pas multiplié).
+  const coeff = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
+
+  // Marge sous-location (coût fournisseur et revenu matos externe suivent la durée).
+  const coutFournisseurTotal = coeff * lignes.reduce((s, l) => {
     if (!l.reference_id) return s;
     const r = refMap.get(l.reference_id);
     return r?.cout_location_jour != null ? s + Number(r.cout_location_jour) * l.quantite : s;
   }, 0);
-  const revenusExterne = lignes.reduce((s, l) => {
+  const revenusExterne = coeff * lignes.reduce((s, l) => {
     if (!l.reference_id) return s;
     const r = refMap.get(l.reference_id);
     return r?.cout_location_jour != null ? s + Number(l.prix_total ?? 0) : s;
@@ -135,8 +141,8 @@ export async function DevisBuilder(props: {
   const margeExterne = revenusExterne - coutFournisseurTotal;
   const hasMargeFournisseur = coutFournisseurTotal > 0;
 
-  const sousTotalBrut = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
-  const netLignes = lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
+  const sousTotalBrut = coeff * lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
+  const netLignes = coeff * lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
   const transportTotal = transports.reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
   const baseGlobale = netLignes + transportTotal;
   const remiseGlobale = montantRemise(baseGlobale, devis.remise_globale_type, devis.remise_globale_valeur);
@@ -197,6 +203,32 @@ export async function DevisBuilder(props: {
           </Card>
         </section>
 
+        {/* Durée / coefficient multi-jours */}
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Durée (tarif multi-jours)</h2>
+          <Card className="p-4">
+            <form action={updateCoefficientDuree.bind(null, devis.id)} className="grid gap-3 sm:grid-cols-4 sm:items-end">
+              <Field
+                label="Coefficient"
+                name="coefficient_duree"
+                type="number"
+                step="0.01"
+                defaultValue={devis.coefficient_duree ?? coefficientAuto}
+                className="sm:col-span-1"
+              />
+              <div className="sm:col-span-2 text-xs text-muted">
+                Multiplie le total du matériel (pas le transport).{" "}
+                <span className="text-foreground">Événement sur {nbJoursEvenement} jour{nbJoursEvenement > 1 ? "s" : ""}</span> → coefficient suggéré{" "}
+                <span className="font-medium text-foreground">×{coefficientAuto}</span>.
+                {devis.coefficient_duree != null && Number(devis.coefficient_duree) !== coefficientAuto && (
+                  <span className="ml-1 text-amber-600 dark:text-amber-500">(valeur personnalisée)</span>
+                )}
+              </div>
+              <div><SubmitButton>Appliquer</SubmitButton></div>
+            </form>
+          </Card>
+        </section>
+
         {/* Marge sous-location */}
         {hasMargeFournisseur && (
           <section>
@@ -235,6 +267,7 @@ export async function DevisBuilder(props: {
 
         <Card className="p-4">
           <div className="space-y-1 text-sm">
+            {coeff !== 1 && <div className="flex justify-between text-muted"><span>Coeff. multi-jours</span><span>×{coeff}</span></div>}
             <div className="flex justify-between"><span className="text-muted">Sous-total HT</span><span>{euros(sousTotalHT)}</span></div>
             {remiseHT > 0 && <div className="flex justify-between text-muted"><span>Remise HT</span><span>− {euros(remiseHT)}</span></div>}
             <div className="mt-1 flex justify-between border-t border-border pt-1.5 text-base font-bold"><span>Total HT</span><span>{euros(totalHT)}</span></div>

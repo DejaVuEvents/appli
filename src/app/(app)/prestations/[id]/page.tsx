@@ -71,15 +71,21 @@ export default async function PrestationDetailPage({
     ? await supabase.from("materiel_reference").select("id, cout_location_jour").in("id", refIds)
     : { data: [] };
   const refCout = new Map((refCoutData ?? []).map((r) => [r.id as string, Number(r.cout_location_jour ?? 0)]));
-  const coutSousLoc = allLignes.reduce((s, l) => s + (l.reference_id ? (refCout.get(l.reference_id) ?? 0) * Number(l.quantite ?? 0) : 0), 0);
+  const coeffDe = (d: Devis): number => (Number(d.coefficient_duree ?? 0) > 0 ? Number(d.coefficient_duree) : 1);
 
-  // Total d'un devis
+  // Total d'un devis (matériel × coefficient multi-jours + transport − remise globale)
   const totalDevis = (d: Devis): number => {
     const ls = allLignes.filter((l) => l.devis_id === d.id);
     const tr = allTransports.filter((t) => t.devis_id === d.id).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
-    return calculerTotaux({ lignes: ls, transportTotal: tr, remiseGlobaleType: d.remise_globale_type, remiseGlobaleValeur: Number(d.remise_globale_valeur ?? 0) }).totalHT;
+    return calculerTotaux({ lignes: ls, transportTotal: tr, remiseGlobaleType: d.remise_globale_type, remiseGlobaleValeur: Number(d.remise_globale_valeur ?? 0), coefficientDuree: coeffDe(d) }).totalHT;
   };
   const totalTousDevis = devisList.reduce((s, d) => s + totalDevis(d), 0);
+  // Coût de sous-location = matériel externe × quantité × coefficient de son devis.
+  const coutSousLoc = devisList.reduce((s, d) => {
+    const c = coeffDe(d);
+    return s + c * allLignes.filter((l) => l.devis_id === d.id)
+      .reduce((ss, l) => ss + (l.reference_id ? (refCout.get(l.reference_id) ?? 0) * Number(l.quantite ?? 0) : 0), 0);
+  }, 0);
   const gainNetEvenement = totalTousDevis - coutSousLoc;
 
   // Tous les documents existants (pour la popup d'ajout) — chargé seulement en vue liste.

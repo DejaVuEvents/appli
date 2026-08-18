@@ -16,7 +16,7 @@ import { assemblerContenuDocument } from "@/lib/document";
 import { urlDocument } from "@/lib/storage";
 import { statutFactureAffichage, STATUT_PAIEMENT_LABELS, type StatutPaiement } from "@/lib/facture-statut";
 import { JustificatifPreview } from "@/components/justificatif-preview";
-import { periodeReservation } from "@/lib/devis";
+import { periodeReservation, joursSuggeres, facteurJours } from "@/lib/devis";
 import { euros, dateFr } from "@/lib/format";
 import type { LignePrestation, Prestation, PrestationStatut, Devis } from "@/lib/types";
 
@@ -295,8 +295,20 @@ export default async function DevisEditorPage({
     const contenuLecture = contenu && aDesLignes ? (
       <div className="space-y-4">
         {pdfImportUrl && (
-          <a href={pdfImportUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface">
-            <IconFile className="h-3.5 w-3.5" /> Voir le PDF d&apos;origine
+          <a
+            href={pdfImportUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:bg-amber-950/40"
+          >
+            <span className="flex items-center gap-2.5">
+              <IconFile className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
+              <span>
+                <span className="block font-medium text-amber-900 dark:text-amber-200">Voir le document original</span>
+                <span className="block text-xs text-amber-700/80 dark:text-amber-400/70">Devis importé — cette liste a été reconstituée à partir du PDF.</span>
+              </span>
+            </span>
+            <span className="shrink-0 text-xs font-semibold text-amber-700 dark:text-amber-400">Ouvrir le PDF →</span>
           </a>
         )}
         {contenu.groupes.map((g) => (
@@ -315,6 +327,12 @@ export default async function DevisEditorPage({
             </div>
           </Card>
         ))}
+        {contenu.coefficientDuree !== 1 && contenu.surchargeDuree !== 0 && (
+          <Card className="flex items-center justify-between px-4 py-2.5 text-sm">
+            <span className="font-medium">Location sur plusieurs jours (coefficient ×{contenu.coefficientDuree})</span>
+            <span className="font-medium">{euros(contenu.surchargeDuree)}</span>
+          </Card>
+        )}
         {contenu.transportTotal > 0 && (
           <Card className="flex items-center justify-between px-4 py-2.5 text-sm">
             <span className="font-medium">Transport</span>
@@ -391,6 +409,18 @@ export default async function DevisEditorPage({
   }
   const besoin = [...besoinMap].map(([referenceId, qty]) => ({ referenceId, qty, nom: refMap.get(referenceId)?.nom ?? "—" }));
 
+  // Coefficient multi-jours : durée de l'événement + paliers dégressifs globaux → coefficient suggéré.
+  const nbJoursEvenement = joursSuggeres(prestation);
+  const { data: paliersData } = await supabase
+    .from("tarif_degressif_global")
+    .select("jour_min, coefficient")
+    .order("jour_min");
+  const paliers = ((paliersData ?? []) as { jour_min: number; coefficient: number }[]).map((p) => ({
+    jour_min: Number(p.jour_min),
+    coefficient: Number(p.coefficient),
+  }));
+  const coefficientAuto = Math.round(facteurJours(nbJoursEvenement, paliers) * 100) / 100;
+
   return (
     <div className="max-w-7xl space-y-6">
       <PageHeader title={titreDoc} subtitle={`${prestation.nom}${prestation.client?.nom ? ` · ${prestation.client.nom}` : ""}`} />
@@ -422,6 +452,8 @@ export default async function DevisEditorPage({
         updatedAt={devis.updated_at ?? null}
         statut={prestation.statut as PrestationStatut}
         statutAction={updateStatut.bind(null, prestationId)}
+        nbJoursEvenement={nbJoursEvenement}
+        coefficientAuto={coefficientAuto}
         supabase={supabase}
       />
 

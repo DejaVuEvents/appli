@@ -158,6 +158,7 @@ export interface Devis {
   remise_globale_type: RemiseType;
   remise_globale_valeur: number;
   remise_globale_libelle: string | null;
+  coefficient_duree: number | null;
   source_devis_id: string | null;
   created_by: string | null;
   created_at: string;

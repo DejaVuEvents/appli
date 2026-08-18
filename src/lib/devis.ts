@@ -77,9 +77,12 @@ export function calculerTotaux(args: {
   transportTotal: number;
   remiseGlobaleType: RemiseType;
   remiseGlobaleValeur: number;
+  /** Coefficient multi-jours appliqué au matériel (pas au transport). Défaut 1. */
+  coefficientDuree?: number;
 }): { sousTotalHT: number; remiseHT: number; totalHT: number } {
-  const sousTotalBrut = args.lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
-  const netLignes = args.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
+  const coeff = args.coefficientDuree && args.coefficientDuree > 0 ? args.coefficientDuree : 1;
+  const sousTotalBrut = args.lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0) * coeff;
+  const netLignes = args.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0) * coeff;
   const base = netLignes + args.transportTotal;
   const remiseGlobale = montantRemise(base, args.remiseGlobaleType, args.remiseGlobaleValeur);
   const sousTotalHT = round2(sousTotalBrut + args.transportTotal);

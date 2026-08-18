@@ -240,6 +240,10 @@ export async function DevisBuilder(props: {
             <div className="mt-1 flex justify-between border-t border-border pt-1.5 text-base font-bold"><span>Total HT</span><span>{euros(totalHT)}</span></div>
             {tauxTva > 0 && <div className="flex justify-between text-muted"><span>TVA {tauxTva} %</span><span>{euros(Math.round(totalHT * tauxTva) / 100)}</span></div>}
             <div className="flex justify-between font-semibold"><span>Total TTC</span><span>{euros(totalTtc)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-border pt-1.5 font-bold">
+              <span className="flex items-center gap-1">Gain net{coutFournisseurTotal > 0 && <span className="text-[10px] font-normal text-muted" title="Total HT − coûts de sous-location">(hors sous-loc.)</span>}</span>
+              <span className={totalHT - coutFournisseurTotal >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}>{euros(totalHT - coutFournisseurTotal)}</span>
+            </div>
           </div>
         </Card>
 

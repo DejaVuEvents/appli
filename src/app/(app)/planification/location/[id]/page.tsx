@@ -56,6 +56,20 @@ export default async function LocationDetailPage({
     ? await supabase.from("ligne_prestation").select("id", { count: "exact", head: true }).eq("prestation_id", loc.prestation_id)
     : { count: 0 };
 
+  // Gain net estimé de la location = total des lignes (net) − coût de sous-location.
+  const { data: lignesLoc } = loc.prestation_id
+    ? await supabase.from("ligne_prestation").select("reference_id, quantite, prix_total").eq("prestation_id", loc.prestation_id)
+    : { data: [] };
+  const ll = (lignesLoc ?? []) as { reference_id: string | null; quantite: number; prix_total: number | null }[];
+  const refIdsLoc = [...new Set(ll.map((l) => l.reference_id).filter(Boolean) as string[])];
+  const { data: refCoutLoc } = refIdsLoc.length
+    ? await supabase.from("materiel_reference").select("id, cout_location_jour").in("id", refIdsLoc)
+    : { data: [] };
+  const refCoutMap = new Map((refCoutLoc ?? []).map((r) => [r.id as string, Number(r.cout_location_jour ?? 0)]));
+  const revenusLoc = ll.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
+  const coutSousLocLoc = ll.reduce((s, l) => s + (l.reference_id ? (refCoutMap.get(l.reference_id) ?? 0) * Number(l.quantite ?? 0) : 0), 0);
+  const gainNetLoc = (revenusLoc || Number(loc.montant ?? 0)) - coutSousLocLoc;
+
   // Équipe attachée (via la prestation support) + créateur.
   const { data: attachesData } = loc.prestation_id
     ? await supabase.from("prestation_membre").select("role, membre:membre_id(id, prenom, nom, email, competences)").eq("prestation_id", loc.prestation_id)
@@ -97,6 +111,11 @@ export default async function LocationDetailPage({
               <div><span className="text-muted">Montant : </span>{loc.montant != null ? euros(loc.montant) : "—"}</div>
               {loc.notes && <div className="sm:col-span-2"><span className="text-muted">Notes : </span>{loc.notes}</div>}
               {creePar && <div className="sm:col-span-2 text-muted text-xs">Créé par {nomMembre(creePar)}</div>}
+              <div className="sm:col-span-2 mt-1 border-t border-border pt-2">
+                <span className="text-muted">Gain net estimé : </span>
+                <span className={`font-semibold ${gainNetLoc >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>{euros(gainNetLoc)}</span>
+                {coutSousLocLoc > 0 && <span className="ml-1 text-xs text-muted">(− {euros(coutSousLocLoc)} sous-loc.)</span>}
+              </div>
             </div>
 
             {/* Personnes attachées + rôles + compétences */}

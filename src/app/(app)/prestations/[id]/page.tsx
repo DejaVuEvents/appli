@@ -45,7 +45,7 @@ export default async function PrestationDetailPage({
     await Promise.all([
       supabase.from("prestation").select("*, client(nom, tarif_preferentiel_pct)").eq("id", id).single(),
       supabase.from("devis").select("*").eq("prestation_id", id).order("created_at"),
-      supabase.from("ligne_prestation").select("id, devis_id, prix_unitaire, quantite, prix_total").eq("prestation_id", id),
+      supabase.from("ligne_prestation").select("id, devis_id, reference_id, prix_unitaire, quantite, prix_total").eq("prestation_id", id),
       supabase.from("transport").select("id, devis_id, cout_calcule").eq("prestation_id", id),
     ]);
 
@@ -62,8 +62,16 @@ export default async function PrestationDetailPage({
     .eq("prestation_id", id)
     .eq("type", "facture");
   const factureMap = new Map((dfData ?? []).map((d) => [d.devis_id as string, d as { numero: string | null; statut_paiement: string | null }]));
-  const allLignes = (lignesData ?? []) as Pick<LignePrestation, "id" | "devis_id" | "prix_unitaire" | "quantite" | "prix_total">[];
+  const allLignes = (lignesData ?? []) as Pick<LignePrestation, "id" | "devis_id" | "reference_id" | "prix_unitaire" | "quantite" | "prix_total">[];
   const allTransports = (transportsData ?? []) as unknown as TransportRow[];
+
+  // Gain net estimé de l'événement = total des devis − coût de sous-location (matériel externe).
+  const refIds = [...new Set(allLignes.map((l) => l.reference_id).filter(Boolean) as string[])];
+  const { data: refCoutData } = refIds.length
+    ? await supabase.from("materiel_reference").select("id, cout_location_jour").in("id", refIds)
+    : { data: [] };
+  const refCout = new Map((refCoutData ?? []).map((r) => [r.id as string, Number(r.cout_location_jour ?? 0)]));
+  const coutSousLoc = allLignes.reduce((s, l) => s + (l.reference_id ? (refCout.get(l.reference_id) ?? 0) * Number(l.quantite ?? 0) : 0), 0);
 
   // Total d'un devis
   const totalDevis = (d: Devis): number => {
@@ -72,6 +80,7 @@ export default async function PrestationDetailPage({
     return calculerTotaux({ lignes: ls, transportTotal: tr, remiseGlobaleType: d.remise_globale_type, remiseGlobaleValeur: Number(d.remise_globale_valeur ?? 0) }).totalHT;
   };
   const totalTousDevis = devisList.reduce((s, d) => s + totalDevis(d), 0);
+  const gainNetEvenement = totalTousDevis - coutSousLoc;
 
   // Tous les documents existants (pour la popup d'ajout) — chargé seulement en vue liste.
   const { data: tousDevisData } = showDevis
@@ -132,6 +141,10 @@ export default async function PrestationDetailPage({
                 <div className="sm:col-span-2 text-muted text-xs">Tarif préférentiel client : −{clientPct}% (à appliquer en remise ligne)</div>
               )}
               {creePar && <div className="sm:col-span-2 text-muted text-xs">Créé par {creePar}</div>}
+              <div className="sm:col-span-2 mt-1 flex flex-wrap gap-x-6 gap-y-1 border-t border-border pt-2">
+                <span><span className="text-muted">Total devis : </span><span className="font-semibold">{euros(totalTousDevis)}</span></span>
+                <span><span className="text-muted">Gain net estimé : </span><span className={`font-semibold ${gainNetEvenement >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>{euros(gainNetEvenement)}</span>{coutSousLoc > 0 && <span className="ml-1 text-xs text-muted">(− {euros(coutSousLoc)} sous-loc.)</span>}</span>
+              </div>
             </div>
 
             {/* Personnes attachées + rôles + compétences */}

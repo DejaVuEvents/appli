@@ -35,8 +35,31 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragRef = useRef<{ id: string; cat: string } | null>(null);
+  const posRef = useRef<{ x: number; y: number } | null>(null); // dernière position pointeur (auto-scroll)
+  const rafRef = useRef<number | null>(null);
   const [remiseOpen, setRemiseOpen] = useState<Set<string>>(new Set());
   const [delId, setDelId] = useState<string | null>(null);
+
+  // Auto-scroll de la fenêtre quand on glisse une ligne près du haut/bas de l'écran.
+  const autoScrollTick = () => {
+    const pos = posRef.current;
+    if (!dragRef.current || !pos) { rafRef.current = null; return; }
+    const EDGE = 90, MAX = 20;
+    const h = window.innerHeight;
+    let dy = 0;
+    if (pos.y < EDGE) dy = -Math.ceil(((EDGE - pos.y) / EDGE) * MAX);
+    else if (pos.y > h - EDGE) dy = Math.ceil(((pos.y - (h - EDGE)) / EDGE) * MAX);
+    if (dy !== 0) {
+      window.scrollBy(0, dy);
+      const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-ligne]") as HTMLElement | null;
+      setOverId(el?.getAttribute("data-ligne") ?? null);
+    }
+    rafRef.current = requestAnimationFrame(autoScrollTick);
+  };
+  const stopAutoScroll = () => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null; posRef.current = null;
+  };
 
   const inline = (ligneId: string, champ: string, valeur: string | number) => {
     const fd = new FormData(); fd.set("champ", champ); fd.set("valeur", String(valeur));
@@ -49,15 +72,19 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
   const onDown = (e: React.PointerEvent, id: string, cat: string) => {
     e.preventDefault(); e.stopPropagation();
     dragRef.current = { id, cat }; setDragId(id);
+    posRef.current = { x: e.clientX, y: e.clientY };
+    if (rafRef.current == null) rafRef.current = requestAnimationFrame(autoScrollTick);
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
   };
   const onMove = (e: React.PointerEvent) => {
     if (!dragRef.current) return;
+    posRef.current = { x: e.clientX, y: e.clientY };
     const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-ligne]") as HTMLElement | null;
     setOverId(el?.getAttribute("data-ligne") ?? null);
   };
   const onUp = () => {
     const d = dragRef.current; const over = overId;
+    stopAutoScroll();
     dragRef.current = null; setDragId(null); setOverId(null);
     if (!d || !over || over === d.id) return;
     const bloc = blocs.find((b) => catKey(b) === d.cat);

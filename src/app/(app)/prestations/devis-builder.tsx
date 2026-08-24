@@ -7,8 +7,6 @@ import { Modal, ModalForm } from "@/components/modal";
 import { LignesEditor, type BlocData, type RefInfo } from "./lignes-editor";
 import { StatutSelect } from "./[id]/statut-select";
 import {
-  addTransport,
-  deleteTransport,
   updateRemiseGlobale,
   updateCoefficientDuree,
   duplicerDevis,
@@ -52,7 +50,7 @@ export async function DevisBuilder(props: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any;
 }) {
-  const { prestationId, devis, lignes, transports, references, categories, refMap, vehicules, tauxTva, plusieurs, createur, modificateur, updatedAt, statut, statutAction, nbJoursEvenement, coefficientAuto, supabase } = props;
+  const { prestationId, devis, lignes, transports, references, categories, refMap, tauxTva, plusieurs, createur, modificateur, updatedAt, statut, statutAction, nbJoursEvenement, coefficientAuto, supabase } = props;
   const id = prestationId;
 
   // Accessoires optionnels disponibles par référence parente
@@ -80,6 +78,7 @@ export async function DevisBuilder(props: {
     [BUCKETS.LUM]: categories.find((c) => c.nom === "Lumière & Effets")?.id,
     [BUCKETS.SON]: categories.find((c) => c.nom === "Son")?.id,
     [BUCKETS.STR]: categories.find((c) => c.nom === "Structure & Scène")?.id,
+    [BUCKETS.ELEC]: categories.find((c) => c.nom === "Électricité" || c.nom === "Distribution électrique")?.id,
     [BUCKETS.TECH]: categories.find((c) => c.nom === "Technique")?.id,
     [BUCKETS.TRANSPORT]: categories.find((c) => c.nom === "Transport")?.id,
   };
@@ -175,36 +174,6 @@ export async function DevisBuilder(props: {
       <div className="min-w-0 flex-1 space-y-6">
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
         <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} />
-
-        {/* Transport */}
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Transport</h2>
-          <Card className="divide-y divide-border overflow-hidden">
-            {transports.length === 0 && <p className="px-4 py-3 text-sm text-muted">Aucun transport.</p>}
-            {transports.map((t) => (
-              <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <span>{t.nb_vehicules} × {t.vehicule?.nom ?? "?"}{t.km ? ` · ${t.km} km` : ""}</span>
-                <span className="flex items-center gap-3">
-                  <strong>{euros(t.cout_calcule)}</strong>
-                  <form action={deleteTransport.bind(null, id, t.id)}>
-                    <ConfirmButton confirm="Supprimer ce transport ?" className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
-                  </form>
-                </span>
-              </div>
-            ))}
-          </Card>
-          {vehicules.length > 0 && (
-            <Card className="mt-3 p-4">
-              <form action={addTransport.bind(null, id, devis.id)} className="grid gap-3 sm:grid-cols-4 sm:items-end">
-                <Select label="Véhicule" name="vehicule_id" required className="sm:col-span-2"
-                  options={[{ value: "", label: "Choisir…" }, ...vehicules.map((v) => ({ value: v.id, label: v.nom }))]} />
-                <Field label="Nb véhicules" name="nb_vehicules" type="number" defaultValue={1} />
-                <Field label="Kilométrage" name="km" type="number" step="0.1" defaultValue={0} />
-                <div className="sm:col-span-4"><SubmitButton>+ Ajouter le transport</SubmitButton></div>
-              </form>
-            </Card>
-          )}
-        </section>
 
         {/* Remise globale */}
         <section>

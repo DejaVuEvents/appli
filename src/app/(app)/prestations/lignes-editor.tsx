@@ -38,6 +38,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const dragRef = useRef<{ id: string; cat: string } | null>(null);
+  const overRef = useRef<string | null>(null); // dernière ligne survolée (id) pendant le drag
   const posRef = useRef<{ x: number; y: number } | null>(null); // dernière position pointeur (auto-scroll)
   const rafRef = useRef<number | null>(null);
   const [remiseOpen, setRemiseOpen] = useState<Set<string>>(new Set());
@@ -55,7 +56,9 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
     if (dy !== 0) {
       window.scrollBy(0, dy);
       const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-ligne]") as HTMLElement | null;
-      setOverId(el?.getAttribute("data-ligne") ?? null);
+      const o = el?.getAttribute("data-ligne") ?? null;
+      overRef.current = o;
+      setOverId(o);
     }
     rafRef.current = requestAnimationFrame(autoScrollTick);
   };
@@ -71,32 +74,38 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
 
   const catKey = (b: BlocData) => b.catId ?? "__divers";
 
-  // Drag & drop (réordonnancement dans une même catégorie).
+  // Drag & drop (réordonnancement dans une même catégorie) via listeners globaux
+  // (plus robuste que setPointerCapture sur un bouton qui se re-rend).
   const onDown = (e: React.PointerEvent, id: string, cat: string) => {
     e.preventDefault(); e.stopPropagation();
-    dragRef.current = { id, cat }; setDragId(id);
+    dragRef.current = { id, cat }; overRef.current = id; setDragId(id);
     posRef.current = { x: e.clientX, y: e.clientY };
+
+    const move = (ev: PointerEvent) => {
+      if (!dragRef.current) return;
+      posRef.current = { x: ev.clientX, y: ev.clientY };
+      const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-ligne]") as HTMLElement | null;
+      const o = el?.getAttribute("data-ligne") ?? null;
+      overRef.current = o; setOverId(o);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      stopAutoScroll();
+      const d = dragRef.current; const over = overRef.current;
+      dragRef.current = null; overRef.current = null; setDragId(null); setOverId(null);
+      if (!d || !over || over === d.id) return;
+      const bloc = blocs.find((b) => catKey(b) === d.cat);
+      if (!bloc) return;
+      const ids = bloc.lignes.map((l) => l.id);
+      const from = ids.indexOf(d.id); const to = ids.indexOf(over);
+      if (from < 0 || to < 0) return; // cible dans une autre catégorie → ignoré
+      ids.splice(to, 0, ids.splice(from, 1)[0]);
+      start(async () => { await reordonnerLignes(prestationId, ids); router.refresh(); });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
     if (rafRef.current == null) rafRef.current = requestAnimationFrame(autoScrollTick);
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
-  };
-  const onMove = (e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    posRef.current = { x: e.clientX, y: e.clientY };
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-ligne]") as HTMLElement | null;
-    setOverId(el?.getAttribute("data-ligne") ?? null);
-  };
-  const onUp = () => {
-    const d = dragRef.current; const over = overId;
-    stopAutoScroll();
-    dragRef.current = null; setDragId(null); setOverId(null);
-    if (!d || !over || over === d.id) return;
-    const bloc = blocs.find((b) => catKey(b) === d.cat);
-    if (!bloc) return;
-    const ids = bloc.lignes.map((l) => l.id);
-    const from = ids.indexOf(d.id); const to = ids.indexOf(over);
-    if (from < 0 || to < 0) return; // cible dans une autre catégorie → ignoré
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    start(async () => { await reordonnerLignes(prestationId, ids); router.refresh(); });
   };
 
   const InlineNum = ({ l, champ, val, w, step = "0.01", suffix }: { l: LigneData; champ: string; val: number; w: string; step?: string; suffix?: string }) => (
@@ -142,7 +151,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                         className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId ? "border-t-2 border-primary" : ""}`}>
                         <div className="group flex items-center gap-2 px-2 py-1.5">
                           {/* Poignée (visible au survol ; toujours visible sur tactile) */}
-                          <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))} onPointerMove={onMove} onPointerUp={onUp}
+                          <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))}
                             className="w-4 shrink-0 cursor-grab touch-none text-center text-muted opacity-0 transition-opacity hover:text-foreground active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100" title="Déplacer" aria-label="Déplacer">⠿</button>
                           {/* Désignation — cliquable pour la fiche produit si liée au catalogue */}
                           {l.reference_id && infosRef[l.reference_id] ? (

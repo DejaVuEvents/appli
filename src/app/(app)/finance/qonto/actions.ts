@@ -303,3 +303,53 @@ export async function importQontoTransactions(
     return { ok: false, error: String(e) };
   }
 }
+
+/**
+ * Récupère depuis Qonto les justificatifs (pièces jointes) des écritures déjà importées
+ * qui n'en ont pas encore. Ne touche qu'au champ `facture` des écritures Qonto sans document.
+ */
+export async function recupererJustificatifsQonto(): Promise<
+  { ok: true; ajoutes: number; sansPiece: number } | { ok: false; error: string }
+> {
+  try {
+    const supabase = await createClient();
+    const { data: ent } = await supabase
+      .from("parametres_entreprise")
+      .select("qonto_login, qonto_token, qonto_account_slug")
+      .limit(1)
+      .maybeSingle();
+    if (!ent?.qonto_login || !ent?.qonto_token || !ent?.qonto_account_slug) {
+      return { ok: false, error: "Identifiants Qonto non configurés (voir Paramètres)." };
+    }
+
+    // Écritures Qonto sans justificatif
+    const { data: sansDoc } = await supabase
+      .from("ecriture_financiere")
+      .select("id, qonto_transaction_id")
+      .not("qonto_transaction_id", "is", null)
+      .is("facture", null);
+    const parTxn = new Map<string, string>(); // transaction_id → id écriture
+    for (const e of sansDoc ?? []) if (e.qonto_transaction_id) parTxn.set(e.qonto_transaction_id as string, e.id as string);
+    if (parTxn.size === 0) return { ok: true, ajoutes: 0, sansPiece: 0 };
+
+    // Retrouve les attachment_ids de ces transactions
+    const txs = await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, undefined, true);
+    let ajoutes = 0;
+    let sansPiece = 0;
+    for (const tx of txs) {
+      const ecrId = parTxn.get(tx.transaction_id);
+      if (!ecrId) continue;
+      if (!tx.attachment_ids?.length) { sansPiece++; continue; }
+      const path = await uploadQontoAttachment(supabase, ent.qonto_login, ent.qonto_token, tx.attachment_ids[0]);
+      if (path) {
+        await supabase.from("ecriture_financiere").update({ facture: path }).eq("id", ecrId);
+        ajoutes++;
+      }
+    }
+    revalidatePath("/finance/journal");
+    revalidatePath("/finance/qonto");
+    return { ok: true, ajoutes, sansPiece };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}

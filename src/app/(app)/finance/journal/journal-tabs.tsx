@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { IconPaperclip } from "@/components/icons";
+import { IconPaperclip, IconAlert } from "@/components/icons";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { deleteEcriture, setValideEcriture, ajouterJustificatifs } from "../actions";
@@ -232,7 +232,8 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                   <div className="mt-1 divide-y divide-border rounded-xl border border-border bg-background">
                     {entries.map((e) => {
                       const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
-                      const missingDoc = e.statut === "reel" && !e.facture && !e.devis_facture_id && !justifSet.has(e.id);
+                      const hasDoc = !!e.facture || !!e.devis_facture_id || (facturesLiees[e.id]?.length ?? 0) > 0 || justifSet.has(e.id);
+                      const missingDoc = e.statut === "reel" && !hasDoc;
                       return (
                         <div
                           key={e.id}
@@ -243,9 +244,12 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                             <div className="flex items-center gap-1.5 truncate font-medium">
                               {e.denomination ?? "(sans libellé)"}
                               {missingDoc && (
-                                <span className="shrink-0 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700" title="Document manquant">
-                                  <IconPaperclip className="h-3 w-3" />
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title="Aucun justificatif — cliquer pour en associer un">
+                                  <IconAlert className="h-3 w-3" /> justif. manquant
                                 </span>
+                              )}
+                              {hasDoc && (
+                                <IconPaperclip className="h-3 w-3 shrink-0 text-muted" aria-label="Justificatif présent" />
                               )}
                               {!e.valide && (
                                 <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" title="Écriture à valider">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { previewQonto, importQontoTransactions } from "./actions";
+import { previewQonto, importQontoTransactions, recupererJustificatifsQonto } from "./actions";
 import type { QontoPreviewItem } from "./actions";
 import { euros, dateFr } from "@/lib/format";
 import { NOMENCLATURE } from "@/lib/finance";
@@ -59,6 +59,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
   const [edited, setEdited] = useState<Map<string, { type: string; specification: string }>>(new Map());
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showDoublons, setShowDoublons] = useState(false);
 
   const handlePreview = () => {
     setResult(null);
@@ -75,7 +76,8 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
   };
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(items!.map((i) => i.transaction_id)) : new Set());
+    const pool = (items ?? []).filter((i) => showDoublons || !i.doublon);
+    setSelected(checked ? new Set(pool.map((i) => i.transaction_id)) : new Set());
   };
 
   const toggle = (id: string) => {
@@ -109,7 +111,25 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
     });
   };
 
+  const handleJustificatifs = () => {
+    setResult(null);
+    setError(null);
+    startTransition(async () => {
+      const r = await recupererJustificatifsQonto();
+      if (!r.ok) { setError(r.error); return; }
+      setResult(
+        r.ajoutes === 0 && r.sansPiece === 0
+          ? "Toutes les écritures Qonto ont déjà un justificatif."
+          : `${r.ajoutes} justificatif${r.ajoutes > 1 ? "s" : ""} récupéré${r.ajoutes > 1 ? "s" : ""} depuis Qonto${r.sansPiece > 0 ? ` · ${r.sansPiece} transaction${r.sansPiece > 1 ? "s" : ""} sans pièce jointe sur Qonto` : ""}.`,
+      );
+    });
+  };
+
   const selectedCount = selected.size;
+
+  // Doublons déjà enregistrés : masqués par défaut (tout est à jour), affichables via un toggle.
+  const nbDoublons = (items ?? []).filter((i) => i.doublon).length;
+  const visibles = showDoublons ? (items ?? []) : (items ?? []).filter((i) => !i.doublon);
 
   // Rapprochement : écart entre le solde bancaire Qonto et le solde réel de l'outil.
   const ecart = balanceQonto !== null && soldeOutil !== undefined ? Math.round((balanceQonto - soldeOutil) * 100) / 100 : null;
@@ -161,14 +181,24 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
         </div>
       )}
 
-      {/* Bouton sync */}
-      <button
-        onClick={handlePreview}
-        disabled={pending}
-        className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-      >
-        {pending ? "Chargement…" : "Récupérer les nouvelles transactions"}
-      </button>
+      {/* Boutons sync */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handlePreview}
+          disabled={pending}
+          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {pending ? "Chargement…" : "Récupérer les nouvelles transactions"}
+        </button>
+        <button
+          onClick={handleJustificatifs}
+          disabled={pending}
+          className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background disabled:opacity-50"
+          title="Télécharge depuis Qonto les pièces jointes des écritures qui n'en ont pas encore"
+        >
+          Récupérer les justificatifs manquants
+        </button>
+      </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
@@ -182,16 +212,16 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm font-semibold">
-              {items.length === 0
-                ? "Aucune nouvelle transaction à importer."
-                : `${items.length} nouvelle${items.length > 1 ? "s" : ""} transaction${items.length > 1 ? "s" : ""} Qonto`}
+              {visibles.length === 0
+                ? (nbDoublons > 0 ? "Tout est à jour — rien de nouveau à importer." : "Aucune nouvelle transaction à importer.")
+                : `${visibles.length} nouvelle${visibles.length > 1 ? "s" : ""} transaction${visibles.length > 1 ? "s" : ""} Qonto`}
             </div>
-            {items.length > 0 && (
+            {visibles.length > 0 && (
               <div className="flex gap-2">
                 <label className="flex cursor-pointer items-center gap-1.5 text-sm">
                   <input
                     type="checkbox"
-                    checked={selectedCount === items.length}
+                    checked={visibles.length > 0 && selectedCount === visibles.length}
                     onChange={(e) => toggleAll(e.target.checked)}
                     className="rounded"
                   />
@@ -208,16 +238,20 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
             )}
           </div>
 
-          {items.length > 0 && (
+          {nbDoublons > 0 && (
+            <div className="mb-3 text-xs text-muted">
+              {nbDoublons} transaction{nbDoublons > 1 ? "s" : ""} déjà enregistrée{nbDoublons > 1 ? "s" : ""} (doublon{nbDoublons > 1 ? "s" : ""}) masquée{nbDoublons > 1 ? "s" : ""}.{" "}
+              <button onClick={() => setShowDoublons((v) => !v)} className="font-medium text-primary hover:underline">
+                {showDoublons ? "Masquer" : "Afficher quand même"}
+              </button>
+            </div>
+          )}
+
+          {visibles.length > 0 && (
             <>
-              {items.some((i) => i.doublon) && (
-                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  ⚠️ <strong>{items.filter((i) => i.doublon).length} doublon{items.filter((i) => i.doublon).length > 1 ? "s" : ""} probable{items.filter((i) => i.doublon).length > 1 ? "s" : ""}</strong> détecté{items.filter((i) => i.doublon).length > 1 ? "s" : ""} — même date, montant et sens qu'une écriture existante. Pré-décochés pour éviter les doublons. Vérifiez avant de cocher.
-                </div>
-              )}
-              {items.some((i) => i.pending) && (
+              {visibles.some((i) => i.pending) && (
                 <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-500/40 dark:bg-blue-950/20 dark:text-blue-300">
-                  ● <strong>{items.filter((i) => i.pending).length} transaction{items.filter((i) => i.pending).length > 1 ? "s" : ""} en attente de règlement</strong> — ce sont tes opérations les plus récentes, pas encore débitées/créditées par la banque. Pré-décochées (le montant peut encore changer) ; coche-les si tu veux les enregistrer dès maintenant.
+                  ● <strong>{visibles.filter((i) => i.pending).length} transaction{visibles.filter((i) => i.pending).length > 1 ? "s" : ""} en attente de règlement</strong> — ce sont tes opérations les plus récentes, pas encore débitées/créditées par la banque. Pré-décochées (le montant peut encore changer) ; coche-les si tu veux les enregistrer dès maintenant.
                 </div>
               )}
               <div className="overflow-x-auto rounded-xl border border-border">
@@ -233,7 +267,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item) => {
+                    {visibles.map((item) => {
                       const edit = edited.get(item.transaction_id);
                       const type = edit?.type ?? item.type;
                       const spec = edit?.specification ?? item.specification;

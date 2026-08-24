@@ -140,10 +140,10 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                     return (
                       <div key={l.id} data-ligne={l.id}
                         className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId ? "border-t-2 border-primary" : ""}`}>
-                        <div className="flex items-center gap-2 px-2 py-1.5">
-                          {/* Poignée */}
+                        <div className="group flex items-center gap-2 px-2 py-1.5">
+                          {/* Poignée (visible au survol ; toujours visible sur tactile) */}
                           <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))} onPointerMove={onMove} onPointerUp={onUp}
-                            className="w-4 shrink-0 cursor-grab touch-none text-center text-muted hover:text-foreground active:cursor-grabbing" title="Déplacer" aria-label="Déplacer">⠿</button>
+                            className="w-4 shrink-0 cursor-grab touch-none text-center text-muted opacity-0 transition-opacity hover:text-foreground active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100" title="Déplacer" aria-label="Déplacer">⠿</button>
                           {/* Désignation — cliquable pour la fiche produit si liée au catalogue */}
                           {l.reference_id && infosRef[l.reference_id] ? (
                             <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
@@ -172,7 +172,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                           <span className="flex w-16 shrink-0 items-center justify-end gap-1.5">
                             <button type="button" title="Remise" onClick={() => setRemiseOpen((p) => { const n = new Set(p); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })}
                               className={`rounded px-1 text-xs ${remiseVisible ? "text-primary" : "text-muted hover:text-foreground"}`}>%</button>
-                            <button type="button" onClick={() => setDelId(l.id)} className="text-muted hover:text-red-600" title="Supprimer">✕</button>
+                            <button type="button" onClick={() => setDelId(l.id)} className="text-muted opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 [@media(hover:none)]:opacity-100" title="Supprimer">✕</button>
                           </span>
                         </div>
                         {/* Remise — ligne dédiée en dessous, indentée */}

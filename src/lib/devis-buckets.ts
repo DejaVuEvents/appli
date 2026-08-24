@@ -10,11 +10,12 @@ export const BUCKETS = {
   SON: "Son",
   STR: "Structure",
   TECH: "Technique",
+  TRANSPORT: "Transport",
 } as const;
 export type BucketNom = (typeof BUCKETS)[keyof typeof BUCKETS];
-export const ORDRE_BUCKETS: BucketNom[] = [BUCKETS.LUM, BUCKETS.SON, BUCKETS.STR, BUCKETS.TECH];
+export const ORDRE_BUCKETS: BucketNom[] = [BUCKETS.LUM, BUCKETS.SON, BUCKETS.STR, BUCKETS.TRANSPORT, BUCKETS.TECH];
 
-const { LUM, SON, STR, TECH } = BUCKETS;
+const { LUM, SON, STR, TECH, TRANSPORT } = BUCKETS;
 
 // Mapping par NOM de (sous-)catégorie du catalogue. « Catalogue Externe » est
 // volontairement absent : ses items sont classés par leur sous-catégorie ou par mots-clés.
@@ -27,11 +28,14 @@ const PAR_CATEGORIE: Record<string, BucketNom> = {
   "Câbles Son": SON, "Traitement & Divers": SON,
   "Structure & Scène": STR, "Structure": STR, "Accessoires scène": STR, "Accrochage": STR,
   "Praticables": STR, "Levage": STR,
-  "Technique": TECH, "Transport": TECH,
+  "Technique": TECH,
+  "Transport": TRANSPORT,
 };
 
 // Mots-clés sur la désignation, testés dans l'ordre.
-const REGLE_TECH = /^\s*tech\b|technicien|\bmontage\b|d[ée]montage|op[ée]ration|main.?d.?.?oeuvre|\btransport|d[ée]placement|\blivraison|forfait (?:route|km)/i;
+// Main d'œuvre → Technique ; logistique/véhicule → Transport.
+const REGLE_TECH = /^\s*tech\b|technicien|\bmontage\b|d[ée]montage|op[ée]ration|main.?d.?.?oeuvre/i;
+const REGLE_TRANSPORT = /\btransport|d[ée]placement|\blivraison|p[ée]age|autoroute|carburant|\bessence|\bdiesel|v[ée]hicule|camion|camionnette|\bfourgon|location.*v[ée]hicule|forfait (?:route|km)|\bkm\b/i;
 const REGLES_MATIERE: { re: RegExp; bucket: BucketNom }[] = [
   { re: /enceinte|caisson|subwoofer|\bampli|micro\b|\bhf\b|table de mix|\bmidas\b|\bm32\b|\bdl32\b|pioneer|\bxdj\b|\bcdj\b|platine|\bdj\b|aes50|di.?box|\bson\b|monitoring|retour son|l.?acoustics|yamaha|allen ?& ?heath|d&b/i, bucket: SON },
   { re: /laser|\blyre|\bpar\b|\bled\b|\bwash\b|\bbeam\b|\bspot\b|blinder|strobe|stroboscope|projecteur|d[ée]coupe|fresnel|gobo|\bdmx\b|ilda|pangolin|fum[ée]e|brouillard|[ée]tincelle|geyser|\bbulle|\bneige\b|\bco2\b|grandma|avolites|chamsys|r[ée]gie lumi|show lumi|show laser/i, bucket: LUM },
@@ -41,14 +45,16 @@ const REGLES_MATIERE: { re: RegExp; bucket: BucketNom }[] = [
 /** Famille d'affichage d'une ligne, d'après sa désignation et sa (sous-)catégorie. */
 export function bucketPour(designation: string | null, categorieNom: string | null): BucketNom {
   const d = (designation ?? "").toLowerCase();
-  // 1. Main d'œuvre / transport → toujours Technique (priorité sur tout).
+  // 1. Main d'œuvre → Technique (priorité, avant transport).
   if (REGLE_TECH.test(d)) return TECH;
-  // 2. Catégorie explicite du catalogue (hors « Catalogue Externe »).
+  // 2. Logistique / véhicule → Transport.
+  if (REGLE_TRANSPORT.test(d)) return TRANSPORT;
+  // 3. Catégorie explicite du catalogue (hors « Catalogue Externe »).
   if (categorieNom && categorieNom !== "Catalogue Externe" && PAR_CATEGORIE[categorieNom]) {
     return PAR_CATEGORIE[categorieNom];
   }
-  // 3. Mots-clés sur la désignation (pour les lignes importées sans catégorie).
+  // 4. Mots-clés sur la désignation (pour les lignes importées sans catégorie).
   for (const r of REGLES_MATIERE) if (r.re.test(d)) return r.bucket;
-  // 4. Par défaut : Technique (fourre-tout ; l'utilisateur peut recatégoriser).
+  // 5. Par défaut : Technique (fourre-tout ; l'utilisateur peut recatégoriser).
   return TECH;
 }

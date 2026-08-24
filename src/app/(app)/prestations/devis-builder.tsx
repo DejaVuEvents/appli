@@ -81,6 +81,7 @@ export async function DevisBuilder(props: {
     [BUCKETS.SON]: categories.find((c) => c.nom === "Son")?.id,
     [BUCKETS.STR]: categories.find((c) => c.nom === "Structure & Scène")?.id,
     [BUCKETS.TECH]: categories.find((c) => c.nom === "Technique")?.id,
+    [BUCKETS.TRANSPORT]: categories.find((c) => c.nom === "Transport")?.id,
   };
   const lignesParBucket = new Map<string, LignePrestation[]>();
   for (const l of lignes) {

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui";
 import { Modal } from "@/components/modal";
 import { LigneForm } from "./ligne-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { IconEdit, IconInfo } from "@/components/icons";
+import { IconInfo } from "@/components/icons";
 import { euros } from "@/lib/format";
 import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel } from "./actions";
 
@@ -138,11 +138,10 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                           <span className="flex w-24 shrink-0 items-center justify-end"><InlineNum l={l} champ="prix_unitaire" val={l.prix_unitaire} w="w-16" suffix="€" /></span>
                           {/* Total */}
                           <span className="w-24 shrink-0 text-right text-sm font-medium tabular-nums">{euros(l.prix_total)}</span>
-                          {/* Actions : remise / édition / suppression */}
-                          <span className="flex w-16 shrink-0 items-center justify-end gap-1">
+                          {/* Actions : remise / suppression */}
+                          <span className="flex w-16 shrink-0 items-center justify-end gap-1.5">
                             <button type="button" title="Remise" onClick={() => setRemiseOpen((p) => { const n = new Set(p); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })}
                               className={`rounded px-1 text-xs ${remiseVisible ? "text-primary" : "text-muted hover:text-foreground"}`}>%</button>
-                            <Link href={`/prestations/${prestationId}/lignes/${l.id}?devis=${devisId}`} className="text-muted hover:text-primary" title="Éditer"><IconEdit className="h-4 w-4" /></Link>
                             <button type="button" onClick={() => setDelId(l.id)} className="text-muted hover:text-red-600" title="Supprimer">✕</button>
                           </span>
                         </div>

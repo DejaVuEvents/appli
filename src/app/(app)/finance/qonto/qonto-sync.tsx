@@ -67,8 +67,9 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
       const r = await previewQonto();
       if (!r.ok) { setError(r.error); return; }
       setItems(r.items);
-      // Pré-sélectionner tout SAUF les doublons détectés
-      setSelected(new Set(r.items.filter((i) => !i.doublon).map((i) => i.transaction_id)));
+      // Pré-sélectionner tout SAUF les doublons et les transactions en attente de règlement
+      // (montant susceptible de changer — l'utilisateur les coche manuellement s'il le souhaite).
+      setSelected(new Set(r.items.filter((i) => !i.doublon && !i.pending).map((i) => i.transaction_id)));
       setEdited(new Map());
     });
   };
@@ -214,6 +215,11 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
                   ⚠️ <strong>{items.filter((i) => i.doublon).length} doublon{items.filter((i) => i.doublon).length > 1 ? "s" : ""} probable{items.filter((i) => i.doublon).length > 1 ? "s" : ""}</strong> détecté{items.filter((i) => i.doublon).length > 1 ? "s" : ""} — même date, montant et sens qu'une écriture existante. Pré-décochés pour éviter les doublons. Vérifiez avant de cocher.
                 </div>
               )}
+              {items.some((i) => i.pending) && (
+                <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-500/40 dark:bg-blue-950/20 dark:text-blue-300">
+                  ● <strong>{items.filter((i) => i.pending).length} transaction{items.filter((i) => i.pending).length > 1 ? "s" : ""} en attente de règlement</strong> — ce sont tes opérations les plus récentes, pas encore débitées/créditées par la banque. Pré-décochées (le montant peut encore changer) ; coche-les si tu veux les enregistrer dès maintenant.
+                </div>
+              )}
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full border-collapse text-xs">
                   <thead>
@@ -252,6 +258,9 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
                             {item.reference && <div className="text-muted">{item.reference}</div>}
                             {item.doublon && (
                               <div className="text-amber-600 font-medium">⚠ doublon probable</div>
+                            )}
+                            {item.pending && (
+                              <div className="font-medium text-blue-600">● en attente de règlement</div>
                             )}
                             {item.attachment_ids?.length > 0 && (
                               <div className="text-blue-600 text-xs">{item.attachment_ids.length} pièce{item.attachment_ids.length > 1 ? "s" : ""} jointe{item.attachment_ids.length > 1 ? "s" : ""}</div>

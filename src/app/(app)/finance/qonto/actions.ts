@@ -18,6 +18,7 @@ export type QontoPreviewItem = {
   cashflow_cat: string | null;
   cashflow_sub: string | null;
   doublon: boolean;
+  pending: boolean;
   attachment_ids: string[];
 };
 
@@ -68,11 +69,13 @@ export async function previewQonto(): Promise<
       return dates.some((d) => Math.abs(d - t) <= TOLERANCE_MS);
     };
 
-    // 3. Fetch Qonto
+    // 3. Fetch Qonto (inclut les transactions EN ATTENTE de règlement = les plus récentes)
     const txs: QontoTransaction[] = await fetchQontoTransactions(
       ent.qonto_login,
       ent.qonto_token,
       ent.qonto_account_slug,
+      undefined,
+      true,
     );
 
     const items: QontoPreviewItem[] = txs
@@ -84,7 +87,8 @@ export async function previewQonto(): Promise<
           t.cashflow_subcategory?.name ?? null,
           t.label,
         );
-        const date = t.settled_at.slice(0, 10);
+        // Les transactions en attente n'ont pas de settled_at → on prend la date d'émission.
+        const date = (t.settled_at ?? t.emitted_at ?? "").slice(0, 10);
         const sens = (t.side === "credit" ? "entree" : "sortie") as "entree" | "sortie";
         return {
           transaction_id: t.transaction_id,
@@ -98,6 +102,7 @@ export async function previewQonto(): Promise<
           cashflow_cat: t.cashflow_category?.name ?? null,
           cashflow_sub: t.cashflow_subcategory?.name ?? null,
           doublon: estDoublon(date, t.amount, sens),
+          pending: t.status !== "completed",
           attachment_ids: t.attachment_ids ?? [],
         };
       })
@@ -155,7 +160,7 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
 
     // Transactions Qonto depuis la date du solde initial
     const txs = (await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, `${baseline}T00:00:00.000Z`))
-      .filter((t) => t.settled_at.slice(0, 10) >= baseline);
+      .filter((t) => (t.settled_at ?? "").slice(0, 10) >= baseline);
 
     // Écritures « réelles » de l'outil depuis la date du solde initial
     const { data: toolData } = await supabase
@@ -179,7 +184,7 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
     for (const tx of txs) {
       if (linkedIds.has(tx.transaction_id)) continue; // déjà importée
       const sens = (tx.side === "credit" ? "entree" : "sortie") as "entree" | "sortie";
-      const date = tx.settled_at.slice(0, 10);
+      const date = (tx.settled_at ?? tx.emitted_at ?? "").slice(0, 10);
       const cents = Math.round(tx.amount * 100);
       const t = new Date(date).getTime();
       const jumeau = manuels.find((m) => !m.used && m.sens === sens && m.cents === cents && Math.abs(m.t - t) <= TOL);
@@ -189,7 +194,7 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
         transaction_id: tx.transaction_id, date, label: tx.label, montant: tx.amount, sens,
         type: cat.type, specification: cat.specification, reference: tx.reference,
         cashflow_cat: tx.cashflow_category?.name ?? null, cashflow_sub: tx.cashflow_subcategory?.name ?? null,
-        doublon: false, attachment_ids: tx.attachment_ids ?? [],
+        doublon: false, pending: false, attachment_ids: tx.attachment_ids ?? [],
       });
     }
     const enTrop = manuels

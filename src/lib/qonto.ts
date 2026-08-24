@@ -6,7 +6,8 @@ export type QontoTransaction = {
   amount: number;
   side: "debit" | "credit";
   label: string;
-  settled_at: string;
+  settled_at: string | null;
+  emitted_at: string | null;
   status: string;
   reference: string | null;
   note: string | null;
@@ -60,18 +61,22 @@ export async function fetchQontoTransactions(
   token: string,
   accountSlug: string,
   settledAfter?: string,
+  includePending = false,
 ): Promise<QontoTransaction[]> {
   const all: QontoTransaction[] = [];
   let page = 1;
 
   while (true) {
-    const params = new URLSearchParams({
-      slug: accountSlug,
-      "status[]": "completed",
-      per_page: "100",
-      current_page: String(page),
-      sort_by: "settled_at:desc",
-    });
+    const params = new URLSearchParams();
+    params.set("slug", accountSlug);
+    // Toujours les transactions réglées ; en option celles en attente de règlement
+    // (les plus récentes, qui n'ont pas encore de settled_at).
+    params.append("status[]", "completed");
+    if (includePending) params.append("status[]", "pending");
+    params.set("per_page", "100");
+    params.set("current_page", String(page));
+    // On trie par date d'émission quand on inclut le pending (settled_at peut être null).
+    params.set("sort_by", includePending ? "emitted_at:desc" : "settled_at:desc");
     if (settledAfter) params.set("settled_after", settledAfter);
 
     const resp = await fetch(`https://thirdparty.qonto.com/v2/transactions?${params}`, {
@@ -82,7 +87,7 @@ export async function fetchQontoTransactions(
 
     const data = await resp.json();
     all.push(...data.transactions);
-    if (!data.meta.next_page) break;
+    if (!data.meta?.next_page) break;
     page++;
   }
 

@@ -27,6 +27,9 @@ export type RefInfo = {
 type Ref = { id: string; nom: string; prix_location_jour: number; cout_location_jour: number | null; categorie_id: string | null; est_consommable: boolean };
 type Cat = { id: string; nom: string; ordre?: number | null };
 
+// Masque les petites flèches +/− natives des champs numériques (affichage plus léger).
+const NO_SPIN = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0";
+
 export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef }: {
   prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>;
 }) {
@@ -103,7 +106,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
         type="number" step={step} min="0" inputMode="decimal" defaultValue={val}
         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         onBlur={(e) => { const v = Number(e.target.value.replace(",", ".")); if (v !== val) inline(l.id, champ, v); }}
-        className={`${w} rounded-md border border-transparent bg-transparent py-0.5 pl-1.5 pr-2 text-right text-sm hover:border-border focus:border-primary focus:bg-background focus:outline-none`}
+        className={`${w} ${NO_SPIN} rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-right text-sm hover:border-border focus:border-primary focus:bg-background focus:outline-none`}
       />
       {suffix && <span className="text-xs text-muted">{suffix}</span>}
     </span>
@@ -179,12 +182,15 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                             <input key={`${l.id}-rem-${l.remise_valeur}`} type="number" step="0.01" min="0" inputMode="decimal" defaultValue={l.remise_valeur}
                               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               onBlur={(e) => { const v = Number(e.target.value.replace(",", ".")); if (v !== l.remise_valeur) inline(l.id, "remise_valeur", v); }}
-                              className="w-16 rounded-md border border-border bg-background px-1.5 py-0.5 text-right text-xs focus:border-primary focus:outline-none" />
+                              className={`w-16 ${NO_SPIN} rounded-md border border-border bg-background px-1.5 py-0.5 text-right text-xs focus:border-primary focus:outline-none`} />
                             <select defaultValue={l.remise_type} onChange={(e) => inline(l.id, "remise_type", e.target.value)}
                               className="rounded-md border border-border bg-background px-1 py-0.5 text-xs">
                               <option value="pct">%</option>
                               <option value="montant">€</option>
                             </select>
+                            <button type="button" title="Supprimer la remise"
+                              onClick={() => { if (l.remise_valeur !== 0) inline(l.id, "remise_valeur", 0); setRemiseOpen((p) => { const n = new Set(p); n.delete(l.id); return n; }); }}
+                              className="text-muted hover:text-red-600">✕</button>
                           </div>
                         )}
                       </div>

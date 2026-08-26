@@ -49,7 +49,7 @@ export default async function QontoPage({
 
   return (
     <div className="max-w-6xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
 
       <h2 className="mb-4 text-base font-semibold">Synchronisation Qonto</h2>

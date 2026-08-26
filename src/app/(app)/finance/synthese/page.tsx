@@ -48,7 +48,7 @@ export default async function SynthesePage({
 
   return (
     <div className="max-w-7xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
 
       {/* Sous-onglets */}

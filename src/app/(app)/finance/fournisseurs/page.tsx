@@ -88,7 +88,7 @@ export default async function FournisseursPage({
 
   return (
     <div className="max-w-7xl">
-      <PageHeader title="Finance / Trésorerie" action={ajouter} />
+      <PageHeader title="Comptabilité" action={ajouter} />
       <FinanceTabs annee={annee} />
 
       {/* Résumé échéancier */}

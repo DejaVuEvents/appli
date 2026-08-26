@@ -14,7 +14,7 @@ export default async function FinanceDashboard({
 }) {
   const annee = Number((await searchParams)?.annee) || new Date().getFullYear();
   const supabase = await createClient();
-  const [{ data: entData }, { data: ecrData }, { data: cliDues }, { data: fouDues }] = await Promise.all([
+  const [{ data: entData }, { data: ecrData }, { data: cliDues }, { data: fouDues }, { data: ndfData }, { data: membresData }] = await Promise.all([
     supabase.from("parametres_entreprise").select("*").limit(1).maybeSingle(),
     supabase.from("ecriture_financiere").select("*"),
     supabase
@@ -25,6 +25,11 @@ export default async function FinanceDashboard({
       .from("facture_fournisseur")
       .select("id, fournisseur, numero, montant_ttc, date_echeance, statut_paiement")
       .neq("statut_paiement", "paye"),
+    supabase
+      .from("note_frais")
+      .select("id, titre, demandeur_id, ecriture_id, created_at, lignes:ligne_note_frais(montant_ttc)")
+      .eq("statut", "validee"),
+    supabase.from("membre").select("id, prenom, nom"),
   ]);
   const ent = entData as ParametresEntreprise | null;
   const ecritures = (ecrData ?? []) as EcritureFinanciere[];
@@ -46,8 +51,21 @@ export default async function FinanceDashboard({
     .filter((c) => c.statut_paiement === "retard" || (c.date_echeance != null && c.date_echeance < today))
     .sort((a, b) => (a.date_echeance ?? "9999").localeCompare(b.date_echeance ?? "9999"));
   const fournisseurs = ((fouDues ?? []) as Fou[]).sort((a, b) => (a.date_echeance ?? "9999").localeCompare(b.date_echeance ?? "9999"));
+
+  // NDF validées non encore remboursées (écriture liée pas encore « réelle »).
+  type Ndf = { id: string; titre: string | null; demandeur_id: string | null; ecriture_id: string | null; created_at: string; lignes: { montant_ttc: number }[] };
+  const ecrReelSet = new Set(ecritures.filter((e) => e.statut === "reel").map((e) => e.id));
+  const membreNom = new Map((membresData ?? []).map((m) => {
+    const mm = m as { id: string; prenom: string | null; nom: string | null };
+    return [mm.id, [mm.prenom, mm.nom].filter(Boolean).join(" ") || "—"];
+  }));
+  const ndfAPayer = ((ndfData ?? []) as unknown as Ndf[])
+    .filter((n) => !(n.ecriture_id && ecrReelSet.has(n.ecriture_id)))
+    .map((n) => ({ id: n.id, titre: n.titre ?? "Note de frais", qui: membreNom.get(n.demandeur_id ?? "") ?? "—", montant: (n.lignes ?? []).reduce((s, l) => s + Number(l.montant_ttc ?? 0), 0), created_at: n.created_at }))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+
   const totalDu = clients.reduce((s, c) => s + Number(c.montant_ttc ?? 0), 0);
-  const totalAPayer = fournisseurs.reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
+  const totalAPayer = fournisseurs.reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0) + ndfAPayer.reduce((s, n) => s + n.montant, 0);
 
   // Série multi-années pour le graphe à fenêtre glissante navigable.
   // Libellés courts DISTINCTS (Juin ≠ Juil) + clé unique par mois.
@@ -67,7 +85,7 @@ export default async function FinanceDashboard({
 
   return (
     <div className="max-w-6xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
 
       {/* Résumé : 3 cartes alignées */}
@@ -116,15 +134,33 @@ export default async function FinanceDashboard({
           )}
         </Card>
 
-        {/* À payer — fournisseurs */}
+        {/* À payer — NDF à rembourser + fournisseurs */}
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">On doit (à payer)</h2>
             <span className="text-sm font-bold text-red-600">{euros(totalAPayer)}</span>
           </div>
-          {fournisseurs.length === 0 ? (
-            <p className="text-sm text-muted">Aucune facture fournisseur en attente</p>
+          {ndfAPayer.length === 0 && fournisseurs.length === 0 ? (
+            <p className="text-sm text-muted">Rien à rembourser ni à payer</p>
           ) : (
+            <div className="space-y-3">
+            {ndfAPayer.length > 0 && (
+              <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                {ndfAPayer.map((n) => (
+                  <Link key={n.id} href={`/notes-frais/${n.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{n.titre}</span>
+                      <span className="text-xs text-muted">NDF · {n.qui}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-semibold tabular-nums">{euros(n.montant)}</span>
+                      <span className="text-[10px] font-semibold text-amber-600">à rembourser</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {fournisseurs.length > 0 && (
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {fournisseurs.map((f) => {
                 const enRetard = f.statut_paiement === "retard" || (f.date_echeance && f.date_echeance < today);
@@ -141,6 +177,8 @@ export default async function FinanceDashboard({
                   </Link>
                 );
               })}
+            </div>
+            )}
             </div>
           )}
         </Card>

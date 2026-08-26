@@ -71,7 +71,7 @@ export default async function JournalPage({
 
   return (
     <div className="max-w-7xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
       <JournalTabs all={ecritures} prestations={prestations} sidebar={sidebar} avecJustif={[...avecJustif]} facturesLiees={facturesLiees} nomenclature={nomenclature} />
     </div>

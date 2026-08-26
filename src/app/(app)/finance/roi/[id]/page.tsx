@@ -29,7 +29,7 @@ export default async function EditRoiPage({
 
   return (
     <div className="max-w-2xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
 
       <h2 className="mb-4 font-semibold">Modifier — {(item as RoiMateriel).nom}</h2>

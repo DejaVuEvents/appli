@@ -237,7 +237,7 @@ export default async function RoiPage({
 
   return (
     <div className="max-w-7xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
 
       <div className="mb-6 flex items-center justify-between">

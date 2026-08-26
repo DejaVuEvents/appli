@@ -75,7 +75,7 @@ const ALL_GROUPS: Group[] = [
       </svg>
     ),
     children: [
-      { href: "/finance", label: "Trésorerie" },
+      { href: "/finance", label: "Comptabilité" },
       { href: "/prestations", label: "Devis & Factures" },
       { href: "/notes-frais", label: "Notes de frais" },
     ],

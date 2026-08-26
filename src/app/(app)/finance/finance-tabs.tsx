@@ -7,7 +7,7 @@ const tabs = [
   { href: "/finance", label: "Tableau de bord" },
   { href: "/finance/synthese", label: "Synthèse" },
   { href: "/finance/journal", label: "Journal" },
-  { href: "/finance/fournisseurs", label: "Fournisseurs" },
+  { href: "/finance/previsionnel", label: "Prévisionnel" },
   { href: "/finance/roi", label: "ROI matériel" },
   { href: "/finance/qonto", label: "Sync Qonto" },
 ];

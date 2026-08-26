@@ -28,7 +28,7 @@ export default async function FluxPage({
 
   return (
     <div className="max-w-7xl">
-      <PageHeader title="Finance / Trésorerie" />
+      <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
 
       <p className="mb-4 text-sm text-muted">

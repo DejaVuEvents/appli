@@ -92,7 +92,6 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
   const tabDefs: { key: Tab; label: string }[] = [
     { key: "entrees", label: "Entrées" },
     { key: "sorties", label: "Sorties" },
-    { key: "previsionnel", label: "Prévisionnel" },
   ];
 
   const prestMap = new Map(prestations.map((p) => [p.id, p]));

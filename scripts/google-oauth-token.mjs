@@ -55,9 +55,10 @@ const url = oauth2.generateAuthUrl({
   access_type: "offline",
   prompt: "consent",
   scope: [
-    "https://www.googleapis.com/auth/drive.file",        // archivage Drive
+    "https://www.googleapis.com/auth/drive.file",        // archivage Drive (fichiers créés par l'app)
+    "https://www.googleapis.com/auth/drive.readonly",    // lecture de TOUT le Drive (import NDF existantes, etc.)
     "https://www.googleapis.com/auth/calendar.events",   // réunions Google Agenda + Meet
-    "https://www.googleapis.com/auth/gmail.readonly",    // lecture factures reçues + emails Qonto (prévisions)
+    "https://www.googleapis.com/auth/gmail.readonly",    // lecture factures reçues + prélèvements à venir
   ],
 });
 

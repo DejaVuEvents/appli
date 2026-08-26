@@ -25,7 +25,7 @@ export function PrevisionnelView({ ponctuelles, recurrents, nomenclature }: { po
   return (
     <div>
       <div className="mb-4 flex gap-1 rounded-xl border border-border bg-surface p-1">
-        <button onClick={() => setVue("recurrents")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${vue === "recurrents" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Récurrents</button>
+        <button onClick={() => setVue("recurrents")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${vue === "recurrents" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Dépenses récurrentes</button>
         <button onClick={() => setVue("ponctuelles")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${vue === "ponctuelles" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Prévisions ponctuelles</button>
       </div>
 

@@ -353,3 +353,26 @@ export async function recupererJustificatifsQonto(): Promise<
     return { ok: false, error: String(e) };
   }
 }
+
+/**
+ * Synchronisation globale : importe les nouvelles transactions Qonto propres
+ * (hors doublons et hors "en attente") + récupère les justificatifs manquants,
+ * en un seul clic. Ne remplace jamais un justificatif déjà présent.
+ */
+export async function syncGlobal(): Promise<
+  { ok: true; importees: number; justificatifs: number; ignoresDoublons: number } | { ok: false; error: string }
+> {
+  const prev = await previewQonto();
+  if (!prev.ok) return { ok: false, error: prev.error };
+  const propres = prev.items.filter((i) => !i.doublon && !i.pending);
+  const ignoresDoublons = prev.items.filter((i) => i.doublon).length;
+  let importees = 0;
+  if (propres.length) {
+    const r = await importQontoTransactions(propres);
+    if (!r.ok) return { ok: false, error: r.error };
+    importees = r.count;
+  }
+  const j = await recupererJustificatifsQonto();
+  const justificatifs = j.ok ? j.ajoutes : 0;
+  return { ok: true, importees, justificatifs, ignoresDoublons };
+}

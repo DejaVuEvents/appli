@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { previewQonto, importQontoTransactions, recupererJustificatifsQonto } from "./actions";
+import { previewQonto, importQontoTransactions, recupererJustificatifsQonto, syncGlobal } from "./actions";
 import type { QontoPreviewItem } from "./actions";
 import { euros, dateFr } from "@/lib/format";
 import { NOMENCLATURE } from "@/lib/finance";
@@ -111,6 +111,22 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
     });
   };
 
+  const handleSyncGlobal = () => {
+    setResult(null);
+    setError(null);
+    setItems(null);
+    startTransition(async () => {
+      const r = await syncGlobal();
+      if (!r.ok) { setError(r.error); return; }
+      const bits = [
+        `${r.importees} transaction${r.importees > 1 ? "s" : ""} importée${r.importees > 1 ? "s" : ""}`,
+        `${r.justificatifs} justificatif${r.justificatifs > 1 ? "s" : ""} récupéré${r.justificatifs > 1 ? "s" : ""}`,
+      ];
+      if (r.ignoresDoublons > 0) bits.push(`${r.ignoresDoublons} doublon${r.ignoresDoublons > 1 ? "s" : ""} ignoré${r.ignoresDoublons > 1 ? "s" : ""}`);
+      setResult(`Synchro terminée : ${bits.join(" · ")}.`);
+    });
+  };
+
   const handleJustificatifs = () => {
     setResult(null);
     setError(null);
@@ -184,11 +200,19 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
       {/* Boutons sync */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={handlePreview}
+          onClick={handleSyncGlobal}
           disabled={pending}
           className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          title="Importe les nouvelles transactions propres (hors doublons/en attente) + récupère les justificatifs manquants, en un clic"
         >
-          {pending ? "Chargement…" : "Récupérer les nouvelles transactions"}
+          {pending ? "Synchronisation…" : "⟳ Tout synchroniser"}
+        </button>
+        <button
+          onClick={handlePreview}
+          disabled={pending}
+          className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background disabled:opacity-50"
+        >
+          {pending ? "Chargement…" : "Vérifier / choisir les transactions"}
         </button>
         <button
           onClick={handleJustificatifs}

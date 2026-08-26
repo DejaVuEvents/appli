@@ -27,6 +27,11 @@ export default async function AppLayout({
   const moi = await getMembreActuel(supabase);
   const avatarUrl = await urlDocument(supabase, moi?.photo_url);
   const notifications = await chargerNotifications(supabase, moi);
+  // État « lu » persistant (par membre) : la pastille rouge ne réapparaît plus à tort.
+  const { data: luesData } = moi
+    ? await supabase.from("notification_lue").select("notif_id").eq("membre_id", moi.id)
+    : { data: [] };
+  const notifsLues = (luesData ?? []).map((l) => l.notif_id as string);
 
   return (
     <div className="min-h-dvh">
@@ -46,7 +51,7 @@ export default async function AppLayout({
           </Link>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-sm text-muted sm:inline">{moi?.prenom?.trim() || (moi?.nom ? nomMembre(moi) : user?.email)}</span>
-            <NotificationBell notifications={notifications} />
+            <NotificationBell notifications={notifications} lues={notifsLues} />
             <ProfileMenu
               avatarUrl={avatarUrl}
               nom={moi?.prenom?.trim() || (moi?.nom ? nomMembre(moi) : user?.email) || "Compte"}

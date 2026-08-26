@@ -25,11 +25,17 @@ export async function chargerNotifications(
   const today = ymd(new Date());
 
   const in7 = ymd(new Date(Date.now() + 7 * 864e5));
-  const [{ data: ndfData }, { data: reunionsData }, { data: ffData }, { data: unitesData }] = await Promise.all([
-    supabase.from("note_frais").select("id, titre, statut, demandeur_id").in("statut", ["soumise", "refusee"]),
+  const [{ data: ndfData }, { data: reunionsData }, { data: ffData }, { data: unitesData }, { data: fcData }, { data: devisData }] = await Promise.all([
+    supabase.from("note_frais").select("id, titre, statut, demandeur_id").in("statut", ["soumise", "refusee", "validee"]),
     supabase.from("reunion").select("id, titre, date, heure_debut, participants:reunion_participant(membre_id)").gte("date", today).order("date"),
     supabase.from("facture_fournisseur").select("id, fournisseur, montant_ttc, date_echeance, statut_paiement").neq("statut_paiement", "paye"),
     supabase.from("unite").select("id, date_derniere_maintenance, maintenance_intervalle_jours, maintenance_intervalle_heures, compteur_heures").or("maintenance_intervalle_jours.not.is.null,maintenance_intervalle_heures.not.is.null"),
+    // Factures clients émises, non payées et échues → relance
+    supabase.from("devis_facture").select("devis_id, prestation_id, numero, montant_ttc, date_echeance, statut_paiement")
+      .eq("type", "facture").in("statut_paiement", ["en_attente", "retard"]).not("numero", "is", null),
+    // Devis récemment signés / refusés par le client
+    supabase.from("devis").select("id, nom, statut_signature, updated_at").in("statut_signature", ["signe", "refuse"])
+      .order("updated_at", { ascending: false }).limit(10),
   ]);
 
   const ndf = (ndfData ?? []) as { id: string; titre: string | null; statut: string; demandeur_id: string | null }[];
@@ -94,6 +100,59 @@ export async function chargerNotifications(
       text: `Note de frais « ${n.titre || "Note"} » refusée`,
       href: `/notes-frais/${n.id}`,
       cls: "border-red-200 bg-red-50 text-red-800",
+    });
+  }
+
+  // Factures clients en retard de paiement (co-présidents) → à relancer
+  if (isCoPres) {
+    const fc = (fcData ?? []) as { devis_id: string; prestation_id: string | null; numero: string | null; montant_ttc: number | null; date_echeance: string | null; statut_paiement: string | null }[];
+    const enRetard = fc.filter((f) => f.statut_paiement === "retard" || (f.date_echeance && f.date_echeance < today));
+    if (enRetard.length > 0) {
+      const total = enRetard.reduce((s2, f) => s2 + Number(f.montant_ttc ?? 0), 0);
+      notifs.push({
+        id: `fc-retard-${enRetard.map((f) => f.devis_id).sort().join("_")}`,
+        icon: "⚠️",
+        text: `${enRetard.length} facture${enRetard.length > 1 ? "s" : ""} client en retard (${Math.round(total)} €) — à relancer`,
+        href: "/finance",
+        cls: "border-red-200 bg-red-50 text-red-800",
+      });
+    }
+  }
+
+  // Devis signés / refusés par le client (co-présidents)
+  if (isCoPres) {
+    const dv = (devisData ?? []) as { id: string; nom: string | null; statut_signature: string | null; updated_at: string | null }[];
+    const recent = (d: { updated_at: string | null }) =>
+      !!d.updated_at && Date.now() - new Date(d.updated_at).getTime() < 14 * 864e5;
+    for (const d of dv.filter((x) => x.statut_signature === "signe" && recent(x)).slice(0, 3)) {
+      notifs.push({
+        id: `devis-signe-${d.id}`,
+        icon: "✅",
+        text: `Devis « ${d.nom || "Devis"} » signé par le client`,
+        href: `/prestations/devis/${d.id}`,
+        cls: "border-green-200 bg-green-50 text-green-800",
+      });
+    }
+    for (const d of dv.filter((x) => x.statut_signature === "refuse" && recent(x)).slice(0, 3)) {
+      notifs.push({
+        id: `devis-refuse-${d.id}`,
+        icon: "❌",
+        text: `Devis « ${d.nom || "Devis"} » refusé par le client`,
+        href: `/prestations/devis/${d.id}`,
+        cls: "border-red-200 bg-red-50 text-red-800",
+      });
+    }
+  }
+
+  // NDF validée en attente de remboursement (pour le demandeur)
+  const mesValidees = (ndfData ?? []) as { id: string; titre: string | null; statut: string; demandeur_id: string | null }[];
+  for (const n of mesValidees.filter((x) => x.statut === "validee" && x.demandeur_id === membre.id).slice(0, 3)) {
+    notifs.push({
+      id: `ndf-validee-${n.id}`,
+      icon: "✅",
+      text: `Note de frais « ${n.titre || "Note"} » validée — remboursement à venir`,
+      href: `/notes-frais/${n.id}`,
+      cls: "border-green-200 bg-green-50 text-green-800",
     });
   }
 

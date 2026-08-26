@@ -3,31 +3,28 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Notif } from "@/lib/notifications";
+import { marquerNotificationsLues } from "@/app/(app)/notif-actions";
 
-const LS_KEY = "dejavu_notifs_lues";
-
-export function NotificationBell({ notifications }: { notifications: Notif[] }) {
+export function NotificationBell({ notifications, lues: luesServeur = [] }: { notifications: Notif[]; lues?: string[] }) {
   const [open, setOpen] = useState(false);
   const [lues, setLues] = useState<Set<string>>(new Set());
   const [monte, setMonte] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Charge l'état « lu » depuis le localStorage au montage
+  // L'état « lu » vient du serveur (persistant, partagé entre appareils).
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) setLues(new Set(JSON.parse(raw) as string[]));
-    } catch { /* ignore */ }
+    setLues(new Set(luesServeur));
     setMonte(true);
-  }, []);
+  }, [luesServeur]);
 
   const nonLues = notifications.filter((n) => !lues.has(n.id));
   const aDuNonLu = monte && nonLues.length > 0;
 
   const marquerLues = () => {
-    const ids = notifications.map((n) => n.id);
-    setLues(new Set(ids));
-    try { localStorage.setItem(LS_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+    const nouvelles = notifications.map((n) => n.id).filter((id) => !lues.has(id));
+    if (!nouvelles.length) return;
+    setLues((p) => new Set([...p, ...nouvelles]));
+    void marquerNotificationsLues(nouvelles);
   };
 
   const ouvrir = () => {

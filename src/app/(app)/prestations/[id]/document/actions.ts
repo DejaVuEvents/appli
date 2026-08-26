@@ -186,7 +186,7 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
 
   const { data: existant } = await supabase
     .from("devis_facture")
-    .select("id, numero")
+    .select("id, numero, date_emission")
     .eq("devis_id", devisId)
     .eq("type", type)
     .maybeSingle();
@@ -201,7 +201,11 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
     numero = (num as string | null) ?? null;
   }
 
-  const echeance = type === "devis" ? new Date(today.getTime() + 30 * 86400000).toISOString().slice(0, 10) : iso;
+  // Une facture déjà numérotée conserve sa DATE D'ÉMISSION d'origine (valeur comptable).
+  const emission = existant?.numero && existant?.date_emission ? existant.date_emission : iso;
+  const echeance = type === "devis"
+    ? new Date(new Date(emission).getTime() + 30 * 86400000).toISOString().slice(0, 10)
+    : emission;
   const payload = {
     prestation_id: prestationId,
     devis_id: devisId,
@@ -210,7 +214,7 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
     montant_ht: contenu.totaux.totalHT,
     taux_tva: contenu.tva.taux,
     montant_ttc: contenu.tva.totalTtc,
-    date_emission: iso,
+    date_emission: emission,
     date_echeance: echeance,
   };
 
@@ -224,8 +228,8 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
   // Archivage PDF sur Google Drive (best-effort, seulement si Drive configuré).
   if (driveConfigured()) {
     try {
-      const pdf = await genererDevisFacturePdf({ ...contenu, type, numero, dateEmission: iso, dateEcheance: echeance });
-      const dossier = type === "devis" ? ["Devis", iso.slice(0, 4)] : ["Factures", iso.slice(0, 4)];
+      const pdf = await genererDevisFacturePdf({ ...contenu, type, numero, dateEmission: emission, dateEcheance: echeance });
+      const dossier = type === "devis" ? ["Devis", emission.slice(0, 4)] : ["Factures", emission.slice(0, 4)];
       const nom = nomFichierSafe(`${type === "devis" ? "Devis" : "Facture"} ${numero ?? contenu.prestationNom}`) + ".pdf";
       await archiverSurDrive({ dossier, nom, mimeType: "application/pdf", data: pdf });
     } catch (e) {

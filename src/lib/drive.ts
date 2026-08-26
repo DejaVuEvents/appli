@@ -67,6 +67,25 @@ export async function archiverSurDrive(opts: {
     const drive = getDrive();
     let parent = await ensureFolder(drive, null, ARCHIVE_ROOT);
     for (const seg of opts.dossier) parent = await ensureFolder(drive, parent, seg);
+
+    // Déduplication : si un fichier du même nom existe déjà dans ce dossier, on met à
+    // jour son contenu au lieu d'en créer un second (ré-émission d'une facture, etc.).
+    const nomEchappe = opts.nom.replace(/'/g, "\\'");
+    const existants = await drive.files.list({
+      q: `'${parent}' in parents and name = '${nomEchappe}' and trashed = false`,
+      fields: "files(id)",
+      spaces: "drive",
+    });
+    const dejaLa = existants.data.files?.[0]?.id;
+    if (dejaLa) {
+      const maj = await drive.files.update({
+        fileId: dejaLa,
+        media: { mimeType: opts.mimeType, body: Readable.from(opts.data) },
+        fields: "id, webViewLink",
+      });
+      return maj.data.webViewLink ?? maj.data.id ?? null;
+    }
+
     const res = await drive.files.create({
       requestBody: { name: opts.nom, parents: [parent] },
       media: { mimeType: opts.mimeType, body: Readable.from(opts.data) },

@@ -73,14 +73,22 @@ function RecurrentsView({ recurrents, nomenclature, mensuelEquivalent }: { recur
                 <td className="px-3 py-2 text-muted">{r.frequence === "annuel" ? `Annuel (${MOIS[(r.mois ?? 1) - 1]}, le ${r.jour})` : `Mensuel (le ${r.jour})`}</td>
                 <td className={`px-3 py-2 text-right font-semibold tabular-nums ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</td>
                 <td className="px-3 py-2 text-center">
-                  <form action={toggleRecurrent.bind(null, r.id, !r.actif)} className="inline">
-                    <button className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.actif ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>{r.actif ? "Actif" : "Inactif"}</button>
-                  </form>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.actif ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{r.actif ? "Actif" : "En pause"}</span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <form action={supprimerRecurrent.bind(null, r.id)} className="inline">
-                    <ConfirmButton confirm="Supprimer cette dépense récurrente ? (retire ses prévisions futures)" className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
-                  </form>
+                  <span className="inline-flex items-center gap-2">
+                    <form action={toggleRecurrent.bind(null, r.id, !r.actif)} className="inline">
+                      <button
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${r.actif ? "border-border text-muted hover:bg-background hover:text-foreground" : "border-green-300 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300"}`}
+                        title={r.actif ? "Suspendre : retire ses prévisions futures (reprise possible à tout moment)" : "Reprendre : regénère ses prévisions futures"}
+                      >
+                        {r.actif ? "⏸ Mettre en pause" : "▶ Reprendre"}
+                      </button>
+                    </form>
+                    <form action={supprimerRecurrent.bind(null, r.id)} className="inline">
+                      <ConfirmButton confirm="Supprimer cette dépense récurrente ? (retire ses prévisions futures)" className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
+                    </form>
+                  </span>
                 </td>
               </tr>
             ))}

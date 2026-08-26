@@ -2,10 +2,15 @@
 // ET la synchronisation Google Agenda / Meet des réunions.
 //
 // Prérequis Google Cloud (projet deja-vu-500820) :
-//   1. APIs & Services → activer « Google Drive API » ET « Google Calendar API ».
+//   1. APIs & Services → activer « Google Drive API », « Google Calendar API »
+//      ET « Gmail API » (pour lire les factures reçues + emails Qonto).
 //   2. OAuth consent screen (= « Data Access » dans la nouvelle UI) → ajouter les scopes
-//      drive.file et calendar.events ; Audience = External → « Publish app » (In production).
+//      drive.file, calendar.events et gmail.readonly ; Audience = External → « Publish app ».
 //   3. Credentials → Create OAuth client ID → type « Desktop app ».
+//
+// ⚠️ Après ajout de gmail.readonly : RE-LANCER ce script pour régénérer le refresh token
+//    (l'ancien n'a pas le scope Gmail), puis mettre à jour GOOGLE_OAUTH_REFRESH_TOKEN
+//    en local ET sur Vercel (Environment Variables), et redéployer.
 //
 // Les identifiants (CLIENT_ID / CLIENT_SECRET) sont lus depuis .env.local
 // (ou depuis les variables d'environnement). Lancement simple :
@@ -52,6 +57,7 @@ const url = oauth2.generateAuthUrl({
   scope: [
     "https://www.googleapis.com/auth/drive.file",        // archivage Drive
     "https://www.googleapis.com/auth/calendar.events",   // réunions Google Agenda + Meet
+    "https://www.googleapis.com/auth/gmail.readonly",    // lecture factures reçues + emails Qonto (prévisions)
   ],
 });
 

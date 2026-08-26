@@ -99,11 +99,7 @@ export default async function NotesFraisPage() {
 
   return (
     <div className="max-w-6xl">
-      <PageHeader
-        title="Notes de frais"
-        subtitle={membre ? `Connecté : ${nomMembre(membre)}${isCoPres ? " (co-président)" : ""}` : undefined}
-        action={nouvelleNote}
-      />
+      <PageHeader title="Notes de frais" action={nouvelleNote} />
 
       {/* À valider (co-présidents) */}
       {isCoPres && (

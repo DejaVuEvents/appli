@@ -36,10 +36,15 @@ const ETAT_BADGE: Record<EtatPrepa, { label: string; cls: string }> = {
 
 export default async function PreparationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ retour?: string }>;
 }) {
   const { id } = await params;
+  // Depuis une location, on garde le contexte location (pas les onglets événement).
+  const retourBrut = (await searchParams)?.retour;
+  const retourLocation = retourBrut && retourBrut.startsWith("/planification/location/") ? retourBrut : null;
   const supabase = await createClient();
 
   const [{ data: prest }, { data: resaData }, { data: mvtData }, { data: lignesData }] = await Promise.all([
@@ -99,7 +104,11 @@ export default async function PreparationPage({
           </div>
         }
       />
-      <EventTabBar eventId={id} active="preparation" />
+      {retourLocation ? (
+        <Link href={retourLocation} className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← Location</Link>
+      ) : (
+        <EventTabBar eventId={id} active="preparation" />
+      )}
 
       {/* Progression */}
       <Card className="p-4">

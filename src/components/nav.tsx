@@ -103,6 +103,29 @@ export function groupesVisibles(role: RoleMembre): Group[] {
     .filter((g) => (g.children ? g.children.length > 0 : peutAcceder(role, g.href)));
 }
 
+/**
+ * Détermine si un lien de nav est « actif » pour un chemin donné. Partagé entre la nav
+ * desktop et le menu mobile pour éviter deux logiques divergentes.
+ * Lève les ambiguïtés : /prestations (Finance) vs fiches événement /prestations/<id>,
+ * et Événements vs Location qui partagent /planification (distingués par ?vue=location).
+ */
+export function navHrefActif(pathname: string, vueLocation: boolean, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  const estListePlanif = pathname === "/planification";
+  const estFicheLocation = pathname.startsWith("/planification/location");
+  // Fiche événement : /prestations/<id>/… ou /planification/<id> (onglet Planning),
+  // mais PAS la liste /prestations ni l'éditeur /prestations/devis/…
+  const estFicheEvenement =
+    (pathname.startsWith("/prestations/") && !pathname.startsWith("/prestations/devis")) ||
+    (pathname.startsWith("/planification/") && !estFicheLocation);
+  if (href === "/planification") return (estListePlanif && !vueLocation) || estFicheEvenement;
+  if (href === "/planification?vue=location") return (estListePlanif && vueLocation) || estFicheLocation;
+  if (href === "/prestations") return pathname === "/prestations" || pathname.startsWith("/prestations/devis");
+  // Fiche unité : rattachée au catalogue.
+  if (href === "/catalogue") return pathname.startsWith("/catalogue") || pathname.startsWith("/u/");
+  return pathname.startsWith(href);
+}
+
 export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -113,22 +136,7 @@ export function Nav({ role = "co_president" }: { role?: RoleMembre }) {
   // Sous-onglets « Événements » et « Location » partagent le chemin /planification ;
   // seul le paramètre ?vue=location les distingue (usePathname ne le voit pas).
   const vueLocation = searchParams?.get("vue") === "location";
-  const estListePlanif = pathname === "/planification";
-  const estFicheLocation = pathname.startsWith("/planification/location");
-  // Une fiche événement vit sous /prestations/<id> (ex. /prestations/xxx/technique) — MAIS
-  // la liste Devis & Factures (/prestations) et l'éditeur de devis (/prestations/devis/…)
-  // appartiennent à Finance. On lève donc l'ambiguïté du préfixe /prestations.
-  const estFicheEvenement = pathname.startsWith("/prestations/") && !pathname.startsWith("/prestations/devis");
-  const hrefActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    // Événements : liste planif (hors vue location) + fiches événement
-    if (href === "/planification") return (estListePlanif && !vueLocation) || estFicheEvenement;
-    // Location : liste planif en vue location + fiches location
-    if (href === "/planification?vue=location") return (estListePlanif && vueLocation) || estFicheLocation;
-    // Devis & Factures (Finance) : liste globale + éditeur de devis, PAS les fiches événement
-    if (href === "/prestations") return pathname === "/prestations" || pathname.startsWith("/prestations/devis");
-    return pathname.startsWith(href);
-  };
+  const hrefActive = (href: string) => navHrefActif(pathname, vueLocation, href);
   const groupActive = (g: Group) =>
     hrefActive(g.href) || (g.children?.some((c) => hrefActive(c.href)) ?? false);
 

@@ -239,7 +239,7 @@ export default async function LocationDetailPage({
                 <div className="font-medium">Check-list de chargement</div>
                 <div className="text-muted">{nbLignes} élément{(nbLignes ?? 0) > 1 ? "s" : ""} à préparer · sorties / retours + scan QR</div>
               </div>
-              <Link href={`/prestations/${loc.prestation_id}/preparation`} className={btnPrimary}>Ouvrir la check-list →</Link>
+              <Link href={`/prestations/${loc.prestation_id}/preparation?retour=${encodeURIComponent(`/planification/location/${id}`)}`} className={btnPrimary}>Ouvrir la check-list →</Link>
             </Card>
           )}
         </div>

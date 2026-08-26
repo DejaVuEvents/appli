@@ -500,20 +500,25 @@ export async function deleteDevis(devisId: string, retour?: string) {
   if (error) throw new Error(error.message);
 
   let estEvt = false;
+  let contenantSupprime = false;
   if (prestId) {
     const { data: p } = await supabase.from("prestation").select("est_evenement").eq("id", prestId).maybeSingle();
     estEvt = !!p?.est_evenement;
     // Conteneur « porte-devis » (pas un vrai événement) devenu vide → on le supprime aussi.
     if (!estEvt) {
       const { count } = await supabase.from("devis").select("id", { count: "exact", head: true }).eq("prestation_id", prestId);
-      if ((count ?? 0) === 0) await supabase.from("prestation").delete().eq("id", prestId);
+      if ((count ?? 0) === 0) { await supabase.from("prestation").delete().eq("id", prestId); contenantSupprime = true; }
     }
     revalidatePath(`/prestations/${prestId}`);
   }
   revalidatePath("/prestations");
-  // Redirection explicite si fournie (suppression depuis une liste), sinon logique par défaut.
+  revalidatePath("/planification");
+  // Redirection explicite si fournie (suppression depuis une liste), sinon retour contextuel :
+  // événement → sa fiche, location encore existante → sa fiche, sinon la liste.
   if (retour) redirect(retour);
-  redirect(estEvt && prestId ? `/prestations/${prestId}?tab=devis` : "/prestations");
+  if (prestId && estEvt) redirect(`/prestations/${prestId}?tab=devis`);
+  if (prestId && !contenantSupprime) redirect(`/planification/location/${prestId}?tab=devis`);
+  redirect("/prestations");
 }
 
 export async function renameDevis(devisId: string, formData: FormData) {

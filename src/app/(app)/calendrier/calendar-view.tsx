@@ -166,7 +166,7 @@ function buildEvents(
       dateEnd: e.date.slice(0, 10),
       title: e.denomination ?? (e.sens === "entree" ? "Entrée prévue" : "Sortie prévue"),
       subtitle: `${e.sens === "entree" ? "+" : "−"} ${euros(e.montant_ttc)}`,
-      href: `/finance/${e.id}`,
+      href: `/finance/${e.id}?retour=calendrier`,
       pill: e.sens === "entree" ? "bg-green-100 text-green-800 border border-green-200" : "bg-amber-100 text-amber-800 border border-amber-200",
       dot: e.sens === "entree" ? "bg-green-400" : "bg-amber-400",
       // Les écritures financières prévisionnelles ne sont rattachées à personne (masquées par « me concerne »).

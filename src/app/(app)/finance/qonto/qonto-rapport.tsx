@@ -107,7 +107,7 @@ export function QontoRapport() {
                   <p className="mb-2 text-xs text-muted">Erreurs de saisie, doublons, ou mouvements hors banque (espèces). Clique pour ouvrir et corriger.</p>
                   <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border">
                     {rap.enTrop.map((e) => (
-                      <Link key={e.id} href={`/finance/${e.id}`} className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs hover:bg-background">
+                      <Link key={e.id} href={`/finance/${e.id}?retour=qonto`} className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs hover:bg-background">
                         <span className="min-w-0"><span className="text-muted">{dateFr(e.date)}</span> · {e.denomination}</span>
                         <span className={`shrink-0 font-semibold ${e.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{e.sens === "entree" ? "+" : "−"} {euros(e.montant)}</span>
                       </Link>

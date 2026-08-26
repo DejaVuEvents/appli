@@ -18,10 +18,13 @@ export function EcritureForm({
   prestations = [],
   submitLabel = "+ Ajouter l'écriture",
   cancelHref,
+  retour,
   inModal = false,
   nomenclature = NOMENCLATURE,
 }: {
   action: (formData: FormData) => void;
+  /** Chemin de retour après enregistrement (champ caché lu par l'action). */
+  retour?: string;
   ecriture?: EcritureFinanciere;
   prestations?: Prestation[];
   submitLabel?: string;
@@ -44,6 +47,7 @@ export function EcritureForm({
 
   return (
     <Wrapper action={action} className="space-y-3">
+      {retour && <input type="hidden" name="retour" value={retour} />}
       <div className="grid gap-3 sm:grid-cols-4">
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Sens</span>

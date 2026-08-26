@@ -8,6 +8,7 @@ const tabs = [
   { href: "/finance/synthese", label: "Synthèse" },
   { href: "/finance/journal", label: "Journal" },
   { href: "/finance/previsionnel", label: "Prévisionnel" },
+  { href: "/finance/fournisseurs", label: "Fournisseurs" },
   { href: "/finance/roi", label: "ROI matériel" },
   { href: "/finance/qonto", label: "Sync Qonto" },
 ];
@@ -18,7 +19,9 @@ export function FinanceTabs({ annee }: { annee: number }) {
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-border">
       <nav className="-mb-px flex gap-1 overflow-x-auto">
         {tabs.map((t) => {
-          const active = pathname === t.href;
+          // Actif sur la page ET ses sous-pages (ex. /finance/roi/[id]), sauf « /finance »
+          // qui ne doit pas s'activer pour tout le reste.
+          const active = t.href === "/finance" ? pathname === "/finance" : pathname.startsWith(t.href);
           return (
             <Link
               key={t.href}

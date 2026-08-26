@@ -14,6 +14,7 @@ import {
   detacherMembre,
   setRoleMembre,
   associerDevisExistant,
+  createDevis,
 } from "../actions";
 import { ROLES_MEMBRE } from "@/lib/roles";
 import { euros, dateFr } from "@/lib/format";
@@ -236,7 +237,9 @@ export default async function PrestationDetailPage({
               docs={tousDocs}
               associerAction={associerDevisExistant.bind(null, id)}
               creer={
-                <Link href="/prestations" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90" title="Créer un nouveau document">+ Créer</Link>
+                <form action={createDevis.bind(null, id)}>
+                  <button className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90" title="Créer un devis dans cet événement">+ Créer</button>
+                </form>
               }
             />
           </div>

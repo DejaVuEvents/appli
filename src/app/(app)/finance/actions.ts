@@ -211,7 +211,9 @@ export async function updateEcriture(id: string, formData: FormData) {
   const { error } = await supabase.from("ecriture_financiere").update(await ecritureFromForm(supabase, formData)).eq("id", id);
   if (error) throw new Error(error.message);
   revaliderFinance();
-  redirect("/finance/journal");
+  // Retour d'où l'on vient (champ caché « retour »), sinon le journal.
+  const retour = String(formData.get("retour") ?? "").trim();
+  redirect(retour.startsWith("/") ? retour : "/finance/journal");
 }
 
 export async function deleteEcriture(id: string) {

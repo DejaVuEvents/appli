@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { groupesVisibles, type Group } from "./nav";
+import { groupesVisibles, navHrefActif, type Group } from "./nav";
 import type { RoleMembre } from "@/lib/membre";
-
-const hrefActive = (pathname: string, href: string) =>
-  href === "/" ? pathname === "/" : pathname.startsWith(href);
 
 export function MobileMenu({ role = "membre" }: { role?: RoleMembre }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const vueLocation = searchParams?.get("vue") === "location";
+  const hrefActive = (_p: string, href: string) => navHrefActif(pathname, vueLocation, href);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);

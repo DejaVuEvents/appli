@@ -100,6 +100,12 @@ export default async function FicheUnitePage({
 
   return (
     <div className="max-w-2xl">
+      <Link
+        href={ref?.id ? `/catalogue/${ref.id}` : "/catalogue"}
+        className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
+      >
+        ← {ref?.nom ?? "Catalogue"}
+      </Link>
       <PageHeader
         title={ref?.nom ?? "Unité"}
         subtitle={u.numero_serie ? `N° de série ${u.numero_serie}` : "Fiche unité"}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -9,13 +10,25 @@ import type { EcritureFinanciere, Justificatif } from "@/lib/types";
 import { urlDocument } from "@/lib/storage";
 import { euros } from "@/lib/format";
 import { chargerNomenclature } from "@/lib/finance";
+import { FinanceTabs } from "../finance-tabs";
 
 export default async function EditEcriturePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ retour?: string }>;
 }) {
   const { id } = await params;
+  // Retour contextuel : on revient d'où l'on vient (journal par défaut).
+  const retourParam = (await searchParams)?.retour;
+  const RETOURS: Record<string, { href: string; label: string }> = {
+    dashboard: { href: "/finance", label: "Tableau de bord" },
+    previsionnel: { href: "/finance/previsionnel", label: "Prévisionnel" },
+    calendrier: { href: "/calendrier", label: "Calendrier" },
+    qonto: { href: "/finance/qonto", label: "Sync Qonto" },
+  };
+  const { href: retourHref, label: retourLabel } = RETOURS[retourParam ?? ""] ?? { href: "/finance/journal", label: "Journal" };
   const supabase = await createClient();
   const [{ data }, { data: prestData }, { data: justifData }, { data: liensData }] = await Promise.all([
     supabase.from("ecriture_financiere").select("*").eq("id", id).single(),
@@ -36,14 +49,18 @@ export default async function EditEcriturePage({
 
   return (
     <div className="max-w-6xl space-y-6">
-      <PageHeader title="Modifier l'écriture" />
+      <PageHeader title="Comptabilité" />
+      <FinanceTabs annee={new Date((data as EcritureFinanciere).date).getFullYear() || new Date().getFullYear()} />
+      <Link href={retourHref} className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← {retourLabel}</Link>
+      <h2 className="text-base font-semibold">Modifier l&apos;écriture</h2>
       <Card className="p-5">
         <EcritureForm
           action={updateEcriture.bind(null, id)}
           ecriture={data as EcritureFinanciere}
           prestations={prestations}
           submitLabel="Enregistrer"
-          cancelHref="/finance/journal"
+          cancelHref={retourHref}
+          retour={retourHref}
           nomenclature={await chargerNomenclature(supabase)}
         />
       </Card>

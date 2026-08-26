@@ -5,6 +5,7 @@ import { fetchQontoOrg } from "@/lib/qonto";
 import { chargerNomenclature, syntheseMensuelle } from "@/lib/finance";
 import { QontoSync } from "./qonto-sync";
 import { QontoRapport } from "./qonto-rapport";
+import { EmailFactures } from "./email-factures";
 import type { ParametresEntreprise, EcritureFinanciere } from "@/lib/types";
 
 export default async function QontoPage({
@@ -71,6 +72,9 @@ export default async function QontoPage({
           <QontoRapport />
         </>
       )}
+
+      <h2 className="mb-4 mt-8 text-base font-semibold">Factures reçues par email</h2>
+      <EmailFactures />
     </div>
   );
 }

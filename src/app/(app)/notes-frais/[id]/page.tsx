@@ -10,7 +10,7 @@ import { JustificatifPreview } from "@/components/justificatif-preview";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre } from "@/lib/membre";
 import {
-  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos,
+  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee,
 } from "../actions";
 import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
@@ -57,6 +57,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
   const editable = ndf.statut === "brouillon" && estDemandeur;
   const peutValider = membre?.role === "co_president" && !estDemandeur && ndf.statut === "soumise";
   const estPredepense = ndf.type_ndf === "predepense";
+  const isCoPres = membre?.role === "co_president";
+  // « Remboursée » = l'écriture de trésorerie liée est passée en réel.
+  const { data: ecrLiee } = ndf.ecriture_id
+    ? await supabase.from("ecriture_financiere").select("statut").eq("id", ndf.ecriture_id).maybeSingle()
+    : { data: null };
+  const estRemboursee = ecrLiee?.statut === "reel";
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -83,10 +89,23 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           <strong>{estPredepense ? "Achat autorisé" : "Validée"}</strong> par {mMap.get(ndf.valide_par ?? "") ?? "—"} le {dateFr(ndf.valide_le)}.
           {estPredepense && <div className="mt-1">Tu peux procéder à l&apos;achat. Crée ensuite une note de frais « Dépenses » avec le justificatif pour le remboursement.</div>}
           {!estPredepense && ndf.ecriture_id && (
-            <div className="mt-1">
-              Une ligne <strong>prévisionnelle</strong> (sortie) a été créée dans la trésorerie —{" "}
-              <Link href="/finance/journal" className="underline">voir le journal</Link>.
-            </div>
+            estRemboursee ? (
+              <div className="mt-1">Remboursement <strong>effectué</strong> et enregistré dans la trésorerie.</div>
+            ) : (
+              <div className="mt-2">
+                <div>Une ligne <strong>prévisionnelle</strong> (sortie) attend le remboursement.</div>
+                {isCoPres && (
+                  <form action={marquerNDFRemboursee.bind(null, ndf.id)} className="mt-2 flex flex-wrap items-end gap-2">
+                    <label className="text-xs">
+                      <span className="mb-1 block font-medium">Date du virement</span>
+                      <input type="date" name="date_virement" defaultValue={new Date().toISOString().slice(0, 10)}
+                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground" />
+                    </label>
+                    <SubmitButton className="!py-1.5 !text-xs">Marquer comme remboursée</SubmitButton>
+                  </form>
+                )}
+              </div>
+            )
           )}
         </Card>
       )}

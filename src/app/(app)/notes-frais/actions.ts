@@ -127,6 +127,19 @@ export async function signerNDF(noteId: string) {
 
 export async function soumettreNDF(noteId: string) {
   const supabase = await createSupabase();
+  // Garde-fous : une NDF soumise doit être signée et contenir au moins une ligne
+  // (sinon on valide une écriture à 0 € non signée).
+  const { data: n } = await supabase
+    .from("note_frais")
+    .select("type_ndf, demandeur_signe_le, lignes:ligne_note_frais(id)")
+    .eq("id", noteId)
+    .maybeSingle();
+  const nn = n as unknown as { type_ndf: string | null; demandeur_signe_le: string | null; lignes: { id: string }[] } | null;
+  if (!nn) throw new Error("Note de frais introuvable.");
+  if (!nn.demandeur_signe_le) throw new Error("Signe ta note de frais avant de la soumettre.");
+  if (nn.type_ndf !== "predepense" && (nn.lignes ?? []).length === 0) {
+    throw new Error("Ajoute au moins une dépense avant de soumettre.");
+  }
   await supabase.from("note_frais").update({ statut: "soumise", motif_refus: null }).eq("id", noteId).eq("statut", "brouillon");
   revalidatePath(`/notes-frais/${noteId}`);
   revalidatePath("/notes-frais");
@@ -199,10 +212,16 @@ export async function validerNDF(noteId: string) {
     .single();
   if (ecrErr) throw new Error(ecrErr.message);
 
-  await supabase
+  const { data: maj } = await supabase
     .from("note_frais")
     .update({ statut: "validee", valide_par: membre.id, valide_le: new Date().toISOString(), ecriture_id: ecr.id, motif_refus: null })
-    .eq("id", noteId);
+    .eq("id", noteId)
+    .eq("statut", "soumise")   // anti-concurrence : si déjà validée entre-temps, on annule
+    .select("id");
+  if (!maj || maj.length === 0) {
+    await supabase.from("ecriture_financiere").delete().eq("id", ecr.id);
+    throw new Error("Cette note de frais vient d'être traitée par quelqu'un d'autre.");
+  }
 
   // Archivage Google Drive (best-effort) sous « Notes de frais / {année} »
   if (driveConfigured()) {
@@ -249,7 +268,37 @@ export async function refuserNDF(noteId: string, formData: FormData) {
 
 export async function deleteNoteFrais(noteId: string) {
   const supabase = await createSupabase();
+  // L'écriture de remboursement liée doit disparaître avec la note (la FK est en
+  // SET NULL dans l'autre sens : sans ça elle resterait orpheline et invisible).
+  const { data: n } = await supabase.from("note_frais").select("ecriture_id").eq("id", noteId).maybeSingle();
   await supabase.from("note_frais").delete().eq("id", noteId);
+  if (n?.ecriture_id) await supabase.from("ecriture_financiere").delete().eq("id", n.ecriture_id);
   revalidatePath("/notes-frais");
+  revalidatePath("/finance");
+  revalidatePath("/finance/journal");
+  revalidatePath("/finance/previsionnel");
   redirect("/notes-frais");
+}
+
+/**
+ * Marque une NDF validée comme REMBOURSÉE : son écriture de trésorerie passe de
+ * prévisionnelle à réelle, à la date du virement. C'est ce qui la sort de « On doit ».
+ */
+export async function marquerNDFRemboursee(noteId: string, formData?: FormData) {
+  const supabase = await createSupabase();
+  const membre = await getMembreActuel(supabase);
+  if (!membre || membre.role !== "co_president") throw new Error("Seul un co-président peut marquer un remboursement.");
+  const { data: n } = await supabase.from("note_frais").select("ecriture_id, statut").eq("id", noteId).maybeSingle();
+  if (!n?.ecriture_id) throw new Error("Aucune écriture de trésorerie liée à cette note.");
+  if (n.statut !== "validee") throw new Error("La note doit être validée avant d'être remboursée.");
+  const dateVirement = str(formData?.get("date_virement") ?? null) ?? new Date().toISOString().slice(0, 10);
+  await supabase
+    .from("ecriture_financiere")
+    .update({ statut: "reel", date: dateVirement, valide: true })
+    .eq("id", n.ecriture_id);
+  revalidatePath(`/notes-frais/${noteId}`);
+  revalidatePath("/notes-frais");
+  revalidatePath("/finance");
+  revalidatePath("/finance/journal");
+  revalidatePath("/finance/previsionnel");
 }

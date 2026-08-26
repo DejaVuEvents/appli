@@ -45,14 +45,13 @@ export async function previewQonto(): Promise<
       .not("qonto_transaction_id", "is", null);
     const importedIds = new Set((alreadySynced ?? []).map((e) => e.qonto_transaction_id as string));
 
-    // 2. Écritures manuelles/Excel → détection de doublon TOLÉRANTE AUX DATES.
-    // Le règlement Qonto tombe souvent 1-2 jours après la saisie manuelle : on flague
-    // comme doublon toute transaction de même montant+sens à ±5 jours d'une écriture existante.
+    // 2. Détection de doublon TOLÉRANTE AUX DATES, sur les écritures RÉELLES **et
+    // PRÉVISIONNELLES** : le règlement Qonto d'une facture client, d'une NDF ou d'une
+    // facture fournisseur encore « prévue » ne doit pas s'ajouter à sa prévision.
     const { data: manualEntries } = await supabase
       .from("ecriture_financiere")
-      .select("date, montant_ttc, sens")
-      .is("qonto_transaction_id", null)
-      .eq("statut", "reel");
+      .select("date, montant_ttc, sens, statut")
+      .is("qonto_transaction_id", null);
 
     // Index : "montantCents|sens" -> liste des dates (ms)
     const manualIdx = new Map<string, number[]>();
@@ -61,7 +60,8 @@ export async function previewQonto(): Promise<
       if (!manualIdx.has(k)) manualIdx.set(k, []);
       manualIdx.get(k)!.push(new Date(e.date).getTime());
     }
-    const TOLERANCE_MS = 5 * 24 * 60 * 60 * 1000;
+    // Une prévision peut être datée d'une échéance éloignée du règlement réel → tolérance large.
+    const TOLERANCE_MS = 20 * 24 * 60 * 60 * 1000;
     const estDoublon = (date: string, amount: number, sens: string): boolean => {
       const dates = manualIdx.get(`${Math.round(amount * 100)}|${sens}`);
       if (!dates) return false;

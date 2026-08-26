@@ -9,6 +9,7 @@ import { extraireMaterielPdf } from "@/lib/gemini";
 import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
 import { ROLES_MEMBRE } from "@/lib/roles";
 import { coutKmVehicule } from "@/lib/vehicule";
+import { synchroniserEcritureDevisSigne } from "@/lib/tresorerie-sync";
 
 function num(v: FormDataEntryValue | null): number | null {
   if (v === null || String(v).trim() === "") return null;
@@ -24,6 +25,13 @@ function remiseType(v: FormDataEntryValue | null): RemiseType {
 }
 
 type Supa = Awaited<ReturnType<typeof createSupabase>>;
+
+function revaliderTresorerie() {
+  revalidatePath("/finance");
+  revalidatePath("/finance/journal");
+  revalidatePath("/finance/previsionnel");
+  revalidatePath("/finance/synthese");
+}
 
 /** Marque un devis comme modifié par l'utilisateur courant (updated_at via trigger). */
 async function toucherDevis(supabase: Supa, devisId: string) {
@@ -48,6 +56,12 @@ async function toucherDevis(supabase: Supa, devisId: string) {
   } else {
     await supabase.from("devis_historique").insert({ devis_id: devisId, membre_id: uid, action: "Modification" });
   }
+
+  // Un devis signé alimente le prévisionnel : on resynchronise son montant à chaque
+  // modification (lignes, remise, coefficient) pour qu'il ne reste pas figé.
+  await synchroniserEcritureDevisSigne(supabase, devisId);
+  revalidatePath("/finance");
+  revalidatePath("/finance/previsionnel");
 }
 
 /**
@@ -61,7 +75,7 @@ export async function creerAcompteSolde(devisId: string, formData: FormData) {
 
   const { data: base } = await supabase
     .from("devis")
-    .select("id, nom, prestation_id, remise_globale_type, remise_globale_valeur")
+    .select("id, nom, prestation_id, remise_globale_type, remise_globale_valeur, coefficient_duree")
     .eq("id", devisId)
     .single();
   if (!base) throw new Error("Document introuvable.");
@@ -72,7 +86,9 @@ export async function creerAcompteSolde(devisId: string, formData: FormData) {
   ]);
   const net = (ls ?? []).reduce((s, l) => s + Number(l.prix_total ?? 0), 0) + (trs ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
   const remise = montantRemise(net, base.remise_globale_type as RemiseType, Number(base.remise_globale_valeur ?? 0));
-  const totalHT = Math.round((net - remise) * 100) / 100;
+  // Le coefficient multi-jours multiplie le total final : acompte + solde doivent le refléter.
+  const coeff = Number(base.coefficient_duree ?? 0) > 0 ? Number(base.coefficient_duree) : 1;
+  const totalHT = Math.round((net - remise) * coeff * 100) / 100;
   const montantAcompte = Math.round(totalHT * pct) / 100;
   const montantSolde = Math.round((totalHT - montantAcompte) * 100) / 100;
   const baseNom = base.nom || "devis";
@@ -96,6 +112,10 @@ export async function creerAcompteSolde(devisId: string, formData: FormData) {
   const acompteId = await mkFacture(`Acompte ${pct}%`, `Acompte ${pct}% — ${baseNom}`, montantAcompte);
   await mkFacture("Solde", `Solde — ${baseNom}`, montantSolde);
 
+  // Les 2 factures filles portent désormais la recette : on retire la prévision du
+  // devis source signé (sinon la recette serait comptée deux fois).
+  await synchroniserEcritureDevisSigne(supabase, devisId);
+  revaliderTresorerie();
   revalidatePath(`/prestations/${base.prestation_id}`);
   redirect(`/prestations/devis/${acompteId ?? base.id}`);
 }
@@ -146,11 +166,25 @@ export async function importerDocumentPdf(formData: FormData) {
   }
   // 4) Facture → émission (apparaît dans la liste Factures avec un statut).
   if (type === "facture" && devis) {
-    await supabase.from("devis_facture").insert({
+    const { data: df } = await supabase.from("devis_facture").insert({
       prestation_id: prest.id, devis_id: devis.id, type: "facture", numero,
       montant_ht: montant ?? 0, taux_tva: 0, montant_ttc: montant ?? 0,
       date_emission: date, statut_paiement: "en_attente",
-    });
+    }).select("id").single();
+    // Une facture importée alimente la trésorerie comme une facture émise (entrée
+    // prévisionnelle, à valider), dès lors qu'elle a un numéro et un montant.
+    if (df && numero && montant) {
+      const { data: { user: u2 } } = await supabase.auth.getUser();
+      await supabase.from("ecriture_financiere").insert({
+        date: date ?? new Date().toISOString().slice(0, 10),
+        denomination: `Facture N° ${numero}`,
+        type: "Prestation_Tech", specification: "Location de matériel",
+        sens: "entree", statut: "previsionnel", montant_ttc: montant,
+        prestation_id: prest.id, devis_facture_id: df.id, valide: false,
+        created_by: u2?.id ?? null,
+      });
+      revaliderTresorerie();
+    }
   }
 
   revalidatePath("/prestations");

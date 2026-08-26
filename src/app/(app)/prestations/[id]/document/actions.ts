@@ -8,6 +8,7 @@ import { genererDevisFacturePdf } from "@/lib/pdf/devis-facture";
 import { archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { BUCKET_PRIVE } from "@/lib/storage";
 import { chargerNomenclature, categorieManquante, categorieDefaut } from "@/lib/finance";
+import { synchroniserEcritureDevisSigne } from "@/lib/tresorerie-sync";
 
 type Supa = Awaited<ReturnType<typeof createSupabase>>;
 
@@ -75,87 +76,6 @@ async function synchroniserEcritureFacture(supabase: Supa, devisId: string) {
     montant_ttc: Number(fac.montant_ttc ?? 0),
     prestation_id: fac.prestation_id,
     devis_facture_id: fac.id,
-  };
-
-  if (existante) {
-    await supabase.from("ecriture_financiere").update(payload).eq("id", existante.id);
-  } else {
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("ecriture_financiere").insert({ ...payload, created_by: user?.id ?? null });
-  }
-}
-
-/**
- * Auto-alimentation de la trésorerie depuis un DEVIS SIGNÉ : crée/maj une entrée
- * PRÉVISIONNELLE liée (`devis_id`). Retirée dès qu'une facture est émise pour ce devis
- * (la facture prend le relais → pas de double comptage), ou si le devis n'est plus signé.
- */
-async function synchroniserEcritureDevisSigne(supabase: Supa, devisId: string) {
-  const { data: dv } = await supabase
-    .from("devis")
-    .select("id, nom, prestation_id, statut_signature")
-    .eq("id", devisId)
-    .maybeSingle();
-  if (!dv) return;
-
-  // Une facture est-elle déjà émise pour ce devis ? (elle alimente alors la trésorerie)
-  const { data: fac } = await supabase
-    .from("devis_facture")
-    .select("numero")
-    .eq("devis_id", devisId)
-    .eq("type", "facture")
-    .maybeSingle();
-  const factureEmise = !!fac?.numero;
-
-  const { data: existante } = await supabase
-    .from("ecriture_financiere")
-    .select("id, type, specification")
-    .eq("devis_id", devisId)
-    .maybeSingle();
-
-  // Conditions pour NE PAS avoir d'entrée prévisionnelle de devis signé.
-  if (dv.statut_signature !== "signe" || factureEmise) {
-    if (existante) await supabase.from("ecriture_financiere").delete().eq("id", existante.id);
-    return;
-  }
-
-  // Montant = total HT du devis (coefficient inclus).
-  const contenu = await assemblerContenuDocument(supabase, devisId);
-  const totalHT = contenu?.totaux.totalHT ?? 0;
-  if (!totalHT) {
-    if (existante) await supabase.from("ecriture_financiere").delete().eq("id", existante.id);
-    return;
-  }
-
-  // Catégorie (préserve une correction manuelle valide, sinon défaut prestation).
-  const nomenclature = await chargerNomenclature(supabase);
-  let type = existante?.type ?? null;
-  let specification = existante?.specification ?? null;
-  if (categorieManquante(nomenclature, "entree", type)) {
-    const defo = categorieDefaut(nomenclature, "entree", "Prestation_Tech", "Location de matériel");
-    type = defo.type;
-    specification = defo.specification;
-  }
-
-  // Date prévue = début d'événement, sinon aujourd'hui ; libellé = client.
-  let datePrev = new Date().toISOString().slice(0, 10);
-  let clientNom = "";
-  if (dv.prestation_id) {
-    const { data: p } = await supabase.from("prestation").select("date_event_debut, client(nom)").eq("id", dv.prestation_id).maybeSingle();
-    const pp = p as unknown as { date_event_debut: string | null; client: { nom: string } | null } | null;
-    if (pp?.date_event_debut) datePrev = pp.date_event_debut;
-    clientNom = pp?.client?.nom ?? "";
-  }
-
-  const payload = {
-    date: datePrev,
-    denomination: `Devis signé — ${dv.nom ?? "Devis"}${clientNom ? ` (${clientNom})` : ""}`,
-    type, specification,
-    sens: "entree",
-    statut: "previsionnel",
-    montant_ttc: totalHT,
-    prestation_id: dv.prestation_id,
-    devis_id: devisId,
   };
 
   if (existante) {

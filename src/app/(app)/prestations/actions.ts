@@ -359,7 +359,20 @@ export async function updateStatut(id: string, formData: FormData) {
   const statut = str(formData.get("statut")) ?? "devis";
   const { error } = await supabase.from("prestation").update({ statut }).eq("id", id);
   if (error) throw new Error(error.message);
+
+  // Effet de bord : un événement ANNULÉ libère le matériel réservé (il redevient
+  // disponible pour d'autres dates) et sort du prévisionnel de trésorerie.
+  if (statut === "annule") {
+    await supabase.from("reservation_unite").delete().eq("prestation_id", id);
+    const { data: devisIds } = await supabase.from("devis").select("id").eq("prestation_id", id);
+    for (const d of devisIds ?? []) {
+      await supabase.from("ecriture_financiere").delete().eq("devis_id", d.id).eq("statut", "previsionnel");
+    }
+    revaliderTresorerie();
+  }
   revalidatePath(`/prestations/${id}`);
+  revalidatePath(`/prestations/${id}/preparation`);
+  revalidatePath("/planification");
 }
 
 export async function deletePrestation(id: string, retour?: string) {
@@ -863,7 +876,15 @@ export async function reserverUnites(prestationId: string) {
     const { error } = await supabase.from("reservation_unite").insert(inserts);
     if (error) throw new Error(error.message);
   }
+  // Stock insuffisant : on réserve ce qui est possible mais on le signale (sinon la
+  // sous-réservation passe totalement inaperçue).
+  const demande = [...besoin.values()].reduce((s2, q) => s2 + q, 0);
+  const manquant = demande - inserts.length;
   revalidatePath(`/prestations/${prestationId}`);
+  if (manquant > 0) {
+    redirect(`/prestations/${prestationId}?msg=${encodeURIComponent(
+      `${inserts.length} unité(s) réservée(s) — ${manquant} manquante(s) : stock insuffisant sur ces dates.`)}`);
+  }
 }
 
 export async function libererReservations(prestationId: string) {

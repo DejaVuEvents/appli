@@ -36,9 +36,12 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
   const router = useRouter();
   const [, start] = useTransition();
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dragCat, setDragCat] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [overCat, setOverCat] = useState<string | null>(null);
   const dragRef = useRef<{ id: string; cat: string } | null>(null);
   const overRef = useRef<string | null>(null); // dernière ligne survolée (id) pendant le drag
+  const overCatRef = useRef<string | null>(null); // catégorie survolée (déplacement entre catégories)
   const posRef = useRef<{ x: number; y: number } | null>(null); // dernière position pointeur (auto-scroll)
   const rafRef = useRef<number | null>(null);
   const [remiseOpen, setRemiseOpen] = useState<Set<string>>(new Set());
@@ -57,8 +60,9 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
       window.scrollBy(0, dy);
       const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-ligne]") as HTMLElement | null;
       const o = el?.getAttribute("data-ligne") ?? null;
-      overRef.current = o;
-      setOverId(o);
+      const c = el?.getAttribute("data-cat") ?? overCatRef.current;
+      overRef.current = o; overCatRef.current = c;
+      setOverId(o); setOverCat(c);
     }
     rafRef.current = requestAnimationFrame(autoScrollTick);
   };
@@ -74,50 +78,83 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
 
   const catKey = (b: BlocData) => b.catId ?? "__divers";
 
-  // Drag & drop (réordonnancement dans une même catégorie) via listeners globaux
-  // (plus robuste que setPointerCapture sur un bouton qui se re-rend).
+  // Drag & drop : réordonnancement DANS une catégorie et déplacement ENTRE catégories.
+  // Détection par rectangles (fiable, sans scintillement) via listeners globaux.
   const onDown = (e: React.PointerEvent, id: string, cat: string) => {
     e.preventDefault(); e.stopPropagation();
-    dragRef.current = { id, cat }; overRef.current = id; setDragId(id);
+    dragRef.current = { id, cat }; overRef.current = id; overCatRef.current = cat;
+    setDragId(id); setDragCat(cat); setOverCat(cat);
     posRef.current = { x: e.clientX, y: e.clientY };
 
-    // Cible = ligne du MÊME bucket dont le rectangle contient le pointeur (détection
-    // par rectangles, fiable, sans le scintillement de elementFromPoint).
-    const cibleSousPointeur = (y: number): string | null => {
-      const rows = Array.from(document.querySelectorAll<HTMLElement>(`[data-cat="${cat}"][data-ligne]`));
-      if (!rows.length) return null;
+    // Cible : la ligne sous le pointeur (toutes catégories), sinon la catégorie survolée
+    // (permet de déposer dans une catégorie vide ou sous sa dernière ligne).
+    const cibleSousPointeur = (x: number, y: number): { ligne: string | null; cat: string | null } => {
+      const rows = Array.from(document.querySelectorAll<HTMLElement>("[data-ligne]"));
       for (const row of rows) {
         const r = row.getBoundingClientRect();
-        if (y >= r.top && y <= r.bottom) return row.getAttribute("data-ligne");
+        if (y >= r.top && y <= r.bottom && x >= r.left && x <= r.right) {
+          return { ligne: row.getAttribute("data-ligne"), cat: row.getAttribute("data-cat") };
+        }
       }
-      const first = rows[0].getBoundingClientRect();
-      if (y < first.top) return rows[0].getAttribute("data-ligne");
-      return rows[rows.length - 1].getAttribute("data-ligne");
+      const blocsEl = Array.from(document.querySelectorAll<HTMLElement>("[data-bloc]"));
+      for (const b of blocsEl) {
+        const r = b.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom && x >= r.left && x <= r.right) {
+          return { ligne: null, cat: b.getAttribute("data-bloc") };
+        }
+      }
+      return { ligne: null, cat: null };
     };
+
     const move = (ev: PointerEvent) => {
       if (!dragRef.current) return;
       posRef.current = { x: ev.clientX, y: ev.clientY };
-      const o = cibleSousPointeur(ev.clientY);
-      overRef.current = o; setOverId(o);
+      const c = cibleSousPointeur(ev.clientX, ev.clientY);
+      overRef.current = c.ligne;
+      overCatRef.current = c.cat;
+      setOverId(c.ligne);
+      setOverCat(c.cat);
     };
+
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       stopAutoScroll();
-      const d = dragRef.current; const over = overRef.current;
-      dragRef.current = null; overRef.current = null; setDragId(null); setOverId(null);
-      if (!d || !over || over === d.id) return;
-      const bloc = blocs.find((b) => catKey(b) === d.cat);
-      if (!bloc) return;
-      const ids = bloc.lignes.map((l) => l.id);
-      const from = ids.indexOf(d.id); const to = ids.indexOf(over);
-      if (from < 0 || to < 0) return; // cible dans une autre catégorie → ignoré
-      ids.splice(to, 0, ids.splice(from, 1)[0]);
-      // Renumérotation GLOBALE (tous les buckets dans l'ordre d'affichage) pour éviter
-      // les collisions d'ordre entre catégories.
-      const ordreGlobal = blocs.flatMap((b) => (catKey(b) === d.cat ? ids : b.lignes.map((l) => l.id)));
-      start(async () => { await reordonnerLignes(prestationId, ordreGlobal); router.refresh(); });
+      const d = dragRef.current;
+      const over = overRef.current;
+      const overCatFinal = overCatRef.current;
+      dragRef.current = null; overRef.current = null; overCatRef.current = null;
+      setDragId(null); setDragCat(null); setOverId(null); setOverCat(null);
+      if (!d || !overCatFinal) return;
+      if (over === d.id) return; // déposé sur lui-même
+
+      const blocCible = blocs.find((b) => catKey(b) === overCatFinal);
+      if (!blocCible) return;
+      const changeCategorie = overCatFinal !== d.cat;
+
+      // Ordre cible : on retire la ligne de sa catégorie et on l'insère dans la cible.
+      const idsCible = blocCible.lignes.map((l) => l.id).filter((x) => x !== d.id);
+      const pos = over ? idsCible.indexOf(over) : -1;
+      if (pos >= 0) idsCible.splice(pos, 0, d.id); else idsCible.push(d.id);
+
+      // Renumérotation GLOBALE (toutes catégories) → pas de collision d'ordre.
+      const ordreGlobal = blocs.flatMap((b) => {
+        const k = catKey(b);
+        if (k === overCatFinal) return idsCible;
+        return b.lignes.map((l) => l.id).filter((x) => x !== d.id);
+      });
+
+      start(async () => {
+        await reordonnerLignes(
+          prestationId,
+          ordreGlobal,
+          changeCategorie ? (blocCible.catId ?? null) : undefined,
+          changeCategorie ? d.id : undefined,
+        );
+        router.refresh();
+      });
     };
+
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     if (rafRef.current == null) rafRef.current = requestAnimationFrame(autoScrollTick);
@@ -146,7 +183,11 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
         {blocs.map((b) => {
           const total = b.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
           return (
-            <div key={catKey(b)}>
+            <div
+              key={catKey(b)}
+              data-bloc={catKey(b)}
+              className={`rounded-xl transition-colors ${dragId && overCat === catKey(b) && overCat !== dragCat ? "bg-primary/5 ring-1 ring-dashed ring-primary/40" : ""}`}
+            >
               <h3 className="mb-1 text-sm font-semibold">{b.nom}{b.lignes.length > 0 && <span className="text-muted"> · {euros(total)}</span>}</h3>
               {b.lignes.length > 0 && (
                 <Card className="mb-2 divide-y divide-border overflow-hidden">
@@ -163,7 +204,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                     const remiseVisible = remiseOpen.has(l.id) || l.remise_valeur > 0;
                     return (
                       <div key={l.id} data-ligne={l.id} data-cat={catKey(b)}
-                        className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId && dragId !== l.id ? "border-t-2 border-primary" : ""}`}>
+                        className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId && dragId !== l.id ? "bg-primary/10 ring-1 ring-inset ring-primary" : ""}`}>
                         <div className="group flex items-center gap-2 px-2 py-1.5">
                           {/* Poignée (visible au survol ; toujours visible sur tactile) */}
                           <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))}

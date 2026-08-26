@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { assemblerContenuDocument } from "@/lib/document";
 import { genererDevisFacturePdf } from "@/lib/pdf/devis-facture";
-import { archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
-import { BUCKET_PRIVE } from "@/lib/storage";
+import { archiverSurDrive, archiverDepuisUrl, driveConfigured, nomFichierSafe } from "@/lib/drive";
+import { BUCKET_PRIVE, urlDocument } from "@/lib/storage";
 import { chargerNomenclature, categorieManquante, categorieDefaut } from "@/lib/finance";
 import { synchroniserEcritureDevisSigne } from "@/lib/tresorerie-sync";
 
@@ -153,6 +153,19 @@ export async function uploaderDevisSigne(devisId: string, prestationId: string, 
   if (error) throw new Error(`Upload : ${error.message}`);
   const { error: e2 } = await supabase.from("devis").update({ pdf_signe: data.path, statut_signature: "signe" }).eq("id", devisId);
   if (e2) throw new Error(e2.message);
+
+  // Archivage Drive du devis SIGNÉ par le client (best-effort) sous « Devis signés / année ».
+  if (driveConfigured()) {
+    try {
+      const { data: dv } = await supabase.from("devis").select("nom").eq("id", devisId).maybeSingle();
+      const url = await urlDocument(supabase, data.path, 600);
+      const annee = new Date().toISOString().slice(0, 4);
+      if (url) await archiverDepuisUrl(url, ["Devis signés", annee], nomFichierSafe(`Devis signe ${dv?.nom ?? devisId}`));
+    } catch (e) {
+      console.error("Archivage devis signé échec:", (e as Error).message);
+    }
+  }
+
   await synchroniserEcritureDevisSigne(supabase, devisId);
   revalidatePath(`/prestations/${prestationId}/document`);
   revalidatePath(`/prestations/${prestationId}`);

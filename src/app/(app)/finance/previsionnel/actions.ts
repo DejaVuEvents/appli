@@ -37,16 +37,22 @@ async function regenerer(supabase: Supa) {
   const { data } = await supabase.from("depense_recurrente").select("*");
   const defs = (data ?? []) as Recurrent[];
   const today = ymd(new Date());
-  // On repart des écritures futures générées par des récurrents.
-  await supabase.from("ecriture_financiere").delete().not("depense_recurrente_id", "is", null).gte("date", today);
+  // On repart des écritures futures générées par des récurrents, SAUF celles déjà
+  // validées à la main (corrections de l'utilisateur : on ne les écrase pas).
+  await supabase.from("ecriture_financiere").delete()
+    .not("depense_recurrente_id", "is", null).gte("date", today).eq("valide", false);
+  const { data: gardees } = await supabase.from("ecriture_financiere")
+    .select("depense_recurrente_id, date").not("depense_recurrente_id", "is", null).gte("date", today);
+  const dejaPresent = new Set((gardees ?? []).map((g) => `${g.depense_recurrente_id}|${g.date}`));
   const rows: Record<string, unknown>[] = [];
   for (const def of defs) {
     if (!def.actif) continue;
     for (const date of prochainesDates(def)) {
+      if (dejaPresent.has(`${def.id}|${date}`)) continue; // correction manuelle conservée
       rows.push({
         date, denomination: def.nom, type: def.type, specification: def.specification,
         sens: def.sens, statut: "previsionnel", montant_ttc: def.montant_ttc,
-        depense_recurrente_id: def.id, valide: true,
+        depense_recurrente_id: def.id, valide: false,
       });
     }
   }

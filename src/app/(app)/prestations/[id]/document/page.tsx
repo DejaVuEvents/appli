@@ -78,7 +78,7 @@ export default async function DocumentPage({
   });
   // Surcharge multi-jours affichée comme ligne du tableau (pour que le tableau réconcilie avec le sous-total).
   const materielBrut1j = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
-  const surchargeDuree = Math.round(materielBrut1j * (coeffDuree - 1) * 100) / 100;
+  const surchargeDuree = Math.round((materielBrut1j + transportTotal) * (coeffDuree - 1) * 100) / 100;
   const tauxTva = Number(ent?.taux_tva ?? 0);
   const montantTva = Math.round(totaux.totalHT * (tauxTva / 100) * 100) / 100;
   const totalTtc = Math.round((totaux.totalHT + montantTva) * 100) / 100;

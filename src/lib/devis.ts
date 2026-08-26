@@ -77,16 +77,21 @@ export function calculerTotaux(args: {
   transportTotal: number;
   remiseGlobaleType: RemiseType;
   remiseGlobaleValeur: number;
-  /** Coefficient multi-jours appliqué au matériel (pas au transport). Défaut 1. */
+  /** Coefficient multi-jours appliqué au TOTAL (après remises). Défaut 1. */
   coefficientDuree?: number;
 }): { sousTotalHT: number; remiseHT: number; totalHT: number } {
   const coeff = args.coefficientDuree && args.coefficientDuree > 0 ? args.coefficientDuree : 1;
-  const sousTotalBrut = args.lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0) * coeff;
-  const netLignes = args.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0) * coeff;
+  // On calcule tout à 1 jour, puis on multiplie le total final par le coefficient :
+  // ainsi « coef 1,5 sur un devis à 2000 € » donne bien 3000 € (la remise globale
+  // fixe est prise en compte AVANT le coefficient, pas court-circuitée).
+  const sousTotalBrut = args.lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
+  const netLignes = args.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
   const base = netLignes + args.transportTotal;
   const remiseGlobale = montantRemise(base, args.remiseGlobaleType, args.remiseGlobaleValeur);
-  const sousTotalHT = round2(sousTotalBrut + args.transportTotal);
-  const totalHT = round2(base - remiseGlobale);
+  const sousTotalHT1j = sousTotalBrut + args.transportTotal;
+  const totalHT1j = base - remiseGlobale;
+  const sousTotalHT = round2(sousTotalHT1j * coeff);
+  const totalHT = round2(totalHT1j * coeff);
   return { sousTotalHT, remiseHT: round2(sousTotalHT - totalHT), totalHT };
 }
 

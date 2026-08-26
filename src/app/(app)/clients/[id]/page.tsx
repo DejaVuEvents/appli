@@ -31,7 +31,7 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
 
   const [{ data: devisData }, { data: lignesData }, { data: transportData }, { data: dfData }, { data: contactsData }] = prestIds.length
     ? await Promise.all([
-        supabase.from("devis").select("id, nom, type, prestation_id, remise_globale_type, remise_globale_valeur, statut_signature").in("prestation_id", prestIds),
+        supabase.from("devis").select("id, nom, type, prestation_id, remise_globale_type, remise_globale_valeur, coefficient_duree, statut_signature").in("prestation_id", prestIds),
         supabase.from("ligne_prestation").select("devis_id, prix_total").in("prestation_id", prestIds),
         supabase.from("transport").select("devis_id, cout_calcule").in("prestation_id", prestIds),
         supabase.from("devis_facture").select("devis_id, type, numero, montant_ttc, date_emission, date_echeance, statut_paiement").in("prestation_id", prestIds),
@@ -39,7 +39,7 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
       ])
     : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
-  const devis = (devisData ?? []) as { id: string; nom: string | null; type: "devis" | "facture"; prestation_id: string; remise_globale_type: RemiseType; remise_globale_valeur: number; statut_signature: string | null }[];
+  const devis = (devisData ?? []) as { id: string; nom: string | null; type: "devis" | "facture"; prestation_id: string; remise_globale_type: RemiseType; remise_globale_valeur: number; coefficient_duree: number | null; statut_signature: string | null }[];
   const lignes = (lignesData ?? []) as { devis_id: string | null; prix_total: number | null }[];
   const transports = (transportData ?? []) as { devis_id: string | null; cout_calcule: number | null }[];
   const dfs = (dfData ?? []) as { devis_id: string; type: string; numero: string | null; montant_ttc: number | null; date_emission: string | null; date_echeance: string | null; statut_paiement: string | null }[];
@@ -49,19 +49,20 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
   const today = ymd(new Date());
 
   // Totaux par devis (montant figé si facture émise, sinon calcul depuis lignes)
-  const totalDevis = (devisId: string, rt: RemiseType, rv: number) => {
+  const totalDevis = (devisId: string, rt: RemiseType, rv: number, coeff: number) => {
     const ls = lignes.filter((l) => l.devis_id === devisId).map((l) => ({ prix_total: Number(l.prix_total ?? 0) })) as { prix_total: number }[];
     const tr = transports.filter((t) => t.devis_id === devisId).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
-    // calculerTotaux attend des lignes complètes ; on approxime le total HT par la somme des prix_total + transport − remise globale.
+    // Approximation du total HT : (somme prix_total + transport − remise globale) × coefficient durée.
     const net = ls.reduce((s, l) => s + l.prix_total, 0) + tr;
     const remise = rt === "montant" ? Math.min(rv, net) : (net * rv) / 100;
-    return Math.round((net - remise) * 100) / 100;
+    const c = coeff > 0 ? coeff : 1;
+    return Math.round((net - remise) * c * 100) / 100;
   };
 
   const docs: DocRow[] = devis.map((d) => {
     const df = dfByDevis.get(`${d.id}-${d.type}`);
     const emis = !!df?.numero;
-    const montant = df?.montant_ttc != null ? Number(df.montant_ttc) : totalDevis(d.id, d.remise_globale_type, Number(d.remise_globale_valeur ?? 0));
+    const montant = df?.montant_ttc != null ? Number(df.montant_ttc) : totalDevis(d.id, d.remise_globale_type, Number(d.remise_globale_valeur ?? 0), Number(d.coefficient_duree ?? 1));
     let statutLabel = "Brouillon", statutCls = "bg-gray-200 text-gray-600";
     if (d.type === "facture") {
       const s = statutFactureAffichage(emis, df?.statut_paiement);

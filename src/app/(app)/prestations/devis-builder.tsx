@@ -140,7 +140,7 @@ export async function DevisBuilder(props: {
     };
   }
 
-  // Coefficient multi-jours appliqué au matériel (le transport n'est pas multiplié).
+  // Coefficient multi-jours appliqué au TOTAL final (coef × total).
   const coeff = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
 
   // Marge sous-location (coût fournisseur et revenu matos externe suivent la durée).
@@ -157,13 +157,14 @@ export async function DevisBuilder(props: {
   const margeExterne = revenusExterne - coutFournisseurTotal;
   const hasMargeFournisseur = coutFournisseurTotal > 0;
 
-  const sousTotalBrut = coeff * lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
-  const netLignes = coeff * lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
+  // Totaux calculés à 1 jour puis multipliés par le coefficient (coef × total final).
+  const sousTotalBrut = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
+  const netLignes = lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
   const transportTotal = transports.reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
   const baseGlobale = netLignes + transportTotal;
   const remiseGlobale = montantRemise(baseGlobale, devis.remise_globale_type, devis.remise_globale_valeur);
-  const sousTotalHT = sousTotalBrut + transportTotal;
-  const totalHT = baseGlobale - remiseGlobale;
+  const sousTotalHT = (sousTotalBrut + transportTotal) * coeff;
+  const totalHT = (baseGlobale - remiseGlobale) * coeff;
   const remiseHT = sousTotalHT - totalHT;
 
   const totalTtc = Math.round(totalHT * (1 + tauxTva / 100) * 100) / 100;
@@ -203,7 +204,7 @@ export async function DevisBuilder(props: {
                 className="sm:col-span-1"
               />
               <div className="sm:col-span-2 text-xs text-muted">
-                Multiplie le total du matériel (pas le transport).{" "}
+                Multiplie le total HT du devis (remises incluses).{" "}
                 <span className="text-foreground">Événement sur {nbJoursEvenement} jour{nbJoursEvenement > 1 ? "s" : ""}</span> → coefficient suggéré{" "}
                 <span className="font-medium text-foreground">×{coefficientAuto}</span>.
                 {devis.coefficient_duree != null && Number(devis.coefficient_duree) !== coefficientAuto && (

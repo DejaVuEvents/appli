@@ -76,7 +76,7 @@ export async function assemblerContenuDocument(
     coefficientDuree,
   });
   const materielBrut1j = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
-  const surchargeDuree = Math.round(materielBrut1j * (coefficientDuree - 1) * 100) / 100;
+  const surchargeDuree = Math.round((materielBrut1j + transportTotal) * (coefficientDuree - 1) * 100) / 100;
   const ent = entData as ParametresEntreprise | null;
   const taux = Number(ent?.taux_tva ?? 0);
   const montant = Math.round(totaux.totalHT * (taux / 100) * 100) / 100;

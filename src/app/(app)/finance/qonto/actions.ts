@@ -288,6 +288,27 @@ export async function importQontoTransactions(
     const { error } = await supabase.from("ecriture_financiere").insert(rows);
     if (error) return { ok: false, error: error.message };
 
+    // Consommation des prévisionnelles RÉCURRENTES correspondantes : quand la vraie
+    // transaction arrive (même montant/sens à ±7 jours), la prévision du mois est
+    // supprimée pour éviter le double comptage dans le solde projeté.
+    const { data: prevRec } = await supabase
+      .from("ecriture_financiere")
+      .select("id, date, montant_ttc, sens")
+      .eq("statut", "previsionnel")
+      .not("depense_recurrente_id", "is", null);
+    const aSupprimer: string[] = [];
+    for (const t of items) {
+      const tMs = new Date(t.date).getTime();
+      const cents = Math.round(t.montant * 100);
+      const match = (prevRec ?? []).find(
+        (p) => !aSupprimer.includes(p.id) && p.sens === t.sens &&
+          Math.round(Number(p.montant_ttc) * 100) === cents &&
+          Math.abs(new Date(p.date).getTime() - tMs) <= 7 * 86400000,
+      );
+      if (match) aSupprimer.push(match.id);
+    }
+    if (aSupprimer.length) await supabase.from("ecriture_financiere").delete().in("id", aSupprimer);
+
     await supabase
       .from("parametres_entreprise")
       .update({ qonto_derniere_sync: new Date().toISOString() })

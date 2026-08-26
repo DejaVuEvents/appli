@@ -81,11 +81,23 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
     dragRef.current = { id, cat }; overRef.current = id; setDragId(id);
     posRef.current = { x: e.clientX, y: e.clientY };
 
+    // Cible = ligne du MÊME bucket dont le rectangle contient le pointeur (détection
+    // par rectangles, fiable, sans le scintillement de elementFromPoint).
+    const cibleSousPointeur = (y: number): string | null => {
+      const rows = Array.from(document.querySelectorAll<HTMLElement>(`[data-cat="${cat}"][data-ligne]`));
+      if (!rows.length) return null;
+      for (const row of rows) {
+        const r = row.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom) return row.getAttribute("data-ligne");
+      }
+      const first = rows[0].getBoundingClientRect();
+      if (y < first.top) return rows[0].getAttribute("data-ligne");
+      return rows[rows.length - 1].getAttribute("data-ligne");
+    };
     const move = (ev: PointerEvent) => {
       if (!dragRef.current) return;
       posRef.current = { x: ev.clientX, y: ev.clientY };
-      const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-ligne]") as HTMLElement | null;
-      const o = el?.getAttribute("data-ligne") ?? null;
+      const o = cibleSousPointeur(ev.clientY);
       overRef.current = o; setOverId(o);
     };
     const up = () => {
@@ -101,7 +113,10 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
       const from = ids.indexOf(d.id); const to = ids.indexOf(over);
       if (from < 0 || to < 0) return; // cible dans une autre catégorie → ignoré
       ids.splice(to, 0, ids.splice(from, 1)[0]);
-      start(async () => { await reordonnerLignes(prestationId, ids); router.refresh(); });
+      // Renumérotation GLOBALE (tous les buckets dans l'ordre d'affichage) pour éviter
+      // les collisions d'ordre entre catégories.
+      const ordreGlobal = blocs.flatMap((b) => (catKey(b) === d.cat ? ids : b.lignes.map((l) => l.id)));
+      start(async () => { await reordonnerLignes(prestationId, ordreGlobal); router.refresh(); });
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -147,8 +162,8 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                   {b.lignes.map((l) => {
                     const remiseVisible = remiseOpen.has(l.id) || l.remise_valeur > 0;
                     return (
-                      <div key={l.id} data-ligne={l.id}
-                        className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId ? "border-t-2 border-primary" : ""}`}>
+                      <div key={l.id} data-ligne={l.id} data-cat={catKey(b)}
+                        className={`${dragId === l.id ? "opacity-40" : ""} ${overId === l.id && dragId && dragId !== l.id ? "border-t-2 border-primary" : ""}`}>
                         <div className="group flex items-center gap-2 px-2 py-1.5">
                           {/* Poignée (visible au survol ; toujours visible sur tactile) */}
                           <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))}

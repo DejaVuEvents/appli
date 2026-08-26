@@ -158,27 +158,27 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
 
       {/* Rapprochement Qonto ↔ outil */}
       {ecart !== null && (
-        <div className={`rounded-xl border p-4 ${valide ? "border-green-300 bg-green-50 dark:border-green-500/40 dark:bg-green-950/20" : "border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/20"}`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm font-semibold">
-              {valide ? "Trésorerie validée — les soldes correspondent" : "⚠️ Écart entre Qonto et l'outil"}
-            </div>
-            {!valide && (
+        valide ? (
+          <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700 dark:border-green-500/40 dark:bg-green-950/20 dark:text-green-300">
+            ✓ Trésorerie à jour
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold">⚠️ Écart entre Qonto et l&apos;outil</div>
               <div className="text-sm font-bold text-amber-700 dark:text-amber-400">
                 Écart : {ecart > 0 ? "+" : ""}{euros(ecart)}
               </div>
-            )}
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:max-w-md">
-            <div className="flex justify-between gap-2"><span className="text-muted">Solde banque (Qonto)</span><span className="font-semibold tabular-nums">{euros(balanceQonto)}</span></div>
-            <div className="flex justify-between gap-2"><span className="text-muted">Solde outil (réel)</span><span className="font-semibold tabular-nums">{euros(soldeOutil!)}</span></div>
-          </div>
-          {!valide && (
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:max-w-md">
+              <div className="flex justify-between gap-2"><span className="text-muted">Solde banque (Qonto)</span><span className="font-semibold tabular-nums">{euros(balanceQonto)}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted">Solde outil (réel)</span><span className="font-semibold tabular-nums">{euros(soldeOutil!)}</span></div>
+            </div>
             <p className="mt-2 text-xs text-muted">
               Récupère puis importe les transactions manquantes ci-dessous pour aligner l&apos;outil sur la banque.
             </p>
-          )}
-        </div>
+          </div>
+        )
       )}
 
       {/* Boutons sync */}

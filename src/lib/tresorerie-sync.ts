@@ -5,6 +5,22 @@ import { assemblerContenuDocument } from "@/lib/document";
 import { chargerNomenclature, categorieManquante, categorieDefaut } from "@/lib/finance";
 
 /**
+ * Coût de sous-location d'un devis : matériel du catalogue ayant un coût fournisseur
+ * (`cout_location_jour`), × quantité × coefficient multi-jours.
+ */
+export async function coutSousLocationDevis(supabase: SupabaseClient, devisId: string): Promise<number> {
+  const { data: d } = await supabase.from("devis").select("coefficient_duree").eq("id", devisId).maybeSingle();
+  const coeff = Number(d?.coefficient_duree ?? 0) > 0 ? Number(d!.coefficient_duree) : 1;
+  const { data: lignes } = await supabase
+    .from("ligne_prestation")
+    .select("quantite, reference:materiel_reference(cout_location_jour)")
+    .eq("devis_id", devisId);
+  const total = ((lignes ?? []) as unknown as { quantite: number; reference: { cout_location_jour: number | null } | null }[])
+    .reduce((s2, l) => s2 + (l.reference?.cout_location_jour != null ? Number(l.reference.cout_location_jour) * Number(l.quantite ?? 0) : 0), 0);
+  return Math.round(total * coeff * 100) / 100;
+}
+
+/**
  * Auto-alimentation de la trésorerie depuis un DEVIS SIGNÉ : crée/maj une entrée
  * PRÉVISIONNELLE liée (`devis_id`). Retirée dès qu'une facture est émise pour ce devis,
  * qu'il est découpé en acompte/solde (les filles portent la recette), ou qu'il n'est plus signé.
@@ -47,10 +63,22 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
     .from("ecriture_financiere")
     .select("id, type, specification")
     .eq("devis_id", devisId)
+    .eq("sens", "entree")
     .maybeSingle();
+  // Sortie prévisionnelle jumelle : le coût de sous-location de ce devis.
+  const { data: existanteCout } = await supabase
+    .from("ecriture_financiere")
+    .select("id, type, specification")
+    .eq("devis_id", devisId)
+    .eq("sens", "sortie")
+    .maybeSingle();
+  const supprimerCout = async () => {
+    if (existanteCout) await supabase.from("ecriture_financiere").delete().eq("id", existanteCout.id);
+  };
 
   if (dv.statut_signature !== "signe" || couvertParFacture) {
     if (existante) await supabase.from("ecriture_financiere").delete().eq("id", existante.id);
+    await supprimerCout();
     return;
   }
 
@@ -60,6 +88,7 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
   const montant = Math.round((total - dejaFacture) * 100) / 100;
   if (montant <= 0) {
     if (existante) await supabase.from("ecriture_financiere").delete().eq("id", existante.id);
+    await supprimerCout();
     return;
   }
 
@@ -92,10 +121,42 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
     devis_id: devisId,
   };
 
+  const { data: { user } } = await supabase.auth.getUser();
   if (existante) {
     await supabase.from("ecriture_financiere").update(payload).eq("id", existante.id);
   } else {
-    const { data: { user } } = await supabase.auth.getUser();
     await supabase.from("ecriture_financiere").insert({ ...payload, created_by: user?.id ?? null });
+  }
+
+  // Sortie prévisionnelle jumelle : le matériel sous-loué pour cette prestation
+  // (Audiotec, camion…). Sans elle, le prévisionnel n'affiche que le chiffre d'affaires
+  // et non le bénéfice réel de l'événement.
+  const cout = await coutSousLocationDevis(supabase, devisId);
+  if (cout <= 0) {
+    await supprimerCout();
+    return;
+  }
+  const nomencCout = await chargerNomenclature(supabase);
+  let typeCout = existanteCout?.type ?? null;
+  let specCout = existanteCout?.specification ?? null;
+  if (categorieManquante(nomencCout, "sortie", typeCout)) {
+    const defo = categorieDefaut(nomencCout, "sortie", "Matériel", "Location de matériel");
+    typeCout = defo.type;
+    specCout = defo.specification;
+  }
+  const payloadCout = {
+    date: datePrev,
+    denomination: `Sous-location — ${dv.nom ?? "Devis"}${clientNom ? ` (${clientNom})` : ""}`,
+    type: typeCout, specification: specCout,
+    sens: "sortie",
+    statut: "previsionnel",
+    montant_ttc: cout,
+    prestation_id: dv.prestation_id,
+    devis_id: devisId,
+  };
+  if (existanteCout) {
+    await supabase.from("ecriture_financiere").update(payloadCout).eq("id", existanteCout.id);
+  } else {
+    await supabase.from("ecriture_financiere").insert({ ...payloadCout, created_by: user?.id ?? null });
   }
 }

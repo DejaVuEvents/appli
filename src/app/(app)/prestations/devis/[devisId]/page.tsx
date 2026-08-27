@@ -16,6 +16,7 @@ import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
 import { AcompteForm } from "../../acompte-form";
 import { ecartSolde } from "@/lib/acompte";
+import { coutSousLocationDevis } from "@/lib/tresorerie-sync";
 import { assemblerContenuDocument } from "@/lib/document";
 import { urlDocument } from "@/lib/storage";
 import { statutFactureAffichage, STATUT_PAIEMENT_LABELS, type StatutPaiement } from "@/lib/facture-statut";
@@ -103,6 +104,9 @@ export default async function DevisEditorPage({
     : { data: null };
   const factureEmise = !!facEmise?.numero;
   const pdfSigneUrl = devis.pdf_signe ? await urlDocument(supabase, devis.pdf_signe) : null;
+
+  // Coût de sous-location (matériel externe) → bénéfice estimé du document.
+  const coutSousLoc = await coutSousLocationDevis(supabase, devisId);
 
   // Facture issue d'un découpage acompte/solde : le devis source a-t-il changé depuis ?
   const ecartSoldeInfo = await ecartSolde(supabase, devisId);
@@ -204,6 +208,19 @@ export default async function DevisEditorPage({
               <div className="mt-1 flex justify-between border-t border-border pt-1.5 text-base font-bold"><span>Total HT</span><span>{euros(contenu.totaux.totalHT)}</span></div>
               {contenu.tva.taux > 0 && <div className="flex justify-between text-muted"><span>TVA {contenu.tva.taux} %</span><span>{euros(contenu.tva.montant)}</span></div>}
               <div className="flex justify-between font-semibold"><span>Total TTC</span><span>{euros(contenu.tva.totalTtc)}</span></div>
+              {coutSousLoc > 0 && (
+                <>
+                  <div className="mt-1 flex justify-between border-t border-border pt-1.5 text-muted">
+                    <span>Sous-location</span><span>− {euros(coutSousLoc)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span>Bénéfice estimé</span>
+                    <span className={contenu.totaux.totalHT - coutSousLoc >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}>
+                      {euros(contenu.totaux.totalHT - coutSousLoc)}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </Card>
         )}

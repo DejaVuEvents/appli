@@ -196,7 +196,7 @@ export default async function FicheUnitePage({
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
               Caractéristiques techniques
             </h2>
-            <Ligne label="Puissance" value={ref.puissance_w != null ? `${ref.puissance_w} W` : "—"} />
+            <Ligne label="Consommation" value={ref.puissance_w != null ? `${ref.puissance_w} W` : "—"} />
             <Ligne label="Intensité" value={ref.intensite_a != null ? `${ref.intensite_a} A` : "—"} />
             <Ligne label="Phase" value={ref.phase ? PHASE_LABELS[ref.phase] : "—"} />
             <Ligne label="Poids" value={ref.poids_kg != null ? `${ref.poids_kg} kg` : "—"} />

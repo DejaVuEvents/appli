@@ -67,7 +67,7 @@ export function FicheView({
               }
             />
           )}
-          <Ligne label="Puissance" value={r.puissance_w != null ? `${r.puissance_w} W` : "—"} />
+          <Ligne label="Consommation" value={r.puissance_w != null ? `${r.puissance_w} W` : "—"} />
           <Ligne label="Intensité" value={r.intensite_a != null ? `${r.intensite_a} A` : "—"} />
           <Ligne label="Phase" value={r.phase ? PHASE_LABELS[r.phase] : "—"} />
           <Ligne label="Connecteurs (alimentation)" value={listeOuTiret(r.connecteurs_puissance)} />

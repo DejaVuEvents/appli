@@ -289,7 +289,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
 /** Fiche produit affichée au clic sur une ligne : specs techniques + unités réservées pour l'événement. */
 function FicheProduit({ info, unitePrefix }: { info: RefInfo; unitePrefix: string }) {
   const specs: { label: string; valeur: string }[] = [];
-  if (info.puissance_w != null) specs.push({ label: "Puissance", valeur: `${info.puissance_w} W` });
+  if (info.puissance_w != null) specs.push({ label: "Consommation", valeur: `${info.puissance_w} W` });
   if (info.intensite_a != null) specs.push({ label: "Intensité", valeur: `${info.intensite_a} A${info.phase ? ` (${info.phase})` : ""}` });
   else if (info.phase) specs.push({ label: "Phase", valeur: info.phase });
   if (info.poids_kg != null) specs.push({ label: "Poids", valeur: `${info.poids_kg} kg` });

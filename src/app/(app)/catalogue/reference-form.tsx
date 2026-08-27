@@ -141,7 +141,7 @@ export function ReferenceForm({
             Caractéristiques techniques
           </legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Puissance (W)" name="puissance_w" type="number" step="0.01" defaultValue={reference?.puissance_w} />
+            <Field label="Consommation électrique (W)" name="puissance_w" type="number" step="0.01" defaultValue={reference?.puissance_w} />
             <Field label="Intensité (A)" name="intensite_a" type="number" step="0.01" defaultValue={reference?.intensite_a} />
             <Select
               label="Phase"

@@ -4,20 +4,49 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { assemblerContenuDocument } from "@/lib/document";
 import { chargerNomenclature, categorieManquante, categorieDefaut } from "@/lib/finance";
 
+type LigneCout = {
+  quantite: number;
+  reference: {
+    cout_location_jour: number | null;
+    remise_fournisseur_pct: number | null;
+    tva_fournisseur_pct: number | null;
+    fournisseur: string | null;
+  } | null;
+};
+
 /**
- * Coût de sous-location d'un devis : matériel du catalogue ayant un coût fournisseur
- * (`cout_location_jour`), × quantité × coefficient multi-jours.
+ * Coût de sous-location d'un devis, VENTILÉ PAR FOURNISSEUR.
+ * Le tarif catalogue est HT : on applique d'abord la remise négociée (sur le HT),
+ * puis la TVA — d'où coût = HT × (1 − remise%) × (1 + tva%), × quantité × coefficient.
  */
-export async function coutSousLocationDevis(supabase: SupabaseClient, devisId: string): Promise<number> {
+export async function coutSousLocationParFournisseur(
+  supabase: SupabaseClient,
+  devisId: string,
+): Promise<Map<string, number>> {
   const { data: d } = await supabase.from("devis").select("coefficient_duree").eq("id", devisId).maybeSingle();
   const coeff = Number(d?.coefficient_duree ?? 0) > 0 ? Number(d!.coefficient_duree) : 1;
   const { data: lignes } = await supabase
     .from("ligne_prestation")
-    .select("quantite, reference:materiel_reference(cout_location_jour)")
+    .select("quantite, reference:materiel_reference(cout_location_jour, remise_fournisseur_pct, tva_fournisseur_pct, fournisseur)")
     .eq("devis_id", devisId);
-  const total = ((lignes ?? []) as unknown as { quantite: number; reference: { cout_location_jour: number | null } | null }[])
-    .reduce((s2, l) => s2 + (l.reference?.cout_location_jour != null ? Number(l.reference.cout_location_jour) * Number(l.quantite ?? 0) : 0), 0);
-  return Math.round(total * coeff * 100) / 100;
+
+  const parFournisseur = new Map<string, number>();
+  for (const l of ((lignes ?? []) as unknown as LigneCout[])) {
+    const r = l.reference;
+    if (!r || r.cout_location_jour == null) continue;
+    const ht = Number(r.cout_location_jour) * (1 - Number(r.remise_fournisseur_pct ?? 0) / 100);
+    const ttc = ht * (1 + Number(r.tva_fournisseur_pct ?? 20) / 100);
+    const montant = ttc * Number(l.quantite ?? 0) * coeff;
+    const cle = r.fournisseur?.trim() || "Sous-location";
+    parFournisseur.set(cle, Math.round(((parFournisseur.get(cle) ?? 0) + montant) * 100) / 100);
+  }
+  return parFournisseur;
+}
+
+/** Coût total de sous-location d'un devis (toutes lignes, tous fournisseurs). */
+export async function coutSousLocationDevis(supabase: SupabaseClient, devisId: string): Promise<number> {
+  const m = await coutSousLocationParFournisseur(supabase, devisId);
+  return Math.round([...m.values()].reduce((s2, v) => s2 + v, 0) * 100) / 100;
 }
 
 /**
@@ -65,15 +94,9 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
     .eq("devis_id", devisId)
     .eq("sens", "entree")
     .maybeSingle();
-  // Sortie prévisionnelle jumelle : le coût de sous-location de ce devis.
-  const { data: existanteCout } = await supabase
-    .from("ecriture_financiere")
-    .select("id, type, specification")
-    .eq("devis_id", devisId)
-    .eq("sens", "sortie")
-    .maybeSingle();
+  // Sorties prévisionnelles jumelles (une par fournisseur) : retirées avec l'entrée.
   const supprimerCout = async () => {
-    if (existanteCout) await supabase.from("ecriture_financiere").delete().eq("id", existanteCout.id);
+    await supabase.from("ecriture_financiere").delete().eq("devis_id", devisId).eq("sens", "sortie");
   };
 
   if (dv.statut_signature !== "signe" || couvertParFacture) {
@@ -128,35 +151,43 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
     await supabase.from("ecriture_financiere").insert({ ...payload, created_by: user?.id ?? null });
   }
 
-  // Sortie prévisionnelle jumelle : le matériel sous-loué pour cette prestation
-  // (Audiotec, camion…). Sans elle, le prévisionnel n'affiche que le chiffre d'affaires
-  // et non le bénéfice réel de l'événement.
-  const cout = await coutSousLocationDevis(supabase, devisId);
-  if (cout <= 0) {
-    await supprimerCout();
-    return;
-  }
+  // Sorties prévisionnelles jumelles : le matériel sous-loué pour cette prestation,
+  // UNE LIGNE PAR FOURNISSEUR (Audiotec, loueur de camion…). Sans elles, le prévisionnel
+  // n'affiche que le chiffre d'affaires et non le bénéfice réel de l'événement.
+  const parFournisseur = await coutSousLocationParFournisseur(supabase, devisId);
+  const { data: sortiesExistantes } = await supabase
+    .from("ecriture_financiere")
+    .select("id, type, specification, effectue_par")
+    .eq("devis_id", devisId)
+    .eq("sens", "sortie");
+  const dejaLa = (sortiesExistantes ?? []) as { id: string; type: string | null; specification: string | null; effectue_par: string | null }[];
+
   const nomencCout = await chargerNomenclature(supabase);
-  let typeCout = existanteCout?.type ?? null;
-  let specCout = existanteCout?.specification ?? null;
-  if (categorieManquante(nomencCout, "sortie", typeCout)) {
-    const defo = categorieDefaut(nomencCout, "sortie", "Matériel", "Location de matériel");
-    typeCout = defo.type;
-    specCout = defo.specification;
+  const defoCout = categorieDefaut(nomencCout, "sortie", "Matériel", "Location de matériel");
+  const gardes = new Set<string>();
+
+  for (const [fournisseur, montantCout] of parFournisseur) {
+    if (montantCout <= 0) continue;
+    const ex = dejaLa.find((x) => (x.effectue_par ?? "") === fournisseur);
+    if (ex) gardes.add(ex.id);
+    const typeC = ex && !categorieManquante(nomencCout, "sortie", ex.type) ? ex.type : defoCout.type;
+    const specC = ex && !categorieManquante(nomencCout, "sortie", ex.type) ? ex.specification : defoCout.specification;
+    const payloadCout = {
+      date: datePrev,
+      denomination: `Sous-location ${fournisseur} — ${dv.nom ?? "Devis"}${clientNom ? ` (${clientNom})` : ""}`,
+      type: typeC, specification: specC,
+      sens: "sortie",
+      statut: "previsionnel",
+      montant_ttc: montantCout,
+      effectue_par: fournisseur,
+      prestation_id: dv.prestation_id,
+      devis_id: devisId,
+    };
+    if (ex) await supabase.from("ecriture_financiere").update(payloadCout).eq("id", ex.id);
+    else await supabase.from("ecriture_financiere").insert({ ...payloadCout, created_by: user?.id ?? null });
   }
-  const payloadCout = {
-    date: datePrev,
-    denomination: `Sous-location — ${dv.nom ?? "Devis"}${clientNom ? ` (${clientNom})` : ""}`,
-    type: typeCout, specification: specCout,
-    sens: "sortie",
-    statut: "previsionnel",
-    montant_ttc: cout,
-    prestation_id: dv.prestation_id,
-    devis_id: devisId,
-  };
-  if (existanteCout) {
-    await supabase.from("ecriture_financiere").update(payloadCout).eq("id", existanteCout.id);
-  } else {
-    await supabase.from("ecriture_financiere").insert({ ...payloadCout, created_by: user?.id ?? null });
-  }
+
+  // Fournisseurs disparus du devis → on retire leurs prévisions.
+  const obsoletes = dejaLa.filter((x) => !gardes.has(x.id)).map((x) => x.id);
+  if (obsoletes.length) await supabase.from("ecriture_financiere").delete().in("id", obsoletes);
 }

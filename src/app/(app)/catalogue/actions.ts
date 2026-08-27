@@ -79,6 +79,9 @@ async function referenceFromForm(
     prix_location_jour: num(formData.get("prix_location_jour")) ?? 0,
     // Coût fournisseur (sous-location). Vide → NULL (matériel possédé par Déjà Vu).
     cout_location_jour: num(formData.get("cout_location_jour")),
+    fournisseur: str(formData.get("fournisseur")),
+    remise_fournisseur_pct: num(formData.get("remise_fournisseur_pct")) ?? 0,
+    tva_fournisseur_pct: num(formData.get("tva_fournisseur_pct")) ?? 20,
     puissance_w: num(formData.get("puissance_w")),
     intensite_a: num(formData.get("intensite_a")),
     phase: phase === "mono" || phase === "tri" ? phase : null,

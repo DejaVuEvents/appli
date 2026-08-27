@@ -97,12 +97,34 @@ export function ReferenceForm({
             placeholder="0"
           />
           <Field
-            label="Coût fournisseur / jour (€)"
+            label="Coût fournisseur / jour (€ HT)"
             name="cout_location_jour"
             type="number"
             step="0.01"
             defaultValue={reference?.cout_location_jour ?? undefined}
-            placeholder="Sous-location — laisser vide si matériel Déjà Vu"
+            placeholder="Tarif HT du loueur — vide si matériel Déjà Vu"
+          />
+          <Field
+            label="Fournisseur"
+            name="fournisseur"
+            defaultValue={reference?.fournisseur ?? ""}
+            placeholder="Audiotec, loueur camion…"
+          />
+          <Field
+            label="Remise fournisseur (%)"
+            name="remise_fournisseur_pct"
+            type="number"
+            step="0.01"
+            defaultValue={reference?.remise_fournisseur_pct ?? 0}
+            placeholder="Appliquée sur le HT (ex. 30)"
+          />
+          <Field
+            label="TVA fournisseur (%)"
+            name="tva_fournisseur_pct"
+            type="number"
+            step="0.01"
+            defaultValue={reference?.tva_fournisseur_pct ?? 20}
+            placeholder="Ajoutée après la remise"
           />
           <Field
             label="Zone de stockage"

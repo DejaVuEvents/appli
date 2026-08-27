@@ -28,6 +28,9 @@ export interface MaterielReference {
   charge_max_kg: number | null;
   dimensions: string | null;
   lieu_stockage: string | null;
+  fournisseur: string | null;
+  remise_fournisseur_pct: number;
+  tva_fournisseur_pct: number;
   est_consommable: boolean;
   created_at: string;
 }

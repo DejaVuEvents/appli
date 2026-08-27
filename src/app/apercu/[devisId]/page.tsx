@@ -25,14 +25,17 @@ export default async function ApercuDevisPage({
   const moi = await getMembreActuel(supabase);
   if (moi?.role !== "co_president") redirect("/prestations");
 
-  // Document importé Tiime : on renvoie l'ancien PDF d'origine.
   const { data: dv } = await supabase.from("devis").select("pdf_import").eq("id", devisId).maybeSingle();
-  if (dv?.pdf_import) {
+
+  const c = await assemblerContenuDocument(supabase, devisId);
+  const aDesLignes = !!c && c.groupes.some((g) => g.items.length > 0);
+
+  // Document importé : on ne montre l'original que s'il n'a pas encore été repris dans
+  // l'outil ; sinon l'aperçu reflète la version à jour.
+  if (dv?.pdf_import && !aDesLignes) {
     const url = await urlDocument(supabase, dv.pdf_import);
     if (url) redirect(url);
   }
-
-  const c = await assemblerContenuDocument(supabase, devisId);
   if (!c) notFound();
 
   const { data: doc } = await supabase

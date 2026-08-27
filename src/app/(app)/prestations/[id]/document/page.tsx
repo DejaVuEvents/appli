@@ -40,11 +40,8 @@ export default async function DocumentPage({
   if (!devisRow) notFound();
   const pdfSigneUrl = devisRow.pdf_signe ? await urlDocument(supabase, devisRow.pdf_signe) : null;
 
-  // Document importé de Tiime : on affiche l'ancienne version (ancien template), pas la régénération de l'outil.
-  if (devisRow.pdf_import) {
-    const url = await urlDocument(supabase, devisRow.pdf_import);
-    if (url) redirect(url);
-  }
+  // Document importé : l'original ne s'affiche que tant qu'il n'a pas été repris dans
+  // l'outil (redirection décidée plus bas, une fois les lignes connues).
 
   const [{ data: prest }, { data: lignesData }, { data: cats }, { data: transports }, { data: entData }, { data: docData }] =
     await Promise.all([
@@ -62,6 +59,10 @@ export default async function DocumentPage({
     client: { nom: string; adresse: string | null; email: string | null } | null;
   };
   const lignes = (lignesData ?? []) as LigneRow[];
+  if (devisRow.pdf_import && lignes.length === 0) {
+    const url = await urlDocument(supabase, devisRow.pdf_import);
+    if (url) redirect(url);
+  }
   const categories = (cats ?? []) as { id: string; nom: string; ordre?: number | null; parent_id?: string | null }[];
   const ent = entData as ParametresEntreprise | null;
   const doc = docData as DevisFacture | null;

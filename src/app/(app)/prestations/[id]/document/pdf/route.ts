@@ -20,18 +20,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   if (!devisId) return new Response("Introuvable", { status: 404 });
 
-  // Document importé (ancien Tiime) : on renvoie le PDF d'origine. Sans l'option de
-  // téléchargement, le stockage le sert en affichage → le fichier s'ouvrait au lieu
-  // d'être enregistré. `?inline=1` reste l'aperçu.
   const apercu = !!request.nextUrl.searchParams.get("inline");
   const { data: dv } = await supabase.from("devis").select("nom, pdf_import").eq("id", devisId).maybeSingle();
-  if (dv?.pdf_import) {
+
+  const contenu = await assemblerContenuDocument(supabase, devisId);
+  const aDesLignes = !!contenu && contenu.groupes.some((g) => g.items.length > 0);
+
+  // Document importé : on ne renvoie le fichier d'ORIGINE que s'il n'a pas encore été
+  // repris dans l'outil. Dès qu'il a des lignes, le PDF reflète la version à jour
+  // (le fichier d'origine reste accessible via « Voir le document original »).
+  if (dv?.pdf_import && !aDesLignes) {
     const nomImport = nomFichierSafe(`${type === "devis" ? "Devis" : "Facture"} ${dv.nom ?? devisId}`) + ".pdf";
     const url = await urlDocument(supabase, dv.pdf_import, 3600, apercu ? undefined : nomImport);
     if (url) return NextResponse.redirect(url);
   }
 
-  const contenu = await assemblerContenuDocument(supabase, devisId);
   if (!contenu) return new Response("Introuvable", { status: 404 });
 
   const { data: doc } = await supabase

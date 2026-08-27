@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { creerRecurrent, supprimerRecurrent, toggleRecurrent, regenererRecurrents } from "./actions";
+import Link from "next/link";
+import { creerRecurrent, supprimerRecurrent, toggleRecurrent, regenererRecurrents, creerPrevisionPonctuelle } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { euros, dateFr } from "@/lib/format";
@@ -14,7 +15,7 @@ type Nomenclature = Record<string, Record<string, string[]>>;
 const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
 export function PrevisionnelView({ ponctuelles, recurrents, nomenclature }: { ponctuelles: PrevRow[]; recurrents: Recurrent[]; nomenclature: Nomenclature }) {
-  const [vue, setVue] = useState<"ponctuelles" | "recurrents">("recurrents");
+  const [vue, setVue] = useState<"ponctuelles" | "recurrents">("ponctuelles");
 
   // Total mensuel équivalent des récurrents actifs (annuel /12).
   const mensuelEquivalent = recurrents.filter((r) => r.actif).reduce((s, r) => {
@@ -25,14 +26,14 @@ export function PrevisionnelView({ ponctuelles, recurrents, nomenclature }: { po
   return (
     <div>
       <div className="mb-4 flex gap-1 rounded-xl border border-border bg-surface p-1">
-        <button onClick={() => setVue("recurrents")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${vue === "recurrents" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Dépenses récurrentes</button>
         <button onClick={() => setVue("ponctuelles")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${vue === "ponctuelles" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Prévisions ponctuelles</button>
+        <button onClick={() => setVue("recurrents")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${vue === "recurrents" ? "bg-background shadow-sm border border-border" : "text-muted hover:text-foreground"}`}>Dépenses récurrentes</button>
       </div>
 
       {vue === "recurrents" ? (
         <RecurrentsView recurrents={recurrents} nomenclature={nomenclature} mensuelEquivalent={mensuelEquivalent} />
       ) : (
-        <PonctuellesView rows={ponctuelles} />
+        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} />
       )}
     </div>
   );
@@ -141,12 +142,52 @@ function RecurrentsView({ recurrents, nomenclature, mensuelEquivalent }: { recur
   );
 }
 
-function PonctuellesView({ rows }: { rows: PrevRow[] }) {
+function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature: Nomenclature }) {
+  const [sens, setSens] = useState<"sortie" | "entree">("sortie");
+  const [type, setType] = useState("");
+  const map = nomenclature[sens] ?? {};
+  const types = Object.keys(map);
+  const specs = map[type] ?? [];
+
   const groups = new Map<string, PrevRow[]>();
   for (const r of rows) { const k = r.date.slice(0, 7); if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(r); }
   const entries = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
-  if (rows.length === 0) return <div className="rounded-xl border border-border bg-surface px-4 py-10 text-center text-sm text-muted">Aucune prévision ponctuelle (devis signés non facturés, factures émises non payées, échéances fournisseurs, saisies manuelles).</div>;
+  const formulaire = (
+    <form action={creerPrevisionPonctuelle} className="rounded-xl border border-border bg-surface p-4">
+      <div className="mb-3 text-sm font-semibold">Ajouter une prévision ponctuelle</div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="block"><span className="mb-1 block text-xs font-medium">Libellé</span>
+          <input name="denomination" required placeholder="Achat lyres, subvention…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium">Sens</span>
+          <select name="sens" value={sens} onChange={(e) => { setSens(e.target.value as "sortie" | "entree"); setType(""); }} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            <option value="sortie">Dépense</option><option value="entree">Entrée</option>
+          </select></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium">Montant (€)</span>
+          <input name="montant_ttc" type="number" step="0.01" min="0" required className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium">Date prévue</span>
+          <input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium">Catégorie</span>
+          <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            <option value="">—</option>
+            {types.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+          </select></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium">Spécification</span>
+          <select name="specification" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            <option value="">—</option>
+            {specs.map((x) => <option key={x} value={x}>{x}</option>)}
+          </select></label>
+      </div>
+      <div className="mt-3"><SubmitButton>+ Ajouter</SubmitButton></div>
+    </form>
+  );
+
+  if (rows.length === 0) return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-surface px-4 py-10 text-center text-sm text-muted">Aucune prévision ponctuelle (devis signés non facturés, factures émises non payées, échéances fournisseurs, saisies manuelles).</div>
+      {formulaire}
+    </div>
+  );
 
   return (
     <div className="space-y-3">
@@ -166,13 +207,17 @@ function PonctuellesView({ rows }: { rows: PrevRow[] }) {
                     <div className="truncate font-medium">{r.denomination ?? "—"}</div>
                     <div className="text-xs text-muted">{dateFr(r.date)}{r.type ? ` · ${typeLabel(r.type)}` : ""}{r.specification ? ` / ${r.specification}` : ""}</div>
                   </div>
-                  <span className={`shrink-0 font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
+                  <span className="flex shrink-0 items-center gap-3">
+                    <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
+                    <Link href={`/finance/${r.id}?retour=previsionnel`} className="text-xs text-muted hover:text-primary">Modifier</Link>
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         );
       })}
+      {formulaire}
     </div>
   );
 }

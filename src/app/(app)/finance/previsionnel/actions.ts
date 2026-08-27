@@ -103,3 +103,28 @@ export async function regenererRecurrents() {
   await regenerer(supabase);
   revalider();
 }
+
+/**
+ * Crée une prévision PONCTUELLE (dépense ou entrée à venir), saisie à la main :
+ * une écriture prévisionnelle non liée à un document ni à un récurrent.
+ */
+export async function creerPrevisionPonctuelle(formData: FormData) {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const montant = num(formData.get("montant_ttc"));
+  if (!montant) throw new Error("Renseigne un montant.");
+  const { error } = await supabase.from("ecriture_financiere").insert({
+    date: str(formData.get("date")) ?? ymd(new Date()),
+    denomination: String(formData.get("denomination") ?? "").trim() || "Prévision",
+    type: str(formData.get("type")),
+    specification: str(formData.get("specification")),
+    sens: str(formData.get("sens")) === "entree" ? "entree" : "sortie",
+    statut: "previsionnel",
+    montant_ttc: montant,
+    valide: false,
+    created_by: user?.id ?? null,
+  });
+  if (error) throw new Error(error.message);
+  revalider();
+  revalidatePath("/finance/journal");
+}

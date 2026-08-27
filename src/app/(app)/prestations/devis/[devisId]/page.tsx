@@ -4,10 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getMembreActuel } from "@/lib/membre";
 import { PageHeader, Card } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { Modal, ModalForm } from "@/components/modal";
+import { Field } from "@/components/form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement } from "../../actions";
+import { updateStatut, associerDevisAEvenement, creerAcompteSolde } from "../../actions";
 import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
@@ -18,6 +20,12 @@ import { statutFactureAffichage, STATUT_PAIEMENT_LABELS, type StatutPaiement } f
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { periodeReservation, joursSuggeres, facteurJours } from "@/lib/devis";
 import { euros, dateFr } from "@/lib/format";
+
+/** Date compacte « 18/09/26 » pour les encadrés étroits. */
+const dateCourt = (d: string | null | undefined): string => {
+  const s2 = dateFr(d ?? null);
+  return s2 && s2 !== "—" ? s2.replace(/\/(\d{2})(\d{2})$/, "/$2") : s2;
+};
 import type { LignePrestation, Prestation, PrestationStatut, Devis } from "@/lib/types";
 
 export default async function DevisEditorPage({
@@ -136,7 +144,6 @@ export default async function DevisEditorPage({
       refuse: { label: "Refusé", cls: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" },
     };
     const sigStatut = devis.statut_signature ?? "";
-    const devisBadge = STATUT_DEVIS[sigStatut] ?? STATUT_DEVIS[""];
 
     const fullBtn = "flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium";
     const halfBtn = "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface";
@@ -152,15 +159,17 @@ export default async function DevisEditorPage({
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-semibold">{titre}{emis && doc?.numero ? ` n° ${doc.numero}` : ""}</span>
-            {estFacture
-              ? badge && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
-              : <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${devisBadge.cls}`}>{devisBadge.label}</span>}
+            {estFacture && badge && (
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
+            )}
           </div>
           <div className="mt-1.5 text-xs text-muted">
             Créé le {dateFr(devis.created_at?.slice(0, 10) ?? null)}{createur !== "—" ? ` · ${createur}` : ""}
           </div>
           {(prestation?.date_event_debut || prestation?.date_event_fin) && (
-            <div className="mt-0.5 text-xs text-muted">Événement : {dateFr(prestation?.date_event_debut ?? null)}{prestation?.date_event_fin ? ` → ${dateFr(prestation.date_event_fin)}` : ""}</div>
+            <div className="mt-0.5 whitespace-nowrap text-xs text-muted">
+              Événement : {dateCourt(prestation?.date_event_debut ?? null)}{prestation?.date_event_fin && prestation.date_event_fin !== prestation.date_event_debut ? ` → ${dateCourt(prestation.date_event_fin)}` : ""}
+            </div>
           )}
         </Card>
 
@@ -273,6 +282,22 @@ export default async function DevisEditorPage({
           </Card>
         )}
 
+        {/* Découpage en acompte + solde (disponible aussi hors édition) */}
+        <Modal
+          trigger={<>Découper (acompte + solde)</>}
+          title="Découper en acompte + solde"
+          triggerClassName={`${fullBtn} border border-border hover:bg-surface`}
+        >
+          <ModalForm action={creerAcompteSolde.bind(null, devisId)} className="space-y-3">
+            <p className="text-sm text-muted">
+              Crée <span className="font-medium text-foreground">deux factures</span> à partir de ce document :
+              une facture d&apos;acompte (à régler avant la presta pour bloquer le matériel) et une facture de solde.
+            </p>
+            <Field label="Pourcentage d'acompte (%)" name="acompte_pct" type="number" step="1" defaultValue={30} />
+            <SubmitButton>Créer les 2 factures</SubmitButton>
+          </ModalForm>
+        </Modal>
+
         {/* Rattachement événement */}
         <div>
           {prestation?.est_evenement ? (
@@ -285,8 +310,14 @@ export default async function DevisEditorPage({
         {/* Historique des modifications */}
         {hist.length > 0 && (
           <Card className="p-3">
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted">Historique</span>
-            <ul className="max-h-48 space-y-2 overflow-y-auto text-xs">
+            <details>
+              <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wide text-muted marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex items-center gap-1">
+                  <svg className="h-3 w-3 transition-transform [details[open]_&]:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Historique ({hist.length})
+                </span>
+              </summary>
+            <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-xs">
               {hist.map((h, i) => (
                 <li key={i}>
                   <span className="block text-muted">{dt(h.created_at)}</span>
@@ -294,6 +325,7 @@ export default async function DevisEditorPage({
                 </li>
               ))}
             </ul>
+            </details>
           </Card>
         )}
       </aside>

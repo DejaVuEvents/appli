@@ -28,7 +28,7 @@ const dateCourt = (d: string | null | undefined): string => {
   const s2 = dateFr(d ?? null);
   return s2 && s2 !== "—" ? s2.replace(/\/(\d{2})(\d{2})$/, "/$2") : s2;
 };
-import type { LignePrestation, Prestation, PrestationStatut, Devis } from "@/lib/types";
+import type { LignePrestation, Prestation, PrestationStatut, Devis, ParametresEntreprise } from "@/lib/types";
 
 export default async function DevisEditorPage({
   params,
@@ -111,6 +111,16 @@ export default async function DevisEditorPage({
           ? emailModele.replace(/\{document\}/g, titre.toLowerCase()).replace(/\{evenement\}/g, prestation!.nom)
           : `Bonjour,\n\nVeuillez trouver ci-joint notre ${titre.toLowerCase()} pour « ${prestation!.nom} ».\n\nBien cordialement,`;
         if (estFacture) corps += `\n\nLes informations de paiement (IBAN) figurent sur la facture.`;
+        // Signature de l'association, construite depuis les Paramètres → Entreprise.
+        const ent = entParams as ParametresEntreprise | null;
+        const ligneVille = [ent?.code_postal, ent?.ville].filter(Boolean).join(" ");
+        const signature = [
+          ent?.raison_sociale,
+          ent?.adresse,
+          ligneVille || null,
+          ent?.siren ? `SIREN ${ent.siren}` : null,
+        ].filter(Boolean).join("\n");
+        if (signature) corps += `\n\n--\n${signature}`;
         return `mailto:${prestation!.client!.email}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}`;
       })()
     : null;

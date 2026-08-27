@@ -17,6 +17,7 @@ export const IconInfo = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="
 export const IconEye = (p: P) => (<svg {...base(p)}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg>);
 export const IconDownload = (p: P) => (<svg {...base(p)}><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>);
 export const IconUpload = (p: P) => (<svg {...base(p)}><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14" /></svg>);
+export const IconMail = (p: P) => (<svg {...base(p)}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2.5 6.5 12 13l9.5-6.5" /></svg>);
 export const IconSend = (p: P) => (<svg {...base(p)}><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>);
 export const IconReceipt = (p: P) => (<svg {...base(p)}><path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1z" /><path d="M9 8h6M9 12h6" /></svg>);
 export const IconFile = (p: P) => (<svg {...base(p)}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>);

@@ -10,6 +10,7 @@ import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
 import { ROLES_MEMBRE } from "@/lib/roles";
 import { coutKmVehicule } from "@/lib/vehicule";
 import { synchroniserEcritureDevisSigne } from "@/lib/tresorerie-sync";
+import { ecartSolde } from "@/lib/acompte";
 
 function num(v: FormDataEntryValue | null): number | null {
   if (v === null || String(v).trim() === "") return null;
@@ -947,4 +948,37 @@ export async function ajouterAccessoireOptionnel(
   if (error) throw new Error(error.message);
   await toucherDevis(supabase, devisId);
   revalidatePath(`/prestations/${prestationId}`);
+}
+
+/**
+ * Recalcule le montant d'une facture de SOLDE issue d'un découpage acompte/solde :
+ * solde = total actuel du devis source − somme des autres factures filles.
+ * Sert quand du matériel a été ajouté au devis après le découpage.
+ */
+export async function recalculerSolde(devisId: string) {
+  const supabase = await createSupabase();
+  const ecart = await ecartSolde(supabase, devisId);
+  if (!ecart) throw new Error("Cette facture n'est pas issue d'un découpage acompte / solde.");
+  if (ecart.soldeAttendu <= 0) throw new Error("Le solde recalculé serait nul ou négatif — vérifie les acomptes.");
+
+  const { data: lignes } = await supabase
+    .from("ligne_prestation")
+    .select("id")
+    .eq("devis_id", devisId)
+    .order("created_at");
+  const premiere = lignes?.[0]?.id;
+  if (!premiere) throw new Error("Facture de solde sans ligne : impossible de la recalculer.");
+
+  // On garde une seule ligne « Solde » à jour (les éventuelles autres sont retirées).
+  await supabase
+    .from("ligne_prestation")
+    .update({ prix_unitaire: ecart.soldeAttendu, prix_total: ecart.soldeAttendu, quantite: 1, remise_valeur: 0 })
+    .eq("id", premiere);
+  const enTrop = (lignes ?? []).slice(1).map((l) => l.id as string);
+  if (enTrop.length) await supabase.from("ligne_prestation").delete().in("id", enTrop);
+
+  await toucherDevis(supabase, devisId);
+  revaliderTresorerie();
+  revalidatePath(`/prestations/devis/${devisId}`);
+  redirect(`/prestations/devis/${devisId}?msg=${encodeURIComponent(`Solde mis à jour : ${ecart.soldeAttendu.toFixed(2)} €`)}`);
 }

@@ -9,12 +9,13 @@ import { Field } from "@/components/form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement, creerAcompteSolde } from "../../actions";
+import { updateStatut, associerDevisAEvenement, creerAcompteSolde, recalculerSolde } from "../../actions";
 import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
 import { AcompteForm } from "../../acompte-form";
+import { ecartSolde } from "@/lib/acompte";
 import { assemblerContenuDocument } from "@/lib/document";
 import { urlDocument } from "@/lib/storage";
 import { statutFactureAffichage, STATUT_PAIEMENT_LABELS, type StatutPaiement } from "@/lib/facture-statut";
@@ -95,6 +96,10 @@ export default async function DevisEditorPage({
     : { data: null };
   const factureEmise = !!facEmise?.numero;
   const pdfSigneUrl = devis.pdf_signe ? await urlDocument(supabase, devis.pdf_signe) : null;
+
+  // Facture issue d'un découpage acompte/solde : le devis source a-t-il changé depuis ?
+  const ecartSoldeInfo = await ecartSolde(supabase, devisId);
+  const soldeADecaler = ecartSoldeInfo && Math.abs(ecartSoldeInfo.ecart) >= 0.01;
 
   // Message e-mail pré-rempli : modèle paramétrable (Paramètres) sinon message par défaut.
   const { data: entParams } = await supabase.from("parametres_entreprise").select("*").limit(1).maybeSingle();
@@ -183,6 +188,26 @@ export default async function DevisEditorPage({
               {contenu.tva.taux > 0 && <div className="flex justify-between text-muted"><span>TVA {contenu.tva.taux} %</span><span>{euros(contenu.tva.montant)}</span></div>}
               <div className="flex justify-between font-semibold"><span>Total TTC</span><span>{euros(contenu.tva.totalTtc)}</span></div>
             </div>
+          </Card>
+        )}
+
+        {/* Solde décalé : le devis source a été modifié depuis le découpage */}
+        {soldeADecaler && ecartSoldeInfo && (
+          <Card className="border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-500/40 dark:bg-amber-950/20">
+            <div className="font-semibold text-amber-900 dark:text-amber-200">Devis modifié depuis le découpage</div>
+            <div className="mt-1.5 space-y-0.5 text-amber-900/90 dark:text-amber-200/90">
+              <div className="flex justify-between gap-2"><span>Total du devis</span><span className="tabular-nums">{euros(ecartSoldeInfo.totalSource)}</span></div>
+              <div className="flex justify-between gap-2"><span>Déjà facturé</span><span className="tabular-nums">− {euros(ecartSoldeInfo.autresFactures)}</span></div>
+              <div className="flex justify-between gap-2 border-t border-amber-300/60 pt-0.5 font-semibold">
+                <span>Solde attendu</span><span className="tabular-nums">{euros(ecartSoldeInfo.soldeAttendu)}</span>
+              </div>
+              <div className="flex justify-between gap-2"><span>Montant actuel</span><span className="tabular-nums">{euros(ecartSoldeInfo.montantActuel)}</span></div>
+            </div>
+            <form action={recalculerSolde.bind(null, devisId)} className="mt-2">
+              <SubmitButton className="w-full !py-1.5 !text-xs">
+                {ecartSoldeInfo.ecart > 0 ? "Mettre à jour le solde (+" : "Mettre à jour le solde ("}{euros(ecartSoldeInfo.ecart)})
+              </SubmitButton>
+            </form>
           </Card>
         )}
 

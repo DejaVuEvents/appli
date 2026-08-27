@@ -13,10 +13,14 @@ export async function urlDocument(
   supabase: SupabaseClient,
   stored: string | null | undefined,
   expiresIn = 3600,
+  /** Nom de fichier → force le TÉLÉCHARGEMENT au lieu de l'affichage dans le navigateur. */
+  telechargerSous?: string,
 ): Promise<string | null> {
   if (!stored) return null;
   if (/^https?:\/\//i.test(stored)) return stored;
-  const { data } = await supabase.storage.from(BUCKET_PRIVE).createSignedUrl(stored, expiresIn);
+  const { data } = await supabase.storage
+    .from(BUCKET_PRIVE)
+    .createSignedUrl(stored, expiresIn, telechargerSous ? { download: telechargerSous } : undefined);
   return data?.signedUrl ?? null;
 }
 

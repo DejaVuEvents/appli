@@ -20,10 +20,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   if (!devisId) return new Response("Introuvable", { status: 404 });
 
-  // Document importé de Tiime : renvoie l'ancien PDF d'origine.
-  const { data: dv } = await supabase.from("devis").select("pdf_import").eq("id", devisId).maybeSingle();
+  // Document importé (ancien Tiime) : on renvoie le PDF d'origine. Sans l'option de
+  // téléchargement, le stockage le sert en affichage → le fichier s'ouvrait au lieu
+  // d'être enregistré. `?inline=1` reste l'aperçu.
+  const apercu = !!request.nextUrl.searchParams.get("inline");
+  const { data: dv } = await supabase.from("devis").select("nom, pdf_import").eq("id", devisId).maybeSingle();
   if (dv?.pdf_import) {
-    const url = await urlDocument(supabase, dv.pdf_import);
+    const nomImport = nomFichierSafe(`${type === "devis" ? "Devis" : "Facture"} ${dv.nom ?? devisId}`) + ".pdf";
+    const url = await urlDocument(supabase, dv.pdf_import, 3600, apercu ? undefined : nomImport);
     if (url) return NextResponse.redirect(url);
   }
 

@@ -35,7 +35,7 @@ export default async function DevisEditorPage({
   searchParams,
 }: {
   params: Promise<{ devisId: string }>;
-  searchParams: Promise<{ edit?: string; msg?: string }>;
+  searchParams: Promise<{ edit?: string; msg?: string; retour?: string; clientId?: string }>;
 }) {
   const { devisId } = await params;
   const sp = await searchParams;
@@ -71,14 +71,21 @@ export default async function DevisEditorPage({
   const estFacture = devis.type === "facture";
   const titre = estFacture ? "Facture" : "Devis";
   const titreDoc = devis.nom || titre;
-  // Retour contextuel : on revient d'où l'on vient (événement, location) plutôt que
-  // systématiquement sur la liste globale.
-  const backHref = prestation?.est_evenement
-    ? `/prestations/${prestationId}?tab=devis`
-    : prestation
-      ? `/planification/location/${prestationId}?tab=devis`
-      : `/prestations?tab=${estFacture ? "factures" : "devis"}`;
-  const backLabel = prestation?.est_evenement ? "Événement" : prestation ? "Location" : "Devis & Factures";
+  // Retour contextuel : la provenance est transmise par le lien d'origine (?retour=…),
+  // sinon on remonte à l'événement / la location qui porte le document.
+  const provenance = sp?.retour;
+  const backHref =
+    provenance === "liste" ? `/prestations?tab=${estFacture ? "factures" : "devis"}`
+    : provenance === "client" && sp?.clientId ? `/clients/${sp.clientId}`
+    : prestation?.est_evenement ? `/prestations/${prestationId}?tab=devis`
+    : prestation ? `/planification/location/${prestationId}?tab=devis`
+    : `/prestations?tab=${estFacture ? "factures" : "devis"}`;
+  const backLabel =
+    provenance === "liste" ? "Devis & Factures"
+    : provenance === "client" ? "Client"
+    : prestation?.est_evenement ? "Événement"
+    : prestation ? "Location"
+    : "Devis & Factures";
   const pdfUrl = `/prestations/${prestationId}/document/pdf?devis=${devisId}&type=${devis.type}`;
 
   // Émission (n° + montants figés) pour le type de ce document

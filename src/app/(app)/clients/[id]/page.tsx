@@ -86,7 +86,7 @@ export default async function ClientFichePage({ params }: { params: Promise<{ id
       // Valeur brute du statut, et si le document est éditable en statut (facture émise, ou devis).
       statutValue: d.type === "facture" ? (df?.statut_paiement ?? "en_attente") : (d.statut_signature ?? ""),
       statutEditable: d.type === "facture" ? emis : true,
-      href: `/prestations/devis/${d.id}`,
+      href: `/prestations/devis/${d.id}?retour=client&clientId=${id}`,
     };
   });
 

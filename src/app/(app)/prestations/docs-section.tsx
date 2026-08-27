@@ -141,7 +141,7 @@ export function DocsSection({ docs }: { docs: DocRow[] }) {
                     <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-muted sm:w-20">
                       {d.date ? dateFr(d.date) : "—"}
                     </div>
-                    <Link href={`/prestations/devis/${d.id}`} className="min-w-0 flex-1">
+                    <Link href={`/prestations/devis/${d.id}?retour=liste`} className="min-w-0 flex-1">
                       <div className="truncate font-medium">{d.titre}</div>
                       <div className="truncate text-sm text-muted">
                         {d.client ?? "Sans client"}

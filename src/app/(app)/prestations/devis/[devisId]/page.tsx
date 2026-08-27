@@ -226,7 +226,7 @@ export default async function DevisEditorPage({
           <div className="flex gap-2">
             <Link href={`/prestations/devis/${devisId}?edit=1`} className={halfBtnPrimary}><IconEdit /> Éditer</Link>
             <JustificatifPreview
-              url={`/apercu/${devisId}?type=${devis.type}`}
+              url={`${pdfUrl}&inline=1`}
               libelle={`${titreDoc} — aperçu du document`}
               label="Aperçu"
               className={halfBtn}

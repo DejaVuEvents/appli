@@ -1,3 +1,5 @@
+import { readFile } from "fs/promises";
+import path from "path";
 import { Document, Page, Text, View, StyleSheet, Image, renderToBuffer } from "@react-pdf/renderer";
 import { euros, dateFr, adresseMultiligne } from "@/lib/format";
 import type { DocContenu } from "@/lib/document";
@@ -38,10 +40,31 @@ const s = StyleSheet.create({
 });
 
 function eur(n: number | null | undefined) {
-  return euros(Number(n ?? 0));
+  // Les polices PDF standard n'ont pas l'espace fine insécable (U+202F) ni l'insécable
+  // (U+00A0) utilisées par le format français → elles s'affichaient en « / ».
+  return euros(Number(n ?? 0)).replace(/[\u202F\u00A0]/g, " ");
 }
 
-function DocPDF({ contenu, doc }: { contenu: DocContenu; doc: { type: "devis" | "facture"; numero: string | null; dateEmission: string | null; dateEcheance: string | null } }) {
+/**
+ * Source d'image exploitable par le moteur PDF. Un chemin relatif (ex. « /logo.png »)
+ * doit être résolu : d'abord dans public/, sinon via l'URL absolue du déploiement.
+ */
+async function resoudreLogo(logo: string | null | undefined): Promise<string | Buffer | null> {
+  if (!logo) return null;
+  if (logo.startsWith("data:") || /^https?:\/\//i.test(logo)) return logo;
+  if (logo.startsWith("/")) {
+    try {
+      return await readFile(path.join(process.cwd(), "public", logo.replace(/^\//, "")));
+    } catch {
+      const base = process.env.NEXT_PUBLIC_SITE_URL
+        ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+      return base ? `${base}${logo}` : null;
+    }
+  }
+  return logo;
+}
+
+function DocPDF({ contenu, doc, logo }: { contenu: DocContenu; doc: { type: "devis" | "facture"; numero: string | null; dateEmission: string | null; dateEcheance: string | null }; logo: string | Buffer | null }) {
   const { ent, client, prestationNom, groupes, transportTotal, coefficientDuree, surchargeDuree, totaux, tva } = contenu;
   const titre = doc.type === "devis" ? "Devis" : "Facture";
   const villeLigne = [ent?.code_postal, ent?.ville].filter(Boolean).join(" ");
@@ -51,7 +74,7 @@ function DocPDF({ contenu, doc }: { contenu: DocContenu; doc: { type: "devis" | 
       <Page size="A4" style={s.page}>
         {/* En-tête société */}
         <View>
-          {ent?.logo ? <Image style={s.logo} src={ent.logo} /> : null}
+          {logo ? <Image style={s.logo} src={logo as string} /> : null}
           <Text style={s.soc}>{ent?.raison_sociale ?? "—"}</Text>
           {ent?.adresse ? <Text>{ent.adresse}</Text> : null}
           {villeLigne ? <Text>{villeLigne}{ent?.pays ? `, ${ent.pays}` : ""}</Text> : null}
@@ -165,5 +188,6 @@ function DocPDF({ contenu, doc }: { contenu: DocContenu; doc: { type: "devis" | 
 
 export async function genererDevisFacturePdf(args: DocPdfArgs): Promise<Buffer> {
   const { type, numero, dateEmission, dateEcheance, ...contenu } = args;
-  return renderToBuffer(<DocPDF contenu={contenu} doc={{ type, numero, dateEmission, dateEcheance }} />);
+  const logo = await resoudreLogo(contenu.ent?.logo);
+  return renderToBuffer(<DocPDF contenu={contenu} doc={{ type, numero, dateEmission, dateEcheance }} logo={logo} />);
 }

@@ -58,7 +58,9 @@ const s = StyleSheet.create({
 });
 
 function eur(n: number | null | undefined) {
-  return euros(Number(n ?? 0));
+  // Les polices PDF standard n'ont pas l'espace fine insécable (U+202F) ni l'insécable
+  // (U+00A0) utilisées par le format français → elles s'affichaient en « / ».
+  return euros(Number(n ?? 0)).replace(/[\u202F\u00A0]/g, " ");
 }
 function nomComplet(p: NdfPersonne | null) {
   if (!p) return "—";

@@ -14,6 +14,7 @@ import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, I
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
+import { AcompteForm } from "../../acompte-form";
 import { assemblerContenuDocument } from "@/lib/document";
 import { urlDocument } from "@/lib/storage";
 import { statutFactureAffichage, STATUT_PAIEMENT_LABELS, type StatutPaiement } from "@/lib/facture-statut";
@@ -225,11 +226,25 @@ export default async function DevisEditorPage({
                 </form>
               </>
             ) : (
-              <form action={emettreDocument.bind(null, devisId, "facture")}>
-                <ConfirmButton confirm="Transformer ce devis en facture ? Une facture sera émise (n° définitif)." confirmLabel="Transformer" danger={false} className={`${fullBtn} border border-border hover:bg-surface`}>
-                  <IconReceipt /> Transformer en facture
-                </ConfirmButton>
-              </form>
+              <Modal
+                trigger={<><IconReceipt /> Facturer</>}
+                title="Facturer ce devis"
+                triggerClassName={`${fullBtn} border border-border hover:bg-surface`}
+              >
+                <div className="space-y-3">
+                  {/* Option 1 — une seule facture, montant total */}
+                  <form action={emettreDocument.bind(null, devisId, "facture")} className="rounded-xl border border-border p-4">
+                    <div className="text-sm font-semibold">Facture complète</div>
+                    <p className="mb-3 mt-1 text-sm text-muted">
+                      Émet une facture unique du montant total{contenu ? ` (${euros(contenu.tva.totalTtc)})` : ""}, avec un numéro définitif.
+                    </p>
+                    <SubmitButton>Émettre la facture</SubmitButton>
+                  </form>
+
+                  {/* Option 2 — découpage acompte + solde (saisie % ou €, aperçu en direct) */}
+                  <AcompteForm action={creerAcompteSolde.bind(null, devisId)} total={contenu?.tva.totalTtc ?? 0} />
+                </div>
+              </Modal>
             )
           )}
         </div>
@@ -281,22 +296,6 @@ export default async function DevisEditorPage({
             )}
           </Card>
         )}
-
-        {/* Découpage en acompte + solde (disponible aussi hors édition) */}
-        <Modal
-          trigger={<>Découper (acompte + solde)</>}
-          title="Découper en acompte + solde"
-          triggerClassName={`${fullBtn} border border-border hover:bg-surface`}
-        >
-          <ModalForm action={creerAcompteSolde.bind(null, devisId)} className="space-y-3">
-            <p className="text-sm text-muted">
-              Crée <span className="font-medium text-foreground">deux factures</span> à partir de ce document :
-              une facture d&apos;acompte (à régler avant la presta pour bloquer le matériel) et une facture de solde.
-            </p>
-            <Field label="Pourcentage d'acompte (%)" name="acompte_pct" type="number" step="1" defaultValue={30} />
-            <SubmitButton>Créer les 2 factures</SubmitButton>
-          </ModalForm>
-        </Modal>
 
         {/* Rattachement événement */}
         <div>

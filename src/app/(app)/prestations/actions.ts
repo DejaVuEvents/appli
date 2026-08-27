@@ -71,7 +71,9 @@ async function toucherDevis(supabase: Supa, devisId: string) {
 export async function creerAcompteSolde(devisId: string, formData: FormData) {
   const supabase = await createSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  const pct = Math.min(99, Math.max(1, num(formData.get("acompte_pct")) ?? 30));
+  // Acompte saisi en pourcentage OU en euros (nouveau formulaire), avec repli sur l'ancien champ.
+  const mode = str(formData.get("acompte_mode")) === "montant" ? "montant" : "pct";
+  const saisi = num(formData.get("acompte_valeur")) ?? num(formData.get("acompte_pct")) ?? 30;
 
   const { data: base } = await supabase
     .from("devis")
@@ -89,8 +91,14 @@ export async function creerAcompteSolde(devisId: string, formData: FormData) {
   // Le coefficient multi-jours multiplie le total final : acompte + solde doivent le refléter.
   const coeff = Number(base.coefficient_duree ?? 0) > 0 ? Number(base.coefficient_duree) : 1;
   const totalHT = Math.round((net - remise) * coeff * 100) / 100;
-  const montantAcompte = Math.round(totalHT * pct) / 100;
+  const montantAcompte = mode === "montant"
+    ? Math.round(Math.min(Math.max(saisi, 0), totalHT) * 100) / 100
+    : Math.round((totalHT * Math.min(Math.max(saisi, 0), 100)) / 100 * 100) / 100;
   const montantSolde = Math.round((totalHT - montantAcompte) * 100) / 100;
+  if (montantAcompte <= 0 || montantSolde <= 0) {
+    throw new Error("L'acompte doit être supérieur à 0 et inférieur au total du devis.");
+  }
+  const pct = totalHT > 0 ? Math.round((montantAcompte / totalHT) * 100) : 0;
   const baseNom = base.nom || "devis";
 
   const mkFacture = async (nom: string, libelle: string, montant: number): Promise<string | null> => {

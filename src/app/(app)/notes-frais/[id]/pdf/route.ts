@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
 import { nomFichierSafe } from "@/lib/drive";
-import { urlDocument } from "@/lib/storage";
+import { urlDocument, dispositionFichier } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -68,7 +68,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   return new Response(new Uint8Array(out), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${nom}"`,
+      "Content-Disposition": dispositionFichier(nom),
       "Cache-Control": "no-store",
     },
   });

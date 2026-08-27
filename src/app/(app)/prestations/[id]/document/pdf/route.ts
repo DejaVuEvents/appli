@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assemblerContenuDocument } from "@/lib/document";
 import { genererDevisFacturePdf } from "@/lib/pdf/devis-facture";
 import { nomFichierSafe } from "@/lib/drive";
-import { urlDocument } from "@/lib/storage";
+import { urlDocument, dispositionFichier } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${nom}"`,
+      "Content-Disposition": dispositionFichier(nom, disposition as "attachment" | "inline"),
       "Cache-Control": "no-store",
     },
   });

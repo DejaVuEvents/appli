@@ -1,3 +1,4 @@
+import { dispositionFichier } from "@/lib/storage";
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { genererTresoreriePdf } from "@/lib/pdf/tresorerie";
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${nom}"`,
+      "Content-Disposition": dispositionFichier(nom),
       "Cache-Control": "no-store",
     },
   });

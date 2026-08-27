@@ -19,3 +19,17 @@ export async function urlDocument(
   const { data } = await supabase.storage.from(BUCKET_PRIVE).createSignedUrl(stored, expiresIn);
   return data?.signedUrl ?? null;
 }
+
+/**
+ * En-tête Content-Disposition robuste : nom ASCII pour les anciens clients + `filename*`
+ * en UTF-8 (RFC 5987). Sans ça, un nom accentué rend l'en-tête invalide et certains
+ * navigateurs l'ignorent — le fichier s'ouvre au lieu d'être téléchargé.
+ */
+export function dispositionFichier(nom: string, mode: "attachment" | "inline" = "attachment"): string {
+  const ascii = nom
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")   // retire les accents
+    .replace(/[^\x20-\x7E]/g, "_")      // tout caractère non ASCII imprimable
+    .replace(/["\\]/g, "_");
+  return `${mode}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nom)}`;
+}

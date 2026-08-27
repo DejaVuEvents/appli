@@ -1,3 +1,4 @@
+import { dispositionFichier } from "@/lib/storage";
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { typeLabel } from "@/lib/finance";
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${nom}"`,
+      "Content-Disposition": dispositionFichier(nom),
       "Cache-Control": "no-store",
     },
   });

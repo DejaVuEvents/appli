@@ -116,8 +116,11 @@ export async function supprimerFacture(devisId: string, prestationId: string, re
     .eq("devis_id", devisId)
     .eq("type", "facture");
   if (error) throw new Error(error.message);
-  // La facture n'existe plus → si le devis est signé, on rétablit l'entrée prévisionnelle.
+  // La facture n'existe plus → si le devis est signé, on rétablit l'entrée prévisionnelle,
+  // et le devis source (en cas de découpage) reprend ce montant dans son reste à facturer.
+  const { data: dv0 } = await supabase.from("devis").select("source_devis_id").eq("id", devisId).maybeSingle();
   await synchroniserEcritureDevisSigne(supabase, devisId);
+  if (dv0?.source_devis_id) await synchroniserEcritureDevisSigne(supabase, dv0.source_devis_id as string);
   revalidatePath(`/prestations/${prestationId}`);
   revalidatePath(`/prestations/${prestationId}/document`);
   revalidatePath("/prestations");
@@ -181,7 +184,7 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
   const contenu = await assemblerContenuDocument(supabase, devisId);
   if (!contenu) throw new Error("Devis introuvable.");
 
-  const { data: devisRow } = await supabase.from("devis").select("prestation_id").eq("id", devisId).single();
+  const { data: devisRow } = await supabase.from("devis").select("prestation_id, source_devis_id").eq("id", devisId).single();
   const prestationId = devisRow?.prestation_id as string;
 
   const { data: existant } = await supabase
@@ -252,6 +255,8 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
     await synchroniserEcritureFacture(supabase, devisId);
     // La facture prend le relais → on retire l'éventuelle entrée « devis signé ».
     await synchroniserEcritureDevisSigne(supabase, devisId);
+    // Tranche d'un découpage : le devis source ne doit plus prévoir que le RESTE à facturer.
+    if (devisRow?.source_devis_id) await synchroniserEcritureDevisSigne(supabase, devisRow.source_devis_id as string);
     revaliderFinance();
   }
 

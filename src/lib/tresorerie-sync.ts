@@ -23,13 +23,25 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
     .eq("devis_id", devisId)
     .eq("type", "facture")
     .maybeSingle();
-  // Découpage acompte/solde : les factures filles portent la recette → pas de double.
+  // Découpage acompte/solde : seules les factures filles ÉMISES portent la recette.
+  // Tant qu'une tranche n'est pas émise, elle reste couverte par la prévision du devis
+  // (sinon la recette attendue disparaîtrait du prévisionnel entre le découpage et l'émission).
   const { data: filles } = await supabase
     .from("devis")
     .select("id")
     .eq("source_devis_id", devisId)
     .eq("type", "facture");
-  const couvertParFacture = !!fac?.numero || (filles ?? []).length > 0;
+  let dejaFacture = 0;
+  for (const f of filles ?? []) {
+    const { data: df } = await supabase
+      .from("devis_facture")
+      .select("numero, montant_ttc")
+      .eq("devis_id", f.id)
+      .eq("type", "facture")
+      .maybeSingle();
+    if (df?.numero) dejaFacture += Number(df.montant_ttc ?? 0);
+  }
+  const couvertParFacture = !!fac?.numero;
 
   const { data: existante } = await supabase
     .from("ecriture_financiere")
@@ -42,10 +54,11 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
     return;
   }
 
-  // Montant = total TTC (même base que la facture → pas de saut à l'émission).
+  // Montant = total TTC restant à facturer (total − tranches déjà émises).
   const contenu = await assemblerContenuDocument(supabase, devisId);
-  const montant = contenu?.tva.totalTtc ?? contenu?.totaux.totalHT ?? 0;
-  if (!montant) {
+  const total = contenu?.tva.totalTtc ?? contenu?.totaux.totalHT ?? 0;
+  const montant = Math.round((total - dejaFacture) * 100) / 100;
+  if (montant <= 0) {
     if (existante) await supabase.from("ecriture_financiere").delete().eq("id", existante.id);
     return;
   }
@@ -70,7 +83,7 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
 
   const payload = {
     date: datePrev,
-    denomination: `Devis signé — ${dv.nom ?? "Devis"}${clientNom ? ` (${clientNom})` : ""}`,
+    denomination: `${dejaFacture > 0 ? "Reste à facturer" : "Devis signé"} — ${dv.nom ?? "Devis"}${clientNom ? ` (${clientNom})` : ""}`,
     type, specification,
     sens: "entree",
     statut: "previsionnel",

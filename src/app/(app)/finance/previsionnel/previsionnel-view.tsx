@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { creerRecurrent, supprimerRecurrent, toggleRecurrent, regenererRecurrents, creerPrevisionPonctuelle } from "./actions";
+import { creerRecurrent, supprimerRecurrent, toggleRecurrent, creerPrevisionPonctuelle } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { Modal, ModalForm } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { euros, dateFr } from "@/lib/format";
 import { typeLabel } from "@/lib/finance";
@@ -49,6 +50,46 @@ function RecurrentsView({ recurrents, nomenclature, mensuelEquivalent }: { recur
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+      <Modal trigger={<>+ Nouvelle dépense récurrente</>} title="Nouvelle dépense récurrente">
+        <ModalForm action={creerRecurrent} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block"><span className="mb-1 block text-xs font-medium">Libellé</span>
+            <input name="nom" required placeholder="Assurance MAIF, Google One…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">Sens</span>
+            <select name="sens" value={sens} onChange={(e) => { setSens(e.target.value as "sortie" | "entree"); setType(""); }} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="sortie">Dépense</option><option value="entree">Recette</option>
+            </select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">Montant (€)</span>
+            <input name="montant_ttc" type="number" step="0.01" min="0" required className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">Fréquence</span>
+            <select name="frequence" value={freq} onChange={(e) => setFreq(e.target.value as "mensuel" | "annuel")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="mensuel">Mensuel</option><option value="annuel">Annuel</option>
+            </select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">Jour du mois</span>
+            <input name="jour" type="number" min="1" max="28" defaultValue={1} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          {freq === "annuel" && (
+            <label className="block"><span className="mb-1 block text-xs font-medium">Mois</span>
+              <select name="mois" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                {MOIS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              </select></label>
+          )}
+          <label className="block"><span className="mb-1 block text-xs font-medium">Catégorie</span>
+            <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="">—</option>
+              {types.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+            </select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">Spécification</span>
+            <select name="specification" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="">—</option>
+              {specs.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select></label>
+        </div>
+        <SubmitButton>+ Ajouter</SubmitButton>
+        </ModalForm>
+      </Modal>
+      </div>
+
       <div className="rounded-xl border border-border bg-surface p-4 text-sm">
         Charge récurrente mensuelle estimée : <strong className={mensuelEquivalent < 0 ? "text-red-600" : "text-green-700"}>{mensuelEquivalent >= 0 ? "+" : ""}{euros(mensuelEquivalent)}</strong> / mois (annuel réparti /12).
       </div>
@@ -97,47 +138,7 @@ function RecurrentsView({ recurrents, nomenclature, mensuelEquivalent }: { recur
         </table>
       </div>
 
-      {/* Ajout */}
-      <form action={creerRecurrent} className="rounded-xl border border-border bg-surface p-4">
-        <div className="mb-3 text-sm font-semibold">Ajouter une dépense récurrente</div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block"><span className="mb-1 block text-xs font-medium">Libellé</span>
-            <input name="nom" required placeholder="Assurance MAIF, Google One…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
-          <label className="block"><span className="mb-1 block text-xs font-medium">Sens</span>
-            <select name="sens" value={sens} onChange={(e) => { setSens(e.target.value as "sortie" | "entree"); setType(""); }} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-              <option value="sortie">Dépense</option><option value="entree">Recette</option>
-            </select></label>
-          <label className="block"><span className="mb-1 block text-xs font-medium">Montant (€)</span>
-            <input name="montant_ttc" type="number" step="0.01" min="0" required className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
-          <label className="block"><span className="mb-1 block text-xs font-medium">Fréquence</span>
-            <select name="frequence" value={freq} onChange={(e) => setFreq(e.target.value as "mensuel" | "annuel")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-              <option value="mensuel">Mensuel</option><option value="annuel">Annuel</option>
-            </select></label>
-          <label className="block"><span className="mb-1 block text-xs font-medium">Jour du mois</span>
-            <input name="jour" type="number" min="1" max="28" defaultValue={1} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
-          {freq === "annuel" && (
-            <label className="block"><span className="mb-1 block text-xs font-medium">Mois</span>
-              <select name="mois" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                {MOIS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select></label>
-          )}
-          <label className="block"><span className="mb-1 block text-xs font-medium">Catégorie</span>
-            <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-              <option value="">—</option>
-              {types.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
-            </select></label>
-          <label className="block"><span className="mb-1 block text-xs font-medium">Spécification</span>
-            <select name="specification" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-              <option value="">—</option>
-              {specs.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select></label>
-        </div>
-        <div className="mt-3"><SubmitButton>+ Ajouter</SubmitButton></div>
-      </form>
 
-      <form action={regenererRecurrents}>
-        <button className="text-xs text-muted hover:text-foreground underline">Régénérer les prévisions récurrentes</button>
-      </form>
     </div>
   );
 }
@@ -154,9 +155,9 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
   const entries = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
   const formulaire = (
-    <form action={creerPrevisionPonctuelle} className="rounded-xl border border-border bg-surface p-4">
-      <div className="mb-3 text-sm font-semibold">Ajouter une prévision ponctuelle</div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <Modal trigger={<>+ Nouvelle prévision</>} title="Nouvelle prévision ponctuelle">
+      <ModalForm action={creerPrevisionPonctuelle} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="block"><span className="mb-1 block text-xs font-medium">Libellé</span>
           <input name="denomination" required placeholder="Achat lyres, subvention…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Sens</span>
@@ -178,19 +179,21 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
             {specs.map((x) => <option key={x} value={x}>{x}</option>)}
           </select></label>
       </div>
-      <div className="mt-3"><SubmitButton>+ Ajouter</SubmitButton></div>
-    </form>
+      <SubmitButton>+ Ajouter</SubmitButton>
+      </ModalForm>
+    </Modal>
   );
 
   if (rows.length === 0) return (
     <div className="space-y-4">
+      <div className="flex justify-end">{formulaire}</div>
       <div className="rounded-xl border border-border bg-surface px-4 py-10 text-center text-sm text-muted">Aucune prévision ponctuelle (devis signés non facturés, factures émises non payées, échéances fournisseurs, saisies manuelles).</div>
-      {formulaire}
     </div>
   );
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">{formulaire}</div>
       {entries.map(([mk, list]) => {
         const [y, m] = mk.split("-");
         const net = list.reduce((s, r) => s + (r.sens === "entree" ? r.montant_ttc : -r.montant_ttc), 0);
@@ -217,7 +220,6 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
           </div>
         );
       })}
-      {formulaire}
     </div>
   );
 }

@@ -5,14 +5,8 @@ import { createPortal } from "react-dom";
 import { IconSousLocation } from "@/components/icons";
 import { euros } from "@/lib/format";
 
-export type SousLocInfo = {
-  fournisseur: string | null;
-  /** Tarif catalogue du loueur, HT, par jour. */
-  coutHt: number;
-  /** Remise négociée, appliquée sur le HT. */
-  remisePct: number;
-  tvaPct: number;
-};
+import type { SousLocInfo } from "@/lib/sous-location";
+export type { SousLocInfo };
 
 /**
  * Pastille « sous-location » : signale une ligne dont le matériel est loué à un

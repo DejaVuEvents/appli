@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { IconDownload } from "@/components/icons";
-import { SousLocationBadge, type SousLocInfo } from "@/components/sous-location-badge";
+import { SousLocationBadge } from "@/components/sous-location-badge";
+import { chargerSousLocation, type SousLocInfo } from "@/lib/sous-location";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { urlDocument } from "@/lib/storage";
@@ -56,20 +57,7 @@ export default async function DocumentPage({
 
   // Sous-location : matériel loué à un fournisseur. Repéré dans l'outil seulement
   // (pastille masquée à l'impression et absente du PDF).
-  const refIds = [...new Set(((lignesData ?? []) as LigneRow[]).filter((l) => l.reference_id).map((l) => l.reference_id as string))];
-  const { data: refsCout } = refIds.length
-    ? await supabase.from("materiel_reference").select("id, fournisseur, cout_location_jour, remise_fournisseur_pct, tva_fournisseur_pct").in("id", refIds)
-    : { data: [] };
-  const sousLocParRef = new Map<string, SousLocInfo>();
-  for (const r of (refsCout ?? []) as { id: string; fournisseur: string | null; cout_location_jour: number | null; remise_fournisseur_pct: number | null; tva_fournisseur_pct: number | null }[]) {
-    if (r.cout_location_jour == null) continue;
-    sousLocParRef.set(r.id, {
-      fournisseur: r.fournisseur,
-      coutHt: Number(r.cout_location_jour),
-      remisePct: Number(r.remise_fournisseur_pct ?? 0),
-      tvaPct: Number(r.tva_fournisseur_pct ?? 20),
-    });
-  }
+  const sousLocParRef = await chargerSousLocation(supabase, ((lignesData ?? []) as LigneRow[]).map((l) => l.reference_id));
 
   if (!prest) notFound();
   const prestation = prest as unknown as {

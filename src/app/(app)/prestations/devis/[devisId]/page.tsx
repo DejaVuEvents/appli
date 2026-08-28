@@ -23,6 +23,8 @@ import { statutFactureAffichage, STATUT_PAIEMENT_LABELS, type StatutPaiement } f
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { periodeReservation, joursSuggeres, facteurJours } from "@/lib/devis";
 import { euros, dateFr } from "@/lib/format";
+import { SousLocationBadge } from "@/components/sous-location-badge";
+import { chargerSousLocation } from "@/lib/sous-location";
 
 /** Date compacte « 18/09/26 » pour les encadrés étroits. */
 const dateCourt = (d: string | null | undefined): string => {
@@ -146,6 +148,9 @@ export default async function DevisEditorPage({
     // Toujours calculer le contenu : un devis importé peut avoir des lignes extraites à afficher.
     const contenu = await assemblerContenuDocument(supabase, devisId);
     const aDesLignes = !!contenu && contenu.groupes.some((g) => g.items.length > 0);
+
+    // Sous-location : pastille sur les lignes louées à un fournisseur (outil seulement).
+    const sousLocParRef = await chargerSousLocation(supabase, contenu ? contenu.groupes.flatMap((g) => g.items.map((l) => l.reference_id)) : []);
 
     // Création + historique des modifications (qui / quand)
     const { data: histData } = await supabase
@@ -447,7 +452,12 @@ export default async function DevisEditorPage({
               {g.items.map((l) => (
                 <div key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{l.designation}</div>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate font-medium">{l.designation}</span>
+                      {l.reference_id && sousLocParRef.get(l.reference_id) && (
+                        <SousLocationBadge sl={sousLocParRef.get(l.reference_id)!} quantite={l.quantite} coeff={contenu.coefficientDuree} />
+                      )}
+                    </div>
                     <div className="text-xs text-muted">{l.quantite}{l.unite ? ` ${l.unite}` : ""} × {euros(l.prix_unitaire)}</div>
                   </div>
                   <span className="shrink-0 font-medium">{euros(l.prix_total)}</span>

@@ -15,6 +15,7 @@ export type DocLigne = {
   remise_type: string | null;
   remise_valeur: number;
   categorie_id: string | null;
+  reference_id: string | null;
 };
 
 export type DocContenu = {

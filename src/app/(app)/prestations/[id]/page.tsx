@@ -80,9 +80,15 @@ export default async function PrestationDetailPage({
     const tr = allTransports.filter((t) => t.devis_id === d.id).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
     return calculerTotaux({ lignes: ls, transportTotal: tr, remiseGlobaleType: d.remise_globale_type, remiseGlobaleValeur: Number(d.remise_globale_valeur ?? 0), coefficientDuree: coeffDe(d) }).totalHT;
   };
-  const totalTousDevis = devisList.reduce((s, d) => s + totalDevis(d), 0);
+  // Total de l'événement : on NE compte PAS deux fois un devis découpé en acompte + solde.
+  // Les tranches (source_devis_id) sont exclues tant que leur document source est présent.
+  const idsPresents = new Set(devisList.map((d) => d.id));
+  const compteDansTotal = (d: Devis) =>
+    !(d as { source_devis_id?: string | null }).source_devis_id ||
+    !idsPresents.has((d as { source_devis_id?: string | null }).source_devis_id as string);
+  const totalTousDevis = devisList.filter(compteDansTotal).reduce((s, d) => s + totalDevis(d), 0);
   // Coût de sous-location = matériel externe × quantité × coefficient de son devis.
-  const coutSousLoc = devisList.reduce((s, d) => {
+  const coutSousLoc = devisList.filter(compteDansTotal).reduce((s, d) => {
     const c = coeffDe(d);
     return s + c * allLignes.filter((l) => l.devis_id === d.id)
       .reduce((ss, l) => ss + (l.reference_id ? (refCout.get(l.reference_id) ?? 0) * Number(l.quantite ?? 0) : 0), 0);
@@ -256,6 +262,11 @@ export default async function PrestationDetailPage({
                     <span className="flex min-w-0 items-center gap-2">
                       {d.type === "facture" ? <IconReceipt className="h-4 w-4 shrink-0 text-muted" /> : <IconFile className="h-4 w-4 shrink-0 text-muted" />}
                       <span className="truncate">{d.nom || (d.type === "facture" ? "Facture" : "Devis")}{df?.numero ? ` · n°${df.numero}` : ""}</span>
+                      {!compteDansTotal(d) && (
+                        <span className="shrink-0 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted" title="Tranche d'un devis déjà compté dans le total">
+                          tranche
+                        </span>
+                      )}
                       {badge && <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>{badge.label}</span>}
                     </span>
                     <span className="shrink-0 font-medium">{euros(totalDevis(d))}</span>
@@ -263,7 +274,10 @@ export default async function PrestationDetailPage({
                 );
               })}
               {devisList.length > 1 && (
-                <div className="flex items-center justify-between bg-background px-4 py-2.5 text-sm font-bold"><span>Total HT</span><span>{euros(totalTousDevis)}</span></div>
+                <div className="flex items-center justify-between bg-background px-4 py-2.5 text-sm font-bold">
+                  <span>Total HT{devisList.some((d) => !compteDansTotal(d)) && <span className="ml-1 text-[10px] font-normal text-muted">(tranches non recomptées)</span>}</span>
+                  <span>{euros(totalTousDevis)}</span>
+                </div>
               )}
             </Card>
           )}

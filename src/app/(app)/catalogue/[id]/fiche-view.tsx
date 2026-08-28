@@ -54,19 +54,39 @@ export function FicheView({
           {r.designation && <Ligne label="Désignation (devis)" value={r.designation} />}
           <Ligne label="Catégorie" value={categorieNom ?? "—"} />
           <Ligne label="Prix de location / jour" value={euros(r.prix_location_jour)} />
-          {r.cout_location_jour != null && (
-            <Ligne
-              label="Coût fournisseur / jour"
-              value={
-                <span>
-                  {euros(r.cout_location_jour)}
-                  <span className="ml-2 text-xs font-normal text-green-700">
-                    marge {euros(r.prix_location_jour - r.cout_location_jour)}
-                  </span>
-                </span>
-              }
-            />
-          )}
+          {r.cout_location_jour != null && (() => {
+            // Tarif public HT du loueur → notre prix après remise négociée → TTC réellement payé.
+            const remise = Number(r.remise_fournisseur_pct ?? 0);
+            const tva = Number(r.tva_fournisseur_pct ?? 20);
+            const notreHT = Math.round(Number(r.cout_location_jour) * (1 - remise / 100) * 100) / 100;
+            const notreTTC = Math.round(notreHT * (1 + tva / 100) * 100) / 100;
+            return (
+              <>
+                {r.fournisseur && <Ligne label="Fournisseur" value={r.fournisseur} />}
+                <Ligne label="Tarif public / jour (HT)" value={euros(r.cout_location_jour)} />
+                <Ligne
+                  label="Notre tarif / jour"
+                  value={
+                    <span>
+                      <strong>{euros(notreHT)} HT</strong>
+                      <span className="ml-2 text-xs font-normal text-muted">
+                        soit {euros(notreTTC)} TTC{remise > 0 ? ` · remise ${remise} %` : ""}
+                      </span>
+                    </span>
+                  }
+                />
+                <Ligne
+                  label="Marge / jour"
+                  value={
+                    <span className={r.prix_location_jour - notreTTC >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}>
+                      {euros(r.prix_location_jour - notreTTC)}
+                      <span className="ml-2 text-xs font-normal text-muted">(prix client − coût TTC)</span>
+                    </span>
+                  }
+                />
+              </>
+            );
+          })()}
           <Ligne label="Consommation" value={r.puissance_w != null ? `${r.puissance_w} W` : "—"} />
           <Ligne label="Intensité" value={r.intensite_a != null ? `${r.intensite_a} A` : "—"} />
           <Ligne label="Phase" value={r.phase ? PHASE_LABELS[r.phase] : "—"} />

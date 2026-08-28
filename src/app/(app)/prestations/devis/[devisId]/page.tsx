@@ -11,7 +11,7 @@ import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
 import { updateStatut, associerDevisAEvenement, creerAcompteSolde, recalculerSolde } from "../../actions";
 import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck } from "@/components/icons";
-import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture } from "../../[id]/document/actions";
+import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture, redaterDevis } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
 import { AcompteForm } from "../../acompte-form";
@@ -103,6 +103,10 @@ export default async function DevisEditorPage({
     ? await supabase.from("devis_facture").select("numero").eq("devis_id", devisId).eq("type", "facture").maybeSingle()
     : { data: null };
   const factureEmise = !!facEmise?.numero;
+
+  // Un devis dont la validité est dépassée ne peut pas être envoyé tel quel.
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const validiteExpiree = !!doc?.date_echeance && doc.date_echeance < aujourdhui;
   const pdfSigneUrl = devis.pdf_signe ? await urlDocument(supabase, devis.pdf_signe) : null;
 
   // Coût de sous-location (matériel externe) → bénéfice estimé du document.
@@ -197,6 +201,34 @@ export default async function DevisEditorPage({
             <div className="mt-0.5 whitespace-nowrap text-xs text-muted">
               Événement : {dateCourt(prestation?.date_event_debut ?? null)}{prestation?.date_event_fin && prestation.date_event_fin !== prestation.date_event_debut ? ` → ${dateCourt(prestation.date_event_fin)}` : ""}
             </div>
+          )}
+          {emis && doc?.date_emission && (
+            <div className="mt-0.5 text-xs text-muted">
+              Émis le {dateFr(doc.date_emission)}
+              {!estFacture && doc?.date_echeance && (
+                <> · {validiteExpiree
+                  ? <span className="font-medium text-red-600">validité expirée le {dateFr(doc.date_echeance)}</span>
+                  : <>valable jusqu&apos;au {dateFr(doc.date_echeance)}</>}</>
+              )}
+            </div>
+          )}
+          {emis && !estFacture && (
+            <Modal
+              trigger="Redater le devis"
+              title="Redater le devis"
+              triggerClassName={`mt-2 text-xs font-medium underline-offset-2 hover:underline ${validiteExpiree ? "text-red-600" : "text-muted hover:text-foreground"}`}
+            >
+              <form action={redaterDevis.bind(null, devisId)} className="space-y-3">
+                <p className="text-sm text-muted">
+                  Le numéro n&apos;est pas modifié. La validité est recalculée à 30 jours après la nouvelle date d&apos;émission.
+                </p>
+                <label className="block text-sm font-medium">
+                  Nouvelle date d&apos;émission
+                  <input type="date" name="date" defaultValue={aujourdhui} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                </label>
+                <SubmitButton>Redater</SubmitButton>
+              </form>
+            </Modal>
           )}
         </Card>
 

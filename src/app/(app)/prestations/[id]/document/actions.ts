@@ -263,3 +263,36 @@ export async function emettreDocument(devisId: string, type: "devis" | "facture"
   revalidatePath(`/prestations/${prestationId}/document`);
   redirect(`/prestations/${prestationId}/document?devis=${devisId}&type=${type}`);
 }
+
+/**
+ * Redate un devis : nouvelle date d'émission + validité recalculée (30 jours).
+ * Le numéro est conservé. Réservé aux DEVIS : une facture émise garde sa date
+ * d'origine (valeur comptable, numérotation chronologique).
+ */
+export async function redaterDevis(devisId: string, formData: FormData) {
+  const supabase = await createSupabase();
+
+  const { data: doc } = await supabase
+    .from("devis_facture")
+    .select("id, type, prestation_id")
+    .eq("devis_id", devisId)
+    .eq("type", "devis")
+    .maybeSingle();
+  if (!doc) throw new Error("Ce devis n'a pas encore été émis.");
+
+  const saisie = String(formData.get("date") ?? "").trim();
+  const emission = /^\d{4}-\d{2}-\d{2}$/.test(saisie) ? saisie : new Date().toISOString().slice(0, 10);
+  const echeance = new Date(new Date(emission).getTime() + 30 * 86400000).toISOString().slice(0, 10);
+
+  await supabase.from("devis_facture").update({ date_emission: emission, date_echeance: echeance }).eq("id", doc.id);
+
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from("devis_historique").insert({
+    devis_id: devisId,
+    membre_id: user?.id ?? null,
+    action: `Devis redaté au ${emission.slice(8, 10)}/${emission.slice(5, 7)}/${emission.slice(0, 4)} (validité ${echeance.slice(8, 10)}/${echeance.slice(5, 7)}/${echeance.slice(0, 4)})`,
+  });
+
+  revalidatePath(`/prestations/${doc.prestation_id}/document`);
+  revalidatePath(`/prestations/devis/${devisId}`);
+}

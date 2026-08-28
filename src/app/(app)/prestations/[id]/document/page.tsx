@@ -99,6 +99,8 @@ export default async function DocumentPage({
   const numero = doc?.numero ?? null;
   const emis = Boolean(numero);
   const statutFacture = statutFactureAffichage(emis, doc?.statut_paiement);
+  // Devis dont la validité est dépassée : à redater avant envoi au client.
+  const validiteExpiree = type === "devis" && !!doc?.date_echeance && doc.date_echeance < new Date().toISOString().slice(0, 10);
 
   // Facture émise à partir du même devis : on récupère le n° du devis source (s'il existe).
   let devisSourceNumero: string | null = null;
@@ -142,6 +144,12 @@ export default async function DocumentPage({
 
       {/* Colonne document */}
       <div className="min-w-0 flex-1">
+        {validiteExpiree && (
+          <p className="print:hidden mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-300">
+            Validité dépassée depuis le {dateFr(doc?.date_echeance, fmt)} — redate le devis avant de l&apos;envoyer
+            (<Link href={`/prestations/devis/${devisId}`} className="underline">page du devis</Link>).
+          </p>
+        )}
         {!emis && (
           <p className="print:hidden mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             Brouillon — ce {titre.toLowerCase()} n&apos;a pas encore de numéro. Clique « Émettre » pour lui attribuer un numéro et figer les montants.

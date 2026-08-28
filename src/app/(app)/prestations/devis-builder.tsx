@@ -112,7 +112,7 @@ export async function DevisBuilder(props: {
     ? await Promise.all([
         supabase
           .from("materiel_reference")
-          .select("id, nom, description, puissance_w, intensite_a, phase, connecteurs_puissance, connecteurs_data, poids_kg, dimensions")
+          .select("id, nom, description, puissance_w, intensite_a, phase, connecteurs_puissance, connecteurs_data, poids_kg, dimensions, cout_location_jour, fournisseur, remise_fournisseur_pct, tva_fournisseur_pct")
           .in("id", ligneRefIds),
         supabase
           .from("reservation_unite")
@@ -120,7 +120,7 @@ export async function DevisBuilder(props: {
           .eq("prestation_id", prestationId),
       ])
     : [{ data: [] }, { data: [] }];
-  type SpecRow = { id: string; nom: string; description: string | null; puissance_w: number | null; intensite_a: number | null; phase: string | null; connecteurs_puissance: string[] | null; connecteurs_data: string[] | null; poids_kg: number | null; dimensions: string | null };
+  type SpecRow = { id: string; nom: string; description: string | null; puissance_w: number | null; intensite_a: number | null; phase: string | null; connecteurs_puissance: string[] | null; connecteurs_data: string[] | null; poids_kg: number | null; dimensions: string | null; cout_location_jour: number | null; fournisseur: string | null; remise_fournisseur_pct: number | null; tva_fournisseur_pct: number | null };
   const reservesParRef = new Map<string, { id: string; numero_serie: string | null }[]>();
   for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null } | null }[]) {
     const u = r.unite;
@@ -137,6 +137,13 @@ export async function DevisBuilder(props: {
       connecteurs_puissance: s.connecteurs_puissance ?? [], connecteurs_data: s.connecteurs_data ?? [],
       poids_kg: s.poids_kg, dimensions: s.dimensions,
       reserves: reservesParRef.get(s.id) ?? [],
+      // Sous-location : matériel loué à un fournisseur (coût renseigné au catalogue).
+      sousLoc: s.cout_location_jour == null ? null : {
+        fournisseur: s.fournisseur,
+        coutHt: Number(s.cout_location_jour),
+        remisePct: Number(s.remise_fournisseur_pct ?? 0),
+        tvaPct: Number(s.tva_fournisseur_pct ?? 20),
+      },
     };
   }
 
@@ -174,7 +181,7 @@ export async function DevisBuilder(props: {
       {/* Colonne principale : catégories + transport + remise + marge */}
       <div className="min-w-0 flex-1 space-y-6">
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
-        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} />
+        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} coeffDuree={coeff} />
 
         {/* Remise globale */}
         <section>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { IconDownload } from "@/components/icons";
+import { SousLocationBadge, type SousLocInfo } from "@/components/sous-location-badge";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { urlDocument } from "@/lib/storage";
@@ -52,6 +53,23 @@ export default async function DocumentPage({
       supabase.from("parametres_entreprise").select("*").limit(1).maybeSingle(),
       supabase.from("devis_facture").select("*").eq("devis_id", devisId).eq("type", type).maybeSingle(),
     ]);
+
+  // Sous-location : matériel loué à un fournisseur. Repéré dans l'outil seulement
+  // (pastille masquée à l'impression et absente du PDF).
+  const refIds = [...new Set(((lignesData ?? []) as LigneRow[]).filter((l) => l.reference_id).map((l) => l.reference_id as string))];
+  const { data: refsCout } = refIds.length
+    ? await supabase.from("materiel_reference").select("id, fournisseur, cout_location_jour, remise_fournisseur_pct, tva_fournisseur_pct").in("id", refIds)
+    : { data: [] };
+  const sousLocParRef = new Map<string, SousLocInfo>();
+  for (const r of (refsCout ?? []) as { id: string; fournisseur: string | null; cout_location_jour: number | null; remise_fournisseur_pct: number | null; tva_fournisseur_pct: number | null }[]) {
+    if (r.cout_location_jour == null) continue;
+    sousLocParRef.set(r.id, {
+      fournisseur: r.fournisseur,
+      coutHt: Number(r.cout_location_jour),
+      remisePct: Number(r.remise_fournisseur_pct ?? 0),
+      tvaPct: Number(r.tva_fournisseur_pct ?? 20),
+    });
+  }
 
   if (!prest) notFound();
   const prestation = prest as unknown as {
@@ -208,7 +226,7 @@ export default async function DocumentPage({
           </thead>
           <tbody>
             {groupesTries.map(([nom, items]) => (
-              <DocGroup key={nom} nom={nom} items={items} />
+              <DocGroup key={nom} nom={nom} items={items} sousLoc={sousLocParRef} coeff={coeffDuree} />
             ))}
             {coeffDuree !== 1 && surchargeDuree !== 0 && (
               <tr className="border-b border-border/60">
@@ -271,7 +289,7 @@ export default async function DocumentPage({
   );
 }
 
-function DocGroup({ nom, items }: { nom: string; items: LigneRow[] }) {
+function DocGroup({ nom, items, sousLoc, coeff }: { nom: string; items: LigneRow[]; sousLoc: Map<string, SousLocInfo>; coeff: number }) {
   return (
     <>
       <tr className="bg-background/60">
@@ -284,6 +302,11 @@ function DocGroup({ nom, items }: { nom: string; items: LigneRow[] }) {
           <tr key={l.id} className="border-b border-border align-top">
             <td className="py-1.5">
               {l.designation}
+              {l.reference_id && sousLoc.get(l.reference_id) && (
+                <span className="ml-1 inline-flex align-middle">
+                  <SousLocationBadge sl={sousLoc.get(l.reference_id)!} quantite={l.quantite} coeff={coeff} />
+                </span>
+              )}
               {remise > 0 && (
                 <div className="italic text-muted">
                   Remise {l.remise_type === "montant" ? euros(l.remise_valeur) : `${l.remise_valeur}%`}

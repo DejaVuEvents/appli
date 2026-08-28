@@ -8,6 +8,7 @@ import { Modal } from "@/components/modal";
 import { LigneForm } from "./ligne-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IconInfo } from "@/components/icons";
+import { SousLocationBadge } from "@/components/sous-location-badge";
 import { euros } from "@/lib/format";
 import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel } from "./actions";
 
@@ -23,6 +24,8 @@ export type RefInfo = {
   connecteurs_puissance: string[]; connecteurs_data: string[];
   poids_kg: number | null; dimensions: string | null;
   reserves: { id: string; numero_serie: string | null }[];
+  /** Renseigné quand le matériel est loué à un fournisseur (sous-location). */
+  sousLoc?: { fournisseur: string | null; coutHt: number; remisePct: number; tvaPct: number } | null;
 };
 type Ref = { id: string; nom: string; prix_location_jour: number; cout_location_jour: number | null; categorie_id: string | null; est_consommable: boolean };
 type Cat = { id: string; nom: string; ordre?: number | null };
@@ -30,8 +33,8 @@ type Cat = { id: string; nom: string; ordre?: number | null };
 // Masque les petites flèches +/− natives des champs numériques (affichage plus léger).
 const NO_SPIN = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0";
 
-export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef }: {
-  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>;
+export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef, coeffDuree = 1 }: {
+  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>; coeffDuree?: number;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -220,6 +223,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                                 <FicheProduit info={infosRef[l.reference_id]} unitePrefix={`/u/`} />
                               </Modal>
                               {l.est_accessoire_auto && <span className="ml-0.5 shrink-0 text-xs text-muted">(accessoire)</span>}
+                              {infosRef[l.reference_id].sousLoc && <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} coeff={coeffDuree} />}
                             </span>
                           ) : (
                             <span className="min-w-0 flex-1 truncate text-sm">

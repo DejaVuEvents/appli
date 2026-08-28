@@ -57,3 +57,6 @@ export const IconMegaphone = (p: P) => (<svg {...base(p)}><path d="M3 11v2a1 1 0
 export const IconTicket = (p: P) => (<svg {...base(p)}><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z" /><path d="M14 6v12" strokeDasharray="2 2" /></svg>);
 export const IconGift = (p: P) => (<svg {...base(p)}><path d="M3 11h18v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" /><path d="M2 7h20v4H2zM12 7v14" /><path d="M12 7S10.5 3 8.5 3a2 2 0 0 0 0 4zM12 7s1.5-4 3.5-4a2 2 0 0 1 0 4z" /></svg>);
 export const IconTag = (p: P) => (<svg {...base(p)}><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg>);
+
+/** Sous-location : caisse de matériel loué à un fournisseur (flèche entrante). */
+export const IconSousLocation = (p: P) => (<svg {...base(p)}><path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5z" /><path d="M12 20v-8" /><path d="M3 8.5 12 13l9-4.5" /></svg>);

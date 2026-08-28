@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { FinanceTabs } from "../finance-tabs";
+import { InfoHint } from "@/components/info-hint";
 import { chargerNomenclature } from "@/lib/finance";
 import { PrevisionnelView, type PrevRow, type Recurrent } from "./previsionnel-view";
 
@@ -33,8 +34,10 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
     <div className="max-w-6xl">
       <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
-      <h2 className="mb-1 text-base font-semibold">Prévisionnel</h2>
-      <p className="mb-5 text-sm text-muted">Dépenses/recettes à venir : récurrentes (abonnements, assurance, frais bancaires…) et prévisions ponctuelles (devis signés, factures non payées, échéances).</p>
+      <h2 className="mb-4 text-base font-semibold">
+        Prévisionnel
+        <InfoHint text="Dépenses et recettes à venir : récurrentes (abonnements, assurance, frais bancaires…) et prévisions ponctuelles (devis signés, factures non payées, échéances fournisseurs, saisies manuelles)." />
+      </h2>
       <PrevisionnelView ponctuelles={ponctuelles} recurrents={recurrents} nomenclature={nomenclature as Record<string, Record<string, string[]>>} />
     </div>
   );

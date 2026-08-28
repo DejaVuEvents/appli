@@ -12,7 +12,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
     supabase.from("depense_recurrente").select("*").order("actif", { ascending: false }).order("nom"),
     supabase
       .from("ecriture_financiere")
-      .select("id, date, denomination, montant_ttc, sens, type, specification")
+      .select("id, date, denomination, montant_ttc, sens, type, specification, prestation_id, prestation:prestation_id(nom, client(nom))")
       .eq("statut", "previsionnel")
       .is("depense_recurrente_id", null)
       .order("date"),
@@ -20,7 +20,14 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
   ]);
 
   const recurrents = (recData ?? []) as Recurrent[];
-  const ponctuelles = (prevData ?? []) as PrevRow[];
+  const ponctuelles = ((prevData ?? []) as unknown as (PrevRow & {
+    prestation: { nom: string; client: { nom: string } | null } | null;
+  })[]).map((r) => ({
+    ...r,
+    prestationNom: r.prestation
+      ? `${r.prestation.nom}${r.prestation.client?.nom ? ` · ${r.prestation.client.nom}` : ""}`
+      : null,
+  })) as PrevRow[];
 
   return (
     <div className="max-w-6xl">

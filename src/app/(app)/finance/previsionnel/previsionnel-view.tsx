@@ -9,7 +9,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { euros, dateFr } from "@/lib/format";
 import { typeLabel } from "@/lib/finance";
 
-export type PrevRow = { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; type: string | null; specification: string | null };
+export type PrevRow = { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; type: string | null; specification: string | null; prestation_id?: string | null; prestationNom?: string | null };
 export type Recurrent = { id: string; nom: string; sens: string; montant_ttc: number; frequence: string; jour: number; mois: number | null; type: string | null; specification: string | null; actif: boolean };
 type Nomenclature = Record<string, Record<string, string[]>>;
 
@@ -143,6 +143,22 @@ function RecurrentsView({ recurrents, nomenclature, mensuelEquivalent }: { recur
   );
 }
 
+/** Regroupe les écritures d'une même prestation (recette + coûts) pour les relier visuellement. */
+function grouperParPrestation(list: PrevRow[]): { cle: string; nom: string | null; lignes: PrevRow[] }[] {
+  const parPresta = new Map<string, { cle: string; nom: string | null; lignes: PrevRow[] }>();
+  const seules: PrevRow[] = [];
+  for (const r of list) {
+    if (!r.prestation_id) { seules.push(r); continue; }
+    const g = parPresta.get(r.prestation_id) ?? { cle: r.prestation_id, nom: r.prestationNom ?? "Prestation", lignes: [] };
+    g.lignes.push(r);
+    parPresta.set(r.prestation_id, g);
+  }
+  const groupes = [...parPresta.values()]
+    // Une prestation avec une seule écriture n'a pas besoin d'encadré.
+    .map((g) => (g.lignes.length > 1 ? g : { ...g, nom: null }));
+  return seules.length ? [...groupes, { cle: "__autres", nom: null, lignes: seules }] : groupes;
+}
+
 function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature: Nomenclature }) {
   const [sens, setSens] = useState<"sortie" | "entree">("sortie");
   const [type, setType] = useState("");
@@ -204,18 +220,41 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
               <span className={net >= 0 ? "text-green-700" : "text-red-600"}>{net >= 0 ? "+" : ""}{euros(net)}</span>
             </div>
             <div className="divide-y divide-border">
-              {list.map((r) => (
-                <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{r.denomination ?? "—"}</div>
-                    <div className="text-xs text-muted">{dateFr(r.date)}{r.type ? ` · ${typeLabel(r.type)}` : ""}{r.specification ? ` / ${r.specification}` : ""}</div>
+              {grouperParPrestation(list).map((g) => {
+                const netGroupe = g.lignes.reduce((s2, r) => s2 + (r.sens === "entree" ? r.montant_ttc : -r.montant_ttc), 0);
+                const ligne = (r: PrevRow, indente: boolean) => (
+                  <div key={r.id} className={`flex items-center justify-between gap-3 py-2 text-sm ${indente ? "pl-4" : ""}`}>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{r.denomination ?? "—"}</div>
+                      <div className="text-xs text-muted">{dateFr(r.date)}{r.type ? ` · ${typeLabel(r.type)}` : ""}{r.specification ? ` / ${r.specification}` : ""}</div>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
+                      <Link href={`/finance/${r.id}?retour=previsionnel`} className="text-xs text-muted hover:text-primary">Modifier</Link>
+                    </span>
                   </div>
-                  <span className="flex shrink-0 items-center gap-3">
-                    <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
-                    <Link href={`/finance/${r.id}?retour=previsionnel`} className="text-xs text-muted hover:text-primary">Modifier</Link>
-                  </span>
-                </div>
-              ))}
+                );
+
+                // Écritures sans prestation : affichage simple, pas de regroupement.
+                if (!g.nom) return <div key={g.cle} className="px-4">{g.lignes.map((r) => ligne(r, false))}</div>;
+
+                // Écritures d'une même prestation : reliées visuellement (barre latérale + net).
+                return (
+                  <div key={g.cle} className="px-4 py-2">
+                    <div className="rounded-lg border-l-2 border-primary/50 bg-surface/40 py-1 pl-3 pr-1">
+                      <div className="flex items-center justify-between gap-3 pb-1 text-xs">
+                        <span className="truncate font-semibold text-muted">{g.nom}</span>
+                        <span className={`shrink-0 font-semibold ${netGroupe >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>
+                          net {netGroupe >= 0 ? "+" : ""}{euros(netGroupe)}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border/60">
+                        {g.lignes.map((r) => ligne(r, true))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );

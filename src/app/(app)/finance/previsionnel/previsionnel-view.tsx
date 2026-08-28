@@ -8,6 +8,7 @@ import { Modal, ModalForm } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { euros, dateFr } from "@/lib/format";
 import { typeLabel } from "@/lib/finance";
+import { CategorieIcon } from "@/components/categorie-icon";
 
 export type PrevRow = { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; type: string | null; specification: string | null; prestation_id?: string | null; prestationNom?: string | null };
 export type Recurrent = { id: string; nom: string; sens: string; montant_ttc: number; frequence: string; jour: number; mois: number | null; type: string | null; specification: string | null; actif: boolean };
@@ -110,7 +111,12 @@ function RecurrentsView({ recurrents, nomenclature, mensuelEquivalent }: { recur
             {recurrents.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-center text-muted">Aucune dépense récurrente. Ajoute-en une ci-dessous.</td></tr>}
             {recurrents.map((r) => (
               <tr key={r.id} className={r.actif ? "" : "opacity-50"}>
-                <td className="px-3 py-2 font-medium">{r.nom}</td>
+                <td className="px-3 py-2 font-medium">
+                  <span className="flex items-center gap-2.5">
+                    <CategorieIcon type={r.type} specification={r.specification} className="h-4 w-4 shrink-0 text-muted" />
+                    {r.nom}
+                  </span>
+                </td>
                 <td className="px-3 py-2 text-muted">{[typeLabel(r.type), r.specification].filter(Boolean).join(" / ") || "—"}</td>
                 <td className="px-3 py-2 text-muted">{r.frequence === "annuel" ? `Annuel (${MOIS[(r.mois ?? 1) - 1]}, le ${r.jour})` : `Mensuel (le ${r.jour})`}</td>
                 <td className={`px-3 py-2 text-right font-semibold tabular-nums ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</td>
@@ -224,9 +230,12 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
                 const netGroupe = g.lignes.reduce((s2, r) => s2 + (r.sens === "entree" ? r.montant_ttc : -r.montant_ttc), 0);
                 const ligne = (r: PrevRow, indente: boolean) => (
                   <div key={r.id} className={`flex items-center justify-between gap-3 py-2 text-sm ${indente ? "pl-4" : ""}`}>
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <CategorieIcon type={r.type} specification={r.specification} className="h-4 w-4 shrink-0 text-muted" />
+                      <div className="min-w-0">
                       <div className="truncate font-medium">{r.denomination ?? "—"}</div>
                       <div className="text-xs text-muted">{dateFr(r.date)}{r.type ? ` · ${typeLabel(r.type)}` : ""}{r.specification ? ` / ${r.specification}` : ""}</div>
+                      </div>
                     </div>
                     <span className="flex shrink-0 items-center gap-3">
                       <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>

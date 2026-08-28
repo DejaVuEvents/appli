@@ -44,3 +44,16 @@ export const IconArrowUpRight = (p: P) => (<svg {...base(p)}><path d="M7 17L17 7
 export const IconArrowDownRight = (p: P) => (<svg {...base(p)}><path d="M7 7l10 10M17 8v9H8" /></svg>);
 export const IconArrowsUpDown = (p: P) => (<svg {...base(p)}><path d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4" /></svg>);
 export const IconRobot = (p: P) => (<svg {...base(p)}><rect x="4" y="8" width="16" height="12" rx="2" /><path d="M12 4v4M9 14h.01M15 14h.01" /><circle cx="12" cy="3" r="1" /></svg>);
+
+// — Icônes de catégories financières —
+export const IconTruck = (p: P) => (<svg {...base(p)}><path d="M1 6h11v9H1z" /><path d="M12 9h4l3 3v3h-7z" /><circle cx="5" cy="18" r="1.8" /><circle cx="16" cy="18" r="1.8" /></svg>);
+export const IconCloud = (p: P) => (<svg {...base(p)}><path d="M17.5 18a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.5A3.75 3.75 0 0 0 6.5 18z" /></svg>);
+export const IconGlobe = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" /></svg>);
+export const IconBuilding = (p: P) => (<svg {...base(p)}><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /><path d="M16 9h2a2 2 0 0 1 2 2v10" /><path d="M8 7h4M8 11h4M8 15h4M2 21h20" /></svg>);
+export const IconShield = (p: P) => (<svg {...base(p)}><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></svg>);
+export const IconMusic = (p: P) => (<svg {...base(p)}><path d="M9 18V5l10-2v13" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></svg>);
+export const IconPalette = (p: P) => (<svg {...base(p)}><path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.7 1.5-1.5 0-1.4 1-2 2-2H17a4 4 0 0 0 4-4c0-5-4-10.5-9-10.5z" /><circle cx="8" cy="10" r="1" /><circle cx="12" cy="7.5" r="1" /><circle cx="16" cy="10" r="1" /></svg>);
+export const IconMegaphone = (p: P) => (<svg {...base(p)}><path d="M3 11v2a1 1 0 0 0 1 1h2l8 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M18 9a3.5 3.5 0 0 1 0 6" /></svg>);
+export const IconTicket = (p: P) => (<svg {...base(p)}><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z" /><path d="M14 6v12" strokeDasharray="2 2" /></svg>);
+export const IconGift = (p: P) => (<svg {...base(p)}><path d="M3 11h18v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" /><path d="M2 7h20v4H2zM12 7v14" /><path d="M12 7S10.5 3 8.5 3a2 2 0 0 0 0 4zM12 7s1.5-4 3.5-4a2 2 0 0 1 0 4z" /></svg>);
+export const IconTag = (p: P) => (<svg {...base(p)}><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg>);

@@ -9,6 +9,7 @@ import { JustificatifPreview } from "@/components/justificatif-preview";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { typeLabel, categorieManquante, NOMENCLATURE, type Nomenclature } from "@/lib/finance";
+import { CategorieIcon } from "@/components/categorie-icon";
 import { euros, dateFr } from "@/lib/format";
 import type { EcritureFinanciere } from "@/lib/types";
 
@@ -239,7 +240,9 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                           className="flex cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-surface/50"
                           onClick={() => setSelected(e)}
                         >
-                          <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <CategorieIcon type={e.type} specification={e.specification} className="h-4 w-4 shrink-0 text-muted" />
+                            <div className="min-w-0">
                             <div className="flex items-center gap-1.5 truncate font-medium">
                               {e.denomination ?? "(sans libellé)"}
                               {missingDoc && (
@@ -268,6 +271,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                             {e.notes && e.notes !== "Import BP 2026" && e.notes !== "Import historique" && (
                               <div className="text-[11px] italic text-muted">{e.notes}</div>
                             )}
+                            </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-3">
                             {factureUrl && (

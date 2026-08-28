@@ -17,14 +17,16 @@ type LigneCout = {
 /**
  * Coût de sous-location d'un devis, VENTILÉ PAR FOURNISSEUR.
  * Le tarif catalogue est HT : on applique d'abord la remise négociée (sur le HT),
- * puis la TVA — d'où coût = HT × (1 − remise%) × (1 + tva%), × quantité × coefficient.
+ * puis la TVA — d'où coût = HT × (1 − remise%) × (1 + tva%), × quantité.
+ *
+ * Le coefficient multi-jours du devis n'intervient PAS : c'est un multiplicateur
+ * commercial (ce qu'on facture au client). Le loueur applique son propre coefficient
+ * sur son devis à lui, déjà compris dans le tarif catalogue.
  */
 export async function coutSousLocationParFournisseur(
   supabase: SupabaseClient,
   devisId: string,
 ): Promise<Map<string, number>> {
-  const { data: d } = await supabase.from("devis").select("coefficient_duree").eq("id", devisId).maybeSingle();
-  const coeff = Number(d?.coefficient_duree ?? 0) > 0 ? Number(d!.coefficient_duree) : 1;
   const { data: lignes } = await supabase
     .from("ligne_prestation")
     .select("quantite, reference:materiel_reference(cout_location_jour, remise_fournisseur_pct, tva_fournisseur_pct, fournisseur)")
@@ -36,7 +38,7 @@ export async function coutSousLocationParFournisseur(
     if (!r || r.cout_location_jour == null) continue;
     const ht = Number(r.cout_location_jour) * (1 - Number(r.remise_fournisseur_pct ?? 0) / 100);
     const ttc = ht * (1 + Number(r.tva_fournisseur_pct ?? 20) / 100);
-    const montant = ttc * Number(l.quantite ?? 0) * coeff;
+    const montant = ttc * Number(l.quantite ?? 0);
     const cle = r.fournisseur?.trim() || "Sous-location";
     parFournisseur.set(cle, Math.round(((parFournisseur.get(cle) ?? 0) + montant) * 100) / 100);
   }

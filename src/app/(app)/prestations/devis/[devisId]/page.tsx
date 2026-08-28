@@ -455,7 +455,7 @@ export default async function DevisEditorPage({
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate font-medium">{l.designation}</span>
                       {l.reference_id && sousLocParRef.get(l.reference_id) && (
-                        <SousLocationBadge sl={sousLocParRef.get(l.reference_id)!} quantite={l.quantite} coeff={contenu.coefficientDuree} />
+                        <SousLocationBadge sl={sousLocParRef.get(l.reference_id)!} quantite={l.quantite} />
                       )}
                     </div>
                     <div className="text-xs text-muted">{l.quantite}{l.unite ? ` ${l.unite}` : ""} × {euros(l.prix_unitaire)}</div>

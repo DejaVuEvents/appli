@@ -33,8 +33,8 @@ type Cat = { id: string; nom: string; ordre?: number | null };
 // Masque les petites flèches +/− natives des champs numériques (affichage plus léger).
 const NO_SPIN = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0";
 
-export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef, coeffDuree = 1 }: {
-  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>; coeffDuree?: number;
+export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef }: {
+  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -223,7 +223,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                                 <FicheProduit info={infosRef[l.reference_id]} unitePrefix={`/u/`} />
                               </Modal>
                               {l.est_accessoire_auto && <span className="ml-0.5 shrink-0 text-xs text-muted">(accessoire)</span>}
-                              {infosRef[l.reference_id].sousLoc && <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} coeff={coeffDuree} />}
+                              {infosRef[l.reference_id].sousLoc && <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} />}
                             </span>
                           ) : (
                             <span className="min-w-0 flex-1 truncate text-sm">

@@ -181,7 +181,7 @@ export async function DevisBuilder(props: {
       {/* Colonne principale : catégories + transport + remise + marge */}
       <div className="min-w-0 flex-1 space-y-6">
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
-        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} coeffDuree={coeff} />
+        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} />
 
         {/* Remise globale */}
         <section>

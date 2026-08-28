@@ -19,12 +19,10 @@ export type { SousLocInfo };
 export function SousLocationBadge({
   sl,
   quantite,
-  coeff = 1,
   className = "h-3.5 w-3.5",
 }: {
   sl: SousLocInfo;
   quantite: number;
-  coeff?: number;
   className?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -32,8 +30,7 @@ export function SousLocationBadge({
 
   const remise = sl.coutHt * (1 - sl.remisePct / 100);
   const ttc = remise * (1 + sl.tvaPct / 100);
-  const c = coeff > 0 ? coeff : 1;
-  const total = ttc * (Number(quantite) || 0) * c;
+  const total = ttc * (Number(quantite) || 0);
 
   const ouvrir = () => {
     const r = ref.current?.getBoundingClientRect();
@@ -67,7 +64,7 @@ export function SousLocationBadge({
             )}
             <span className="block">TVA {sl.tvaPct} % → {euros(ttc)} TTC / unité</span>
             <span className="mt-1 block border-t border-border pt-1 font-medium text-foreground">
-              Coût de la ligne : {euros(total)} TTC{c !== 1 ? ` (× ${quantite} × coef ${c})` : ` (× ${quantite})`}
+              Coût de la ligne : {euros(total)} TTC (× {quantite})
             </span>
           </span>,
           document.body,

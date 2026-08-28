@@ -214,7 +214,7 @@ export default async function DocumentPage({
           </thead>
           <tbody>
             {groupesTries.map(([nom, items]) => (
-              <DocGroup key={nom} nom={nom} items={items} sousLoc={sousLocParRef} coeff={coeffDuree} />
+              <DocGroup key={nom} nom={nom} items={items} sousLoc={sousLocParRef} />
             ))}
             {coeffDuree !== 1 && surchargeDuree !== 0 && (
               <tr className="border-b border-border/60">
@@ -277,7 +277,7 @@ export default async function DocumentPage({
   );
 }
 
-function DocGroup({ nom, items, sousLoc, coeff }: { nom: string; items: LigneRow[]; sousLoc: Map<string, SousLocInfo>; coeff: number }) {
+function DocGroup({ nom, items, sousLoc }: { nom: string; items: LigneRow[]; sousLoc: Map<string, SousLocInfo> }) {
   return (
     <>
       <tr className="bg-background/60">
@@ -292,7 +292,7 @@ function DocGroup({ nom, items, sousLoc, coeff }: { nom: string; items: LigneRow
               {l.designation}
               {l.reference_id && sousLoc.get(l.reference_id) && (
                 <span className="ml-1 inline-flex align-middle">
-                  <SousLocationBadge sl={sousLoc.get(l.reference_id)!} quantite={l.quantite} coeff={coeff} />
+                  <SousLocationBadge sl={sousLoc.get(l.reference_id)!} quantite={l.quantite} />
                 </span>
               )}
               {remise > 0 && (

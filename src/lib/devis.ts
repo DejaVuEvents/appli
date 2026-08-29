@@ -72,26 +72,42 @@ export function prixLigne({
 }
 
 /** Totaux d'un devis/facture (sous-total brut, remise HT cumulée, total HT). */
+/**
+ * Total d'un devis à partir du net des lignes (transport compris).
+ * Ordre de calcul : on applique D'ABORD le coefficient multi-jours, PUIS la remise
+ * globale — une remise de 200 € retire donc bien 200 € du prix final affiché.
+ */
+export function totalApresCoeffEtRemise(
+  netAvecTransport: number,
+  remiseType: RemiseType,
+  remiseValeur: number,
+  coefficientDuree = 1,
+): number {
+  const coeff = coefficientDuree > 0 ? coefficientDuree : 1;
+  const apresCoeff = round2(netAvecTransport * coeff);
+  return round2(apresCoeff - montantRemise(apresCoeff, remiseType, remiseValeur));
+}
+
 export function calculerTotaux(args: {
   lignes: { prix_unitaire: number | null; quantite: number; prix_total: number | null }[];
   transportTotal: number;
   remiseGlobaleType: RemiseType;
   remiseGlobaleValeur: number;
-  /** Coefficient multi-jours appliqué au TOTAL (après remises). Défaut 1. */
+  /** Coefficient multi-jours, appliqué AVANT la remise globale. Défaut 1. */
   coefficientDuree?: number;
 }): { sousTotalHT: number; remiseHT: number; totalHT: number } {
   const coeff = args.coefficientDuree && args.coefficientDuree > 0 ? args.coefficientDuree : 1;
-  // On calcule tout à 1 jour, puis on multiplie le total final par le coefficient :
-  // ainsi « coef 1,5 sur un devis à 2000 € » donne bien 3000 € (la remise globale
-  // fixe est prise en compte AVANT le coefficient, pas court-circuitée).
+  // Le coefficient multiplie d'abord les lignes, la remise globale se déduit ensuite
+  // du montant obtenu : une remise de 200 € retire 200 € du prix final.
   const sousTotalBrut = args.lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
   const netLignes = args.lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
-  const base = netLignes + args.transportTotal;
-  const remiseGlobale = montantRemise(base, args.remiseGlobaleType, args.remiseGlobaleValeur);
-  const sousTotalHT1j = sousTotalBrut + args.transportTotal;
-  const totalHT1j = base - remiseGlobale;
-  const sousTotalHT = round2(sousTotalHT1j * coeff);
-  const totalHT = round2(totalHT1j * coeff);
+  const sousTotalHT = round2((sousTotalBrut + args.transportTotal) * coeff);
+  const totalHT = totalApresCoeffEtRemise(
+    netLignes + args.transportTotal,
+    args.remiseGlobaleType,
+    args.remiseGlobaleValeur,
+    coeff,
+  );
   return { sousTotalHT, remiseHT: round2(sousTotalHT - totalHT), totalHT };
 }
 

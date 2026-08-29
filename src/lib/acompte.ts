@@ -2,11 +2,11 @@
 // c'est-à-dire « total actuel du devis source − somme des autres factures filles ».
 // Sert à détecter qu'un devis a été modifié après le découpage (matériel ajouté).
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { montantRemise, type RemiseType } from "@/lib/devis";
+import { montantRemise, totalApresCoeffEtRemise, type RemiseType } from "@/lib/devis";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Total actuel d'un devis (lignes + transport − remise globale) × coefficient durée. */
+/** Total actuel d'un devis : (lignes + transport) × coefficient, puis remise globale. */
 export async function totalDevis(supabase: SupabaseClient, devisId: string): Promise<number> {
   const { data: d } = await supabase
     .from("devis")
@@ -23,7 +23,7 @@ export async function totalDevis(supabase: SupabaseClient, devisId: string): Pro
     (trs ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
   const remise = montantRemise(net, d.remise_globale_type as RemiseType, Number(d.remise_globale_valeur ?? 0));
   const coeff = Number(d.coefficient_duree ?? 0) > 0 ? Number(d.coefficient_duree) : 1;
-  return r2((net - remise) * coeff);
+  return totalApresCoeffEtRemise(net, d.remise_globale_type as RemiseType, Number(d.remise_globale_valeur ?? 0), coeff);
 }
 
 export type EcartSolde = {

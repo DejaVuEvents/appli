@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
-import { montantLigne, coutTransport, periodeReservation, montantRemise, type RemiseType } from "@/lib/devis";
+import { montantLigne, coutTransport, periodeReservation, montantRemise, totalApresCoeffEtRemise, type RemiseType } from "@/lib/devis";
 import { BUCKET_PRIVE } from "@/lib/storage";
 import { extraireMaterielPdf } from "@/lib/gemini";
 import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
@@ -88,10 +88,9 @@ export async function creerAcompteSolde(devisId: string, formData: FormData) {
     supabase.from("transport").select("cout_calcule").eq("devis_id", devisId),
   ]);
   const net = (ls ?? []).reduce((s, l) => s + Number(l.prix_total ?? 0), 0) + (trs ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
-  const remise = montantRemise(net, base.remise_globale_type as RemiseType, Number(base.remise_globale_valeur ?? 0));
-  // Le coefficient multi-jours multiplie le total final : acompte + solde doivent le refléter.
+  // Coefficient multi-jours puis remise globale : acompte + solde doivent le refléter.
   const coeff = Number(base.coefficient_duree ?? 0) > 0 ? Number(base.coefficient_duree) : 1;
-  const totalHT = Math.round((net - remise) * coeff * 100) / 100;
+  const totalHT = totalApresCoeffEtRemise(net, base.remise_globale_type as RemiseType, Number(base.remise_globale_valeur ?? 0), coeff);
   const montantAcompte = mode === "montant"
     ? Math.round(Math.min(Math.max(saisi, 0), totalHT) * 100) / 100
     : Math.round((totalHT * Math.min(Math.max(saisi, 0), 100)) / 100 * 100) / 100;

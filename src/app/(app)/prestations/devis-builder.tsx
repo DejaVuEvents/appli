@@ -16,6 +16,8 @@ import {
 } from "./actions";
 import { euros, dateFr } from "@/lib/format";
 import { montantRemise } from "@/lib/devis";
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
 import { BUCKETS, ORDRE_BUCKETS, bucketPour } from "@/lib/devis-buckets";
 import type { LignePrestation, PrestationStatut, Devis } from "@/lib/types";
 
@@ -164,14 +166,14 @@ export async function DevisBuilder(props: {
   const margeExterne = revenusExterne - coutFournisseurTotal;
   const hasMargeFournisseur = coutFournisseurTotal > 0;
 
-  // Totaux calculés à 1 jour puis multipliés par le coefficient (coef × total final).
+  // Coefficient multi-jours d'abord, remise globale ensuite.
   const sousTotalBrut = lignes.reduce((s, l) => s + Number(l.prix_unitaire ?? 0) * l.quantite, 0);
   const netLignes = lignes.reduce((s, l) => s + Number(l.prix_total ?? 0), 0);
   const transportTotal = transports.reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
-  const baseGlobale = netLignes + transportTotal;
+  const baseGlobale = round2((netLignes + transportTotal) * coeff);
   const remiseGlobale = montantRemise(baseGlobale, devis.remise_globale_type, devis.remise_globale_valeur);
   const sousTotalHT = (sousTotalBrut + transportTotal) * coeff;
-  const totalHT = (baseGlobale - remiseGlobale) * coeff;
+  const totalHT = baseGlobale - remiseGlobale;
   const remiseHT = sousTotalHT - totalHT;
 
   const totalTtc = Math.round(totalHT * (1 + tauxTva / 100) * 100) / 100;
@@ -211,7 +213,7 @@ export async function DevisBuilder(props: {
                 className="sm:col-span-1"
               />
               <div className="sm:col-span-2 text-xs text-muted">
-                Multiplie le total HT du devis (remises incluses).{" "}
+                Multiplie les lignes avant la remise globale (la remise se déduit du montant obtenu).{" "}
                 <span className="text-foreground">Événement sur {nbJoursEvenement} jour{nbJoursEvenement > 1 ? "s" : ""}</span> → coefficient suggéré{" "}
                 <span className="font-medium text-foreground">×{coefficientAuto}</span>.
                 {devis.coefficient_duree != null && Number(devis.coefficient_duree) !== coefficientAuto && (

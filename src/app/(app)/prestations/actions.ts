@@ -142,6 +142,20 @@ export async function importerDocumentPdf(formData: FormData) {
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) throw new Error("Sélectionne un fichier PDF.");
 
+  // Le numéro d'un document importé est saisi à la main : il ne passe pas par le
+  // compteur. On vérifie donc qu'il n'entre pas en collision avec un numéro déjà émis
+  // (rien ne l'empêche côté base : `devis_facture.numero` n'est pas unique).
+  if (numero) {
+    const { data: collision } = await supabase
+      .from("devis_facture")
+      .select("id, type")
+      .eq("numero", numero)
+      .maybeSingle();
+    if (collision) {
+      throw new Error(`Le numéro ${numero} est déjà utilisé par un autre document (${collision.type}). Corrige-le avant d'importer.`);
+    }
+  }
+
   // 1) Upload du PDF dans le bucket privé.
   const ext = file.name.split(".").pop() ?? "pdf";
   const path = `imports/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;

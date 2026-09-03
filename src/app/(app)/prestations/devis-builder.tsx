@@ -110,7 +110,7 @@ export async function DevisBuilder(props: {
 
   // Fiche produit au clic sur une ligne : specs techniques + unités réservées pour l'événement.
   const ligneRefIds = [...new Set(lignes.filter((l) => l.reference_id).map((l) => l.reference_id as string))];
-  const [{ data: specsData }, { data: resData }] = ligneRefIds.length
+  const [{ data: specsData }, { data: resData }, { data: unitesData }] = ligneRefIds.length
     ? await Promise.all([
         supabase
           .from("materiel_reference")
@@ -120,8 +120,13 @@ export async function DevisBuilder(props: {
           .from("reservation_unite")
           .select("unite:unite(id, reference_id, numero_serie)")
           .eq("prestation_id", prestationId),
+        supabase
+          .from("unite")
+          .select("id, reference_id, numero_serie, etat")
+          .in("reference_id", ligneRefIds)
+          .order("created_at"),
       ])
-    : [{ data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }];
   type SpecRow = { id: string; nom: string; description: string | null; puissance_w: number | null; intensite_a: number | null; phase: string | null; connecteurs_puissance: string[] | null; connecteurs_data: string[] | null; poids_kg: number | null; dimensions: string | null; cout_location_jour: number | null; fournisseur: string | null; remise_fournisseur_pct: number | null; tva_fournisseur_pct: number | null };
   const reservesParRef = new Map<string, { id: string; numero_serie: string | null }[]>();
   for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null } | null }[]) {
@@ -131,6 +136,15 @@ export async function DevisBuilder(props: {
     arr.push({ id: u.id, numero_serie: u.numero_serie });
     reservesParRef.set(u.reference_id, arr);
   }
+  // Toutes les unités de chaque référence (pas seulement celles réservées) : la fiche
+  // doit montrer le parc complet et signaler celles retenues pour cet événement.
+  const unitesParRef = new Map<string, { id: string; numero_serie: string | null; etat: string }[]>();
+  for (const u of (unitesData ?? []) as { id: string; reference_id: string; numero_serie: string | null; etat: string }[]) {
+    const arr = unitesParRef.get(u.reference_id) ?? [];
+    arr.push({ id: u.id, numero_serie: u.numero_serie, etat: u.etat });
+    unitesParRef.set(u.reference_id, arr);
+  }
+
   const infosRef: Record<string, RefInfo> = {};
   for (const s of (specsData ?? []) as SpecRow[]) {
     infosRef[s.id] = {
@@ -139,6 +153,7 @@ export async function DevisBuilder(props: {
       connecteurs_puissance: s.connecteurs_puissance ?? [], connecteurs_data: s.connecteurs_data ?? [],
       poids_kg: s.poids_kg, dimensions: s.dimensions,
       reserves: reservesParRef.get(s.id) ?? [],
+      unites: unitesParRef.get(s.id) ?? [],
       // Sous-location : matériel loué à un fournisseur (coût renseigné au catalogue).
       sousLoc: s.cout_location_jour == null ? null : {
         fournisseur: s.fournisseur,

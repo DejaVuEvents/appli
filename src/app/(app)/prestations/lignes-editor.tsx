@@ -7,9 +7,10 @@ import { Card } from "@/components/ui";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { LigneForm } from "./ligne-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { IconInfo, IconHorsCatalogue } from "@/components/icons";
+import { IconHorsCatalogue } from "@/components/icons";
 import { SousLocationBadge } from "@/components/sous-location-badge";
 import { euros } from "@/lib/format";
+import { ETAT_LABELS, type EtatUnite } from "@/lib/types";
 import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel, lierLigneAuCatalogue } from "./actions";
 
 export type LigneData = {
@@ -24,6 +25,8 @@ export type RefInfo = {
   connecteurs_puissance: string[]; connecteurs_data: string[];
   poids_kg: number | null; dimensions: string | null;
   reserves: { id: string; numero_serie: string | null }[];
+  /** Parc complet de la référence, états compris. */
+  unites?: { id: string; numero_serie: string | null; etat: string }[];
   /** Renseigné quand le matériel est loué à un fournisseur (sous-location). */
   sousLoc?: { fournisseur: string | null; coutHt: number; remisePct: number; tvaPct: number } | null;
 };
@@ -213,27 +216,30 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                           <button type="button" onPointerDown={(e) => onDown(e, l.id, catKey(b))}
                             className="w-4 shrink-0 cursor-grab touch-none text-center text-muted opacity-0 transition-opacity hover:text-foreground active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-100" title="Déplacer" aria-label="Déplacer">⠿</button>
                           {/* Désignation — cliquable pour la fiche produit si liée au catalogue */}
-                          {l.reference_id && infosRef[l.reference_id] ? (
-                            <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
-                              <Modal
-                                trigger={<span className="inline-flex min-w-0 items-center gap-1"><span className="truncate">{l.designation}</span><IconInfo className="h-3.5 w-3.5 shrink-0 opacity-50" /></span>}
-                                title={infosRef[l.reference_id].nom}
-                                triggerClassName="min-w-0 max-w-full text-left hover:text-primary"
-                              >
+                          {/* Toute la ligne ouvre la fiche : caractéristiques et unités si elle
+                              est reliée au catalogue, rattachement à faire sinon. */}
+                          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+                            <Modal
+                              trigger={<span className="block truncate">{l.designation}</span>}
+                              title={l.designation ?? "Ligne du devis"}
+                              triggerTitle="Voir la fiche"
+                              triggerClassName="min-w-0 max-w-full text-left hover:text-primary"
+                              panelClassName="max-w-lg"
+                            >
+                              {l.reference_id && infosRef[l.reference_id] ? (
                                 <FicheProduit info={infosRef[l.reference_id]} unitePrefix={`/u/`} />
-                              </Modal>
-                              {l.est_accessoire_auto && <span className="ml-0.5 shrink-0 text-xs text-muted">(accessoire)</span>}
-                              {infosRef[l.reference_id].sousLoc && <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} />}
-                            </span>
-                          ) : (
-                            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-                              <span className="truncate">{l.designation}</span>
-                              {l.est_accessoire_auto && <span className="shrink-0 text-xs text-muted">(accessoire)</span>}
-                              {!l.reference_id && (
+                              ) : (
                                 <LierAuCatalogue prestationId={prestationId} ligne={l} references={references} />
                               )}
-                            </span>
-                          )}
+                            </Modal>
+                            {l.est_accessoire_auto && <span className="shrink-0 text-xs text-muted">(accessoire)</span>}
+                            {l.reference_id && infosRef[l.reference_id]?.sousLoc && (
+                              <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} />
+                            )}
+                            {!l.reference_id && (
+                              <IconHorsCatalogue className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-label="Hors catalogue" />
+                            )}
+                          </span>
                           {/* Qté (pas de 1) */}
                           <span className="flex w-16 shrink-0 justify-end"><InlineNum l={l} champ="quantite" val={l.quantite} w="w-12" step="1" /></span>
                           {/* P.U. HT */}
@@ -322,17 +328,35 @@ function FicheProduit({ info, unitePrefix }: { info: RefInfo; unitePrefix: strin
       )}
 
       <div>
-        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Unités réservées pour cet événement</div>
-        {info.reserves.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {info.reserves.map((u) => (
-              <Link key={u.id} href={`${unitePrefix}${u.id}`} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:underline">
-                {u.numero_serie || "unité"}
-              </Link>
-            ))}
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+          Unités associées{info.unites?.length ? ` (${info.unites.length})` : ""}
+        </div>
+        {info.unites && info.unites.length > 0 ? (
+          <div className="divide-y divide-border rounded-lg border border-border">
+            {info.unites.map((u) => {
+              const reservee = info.reserves.some((r) => r.id === u.id);
+              return (
+                <div key={u.id} className="flex items-center gap-2 px-2.5 py-1.5 text-xs">
+                  <Link href={`${unitePrefix}${u.id}`} className="min-w-0 flex-1 truncate hover:underline">
+                    {u.numero_serie || "Sans n° de série"}
+                  </Link>
+                  <span className="shrink-0 text-muted">{ETAT_LABELS[u.etat as EtatUnite] ?? u.etat}</span>
+                  {reservee && (
+                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                      réservée
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <p className="text-xs text-muted">Aucune unité encore réservée (vérifie la disponibilité / les dates de l&apos;événement).</p>
+          <p className="text-xs text-muted">Aucune unité enregistrée au catalogue pour cette référence.</p>
+        )}
+        {info.unites && info.unites.length > 0 && info.reserves.length === 0 && (
+          <p className="mt-1.5 text-xs text-muted">
+            Aucune n&apos;est réservée pour cet événement — vérifie la disponibilité et les dates.
+          </p>
         )}
       </div>
     </div>
@@ -340,9 +364,8 @@ function FicheProduit({ info, unitePrefix }: { info: RefInfo; unitePrefix: strin
 }
 
 /**
- * Pastille « ? » cliquable : ouvre le choix d'une référence du catalogue pour une ligne
- * saisie librement. Tant qu'elle n'est reliée à rien, la ligne est ignorée par le plan de
- * levage, le plan électrique et la réservation d'unités.
+ * Contenu affiché quand on ouvre une ligne saisie librement : explication de ce qu'elle
+ * empêche, et choix de la référence catalogue à lui associer.
  */
 function LierAuCatalogue({
   prestationId,
@@ -355,23 +378,22 @@ function LierAuCatalogue({
 }) {
   const [q, setQ] = useState("");
   const recherche = q.trim().toLowerCase();
-  // Sans recherche, on propose les références dont le nom ressemble à la désignation.
+  // Sans recherche, on propose les références dont le nom reprend des mots de la désignation.
   const mots = (ligne.designation ?? "").toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((m) => m.length > 3);
   const liste = recherche
     ? references.filter((r) => r.nom.toLowerCase().includes(recherche)).slice(0, 60)
     : references.filter((r) => mots.some((m) => r.nom.toLowerCase().includes(m))).slice(0, 20);
 
   return (
-    <Modal
-      trigger={<IconHorsCatalogue className="h-3.5 w-3.5 text-amber-600" />}
-      triggerTitle="Hors catalogue — cliquer pour relier à une référence"
-      triggerClassName="shrink-0 rounded p-0.5 hover:bg-background"
-      title="Relier au catalogue"
-      panelClassName="max-w-lg"
-    >
+    <div>
+      <p className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+        <IconHorsCatalogue className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          Ligne saisie librement, sans référence derrière : elle n&apos;apparaît ni dans le plan de
+          levage, ni dans le plan électrique, et ne réserve aucune unité.
+        </span>
+      </p>
       <p className="mb-3 text-sm text-muted">
-        <strong className="text-foreground">{ligne.designation}</strong> est saisie librement : elle
-        n&apos;apparaît ni dans le plan de levage, ni dans le plan électrique, et ne réserve aucune unité.
         Choisis la référence correspondante — la désignation et le prix de la ligne ne changent pas.
       </p>
       <input
@@ -403,6 +425,6 @@ function LierAuCatalogue({
         </div>
         <div className="mt-3"><ModalCancelButton /></div>
       </ModalForm>
-    </Modal>
+    </div>
   );
 }

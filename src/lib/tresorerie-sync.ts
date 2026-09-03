@@ -193,3 +193,74 @@ export async function synchroniserEcritureDevisSigne(supabase: SupabaseClient, d
   const obsoletes = dejaLa.filter((x) => !gardes.has(x.id)).map((x) => x.id);
   if (obsoletes.length) await supabase.from("ecriture_financiere").delete().in("id", obsoletes);
 }
+
+/**
+ * Alimente la trésorerie depuis une facture IMPORTÉE, sans jamais créer de doublon.
+ *
+ * Une facture déjà réglée a normalement son encaissement dans le journal (sync Qonto).
+ * Créer en plus une écriture prévisionnelle gonflerait le prévisionnel d'un montant
+ * fantôme — c'est ce qui se passait jusqu'ici. On cherche donc d'abord un mouvement
+ * RÉEL du même montant, non encore rattaché à un document, dans une fenêtre autour de
+ * la date de facture ; on s'y rattache s'il existe, sinon on crée la prévision.
+ *
+ * Renvoie ce qui a été fait, pour pouvoir l'annoncer à l'utilisateur.
+ */
+export async function rattacherOuCreerEcritureFacture(
+  supabase: SupabaseClient,
+  args: {
+    factureId: string;
+    prestationId: string;
+    numero: string;
+    montant: number;
+    date: string | null;
+    createdBy: string | null;
+  },
+): Promise<"rattachee" | "creee" | "ignoree"> {
+  const { factureId, prestationId, numero, montant, date, createdBy } = args;
+  if (!montant) return "ignoree"; // facture annulée / à 0 € : rien à comptabiliser
+
+  const ref = date ?? new Date().toISOString().slice(0, 10);
+  const jour = 86400000;
+  // Un règlement arrive après la facture, mais un acompte peut la précéder.
+  const debut = new Date(new Date(ref).getTime() - 15 * jour).toISOString().slice(0, 10);
+  const fin = new Date(new Date(ref).getTime() + 150 * jour).toISOString().slice(0, 10);
+
+  const { data: candidates } = await supabase
+    .from("ecriture_financiere")
+    .select("id, date")
+    .eq("statut", "reel")
+    .eq("sens", montant < 0 ? "sortie" : "entree")
+    .eq("montant_ttc", montant < 0 ? -montant : montant)
+    .is("devis_facture_id", null)
+    .gte("date", debut)
+    .lte("date", fin);
+
+  const liste = (candidates ?? []) as { id: string; date: string }[];
+  if (liste.length > 0) {
+    // La plus proche de la date de facture.
+    const ecart = (d: string) => Math.abs(new Date(d).getTime() - new Date(ref).getTime());
+    const meilleure = liste.reduce((a, b) => (ecart(b.date) < ecart(a.date) ? b : a));
+    await supabase
+      .from("ecriture_financiere")
+      .update({ devis_facture_id: factureId, prestation_id: prestationId })
+      .eq("id", meilleure.id);
+    // Le mouvement est réel : la facture est donc encaissée.
+    await supabase.from("devis_facture").update({ statut_paiement: "paye" }).eq("id", factureId);
+    return "rattachee";
+  }
+
+  await supabase.from("ecriture_financiere").insert({
+    date: ref,
+    denomination: `Facture N° ${numero}`,
+    type: "Prestation_Tech",
+    specification: "Location de matériel",
+    sens: montant < 0 ? "sortie" : "entree",
+    statut: "previsionnel",
+    montant_ttc: montant < 0 ? -montant : montant,
+    prestation_id: prestationId,
+    devis_facture_id: factureId,
+    valide: false,
+    created_by: createdBy,
+  });
+  return "creee";
+}

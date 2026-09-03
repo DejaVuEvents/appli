@@ -213,9 +213,21 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
     </div>
   );
 
+  // Une prévision dont la date est passée n'a pas eu lieu à la date prévue : soit elle
+  // est à repousser, soit l'opération a eu lieu et doit passer en réel. On la signale.
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const nbEchues = rows.filter((r) => r.date < aujourdhui).length;
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">{formulaire}</div>
+      <div className="flex items-center justify-between gap-3">
+        {nbEchues > 0 ? (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+            <strong>{nbEchues}</strong> prévision{nbEchues > 1 ? "s" : ""} dont la date est dépassée — à repousser, ou à passer en réel si l&apos;opération a eu lieu.
+          </p>
+        ) : <span />}
+        {formulaire}
+      </div>
       {entries.map(([mk, list]) => {
         const [y, m] = mk.split("-");
         const net = list.reduce((s, r) => s + (r.sens === "entree" ? r.montant_ttc : -r.montant_ttc), 0);
@@ -228,21 +240,27 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
             <div className="divide-y divide-border">
               {grouperParPrestation(list).map((g) => {
                 const netGroupe = g.lignes.reduce((s2, r) => s2 + (r.sens === "entree" ? r.montant_ttc : -r.montant_ttc), 0);
-                const ligne = (r: PrevRow, indente: boolean) => (
-                  <div key={r.id} className={`flex items-center justify-between gap-3 py-2 text-sm ${indente ? "pl-4" : ""}`}>
+                const ligne = (r: PrevRow, indente: boolean) => {
+                  const echue = r.date < aujourdhui;
+                  return (
+                  <div key={r.id} className={`flex items-center justify-between gap-3 py-2 text-sm ${indente ? "pl-4" : ""} ${echue ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <CategorieIcon type={r.type} specification={r.specification} className="h-4 w-4 shrink-0 text-muted" />
+                      <CategorieIcon type={r.type} specification={r.specification} className={`h-4 w-4 shrink-0 ${echue ? "text-amber-600 dark:text-amber-500" : "text-muted"}`} />
                       <div className="min-w-0">
                       <div className="truncate font-medium">{r.denomination ?? "—"}</div>
-                      <div className="text-xs text-muted">{dateFr(r.date)}{r.type ? ` · ${typeLabel(r.type)}` : ""}{r.specification ? ` / ${r.specification}` : ""}</div>
+                      <div className="text-xs text-muted">
+                        <span className={echue ? "font-medium text-amber-700 dark:text-amber-500" : ""}>{dateFr(r.date)}{echue ? " · échue" : ""}</span>
+                        {r.type ? ` · ${typeLabel(r.type)}` : ""}{r.specification ? ` / ${r.specification}` : ""}
+                      </div>
                       </div>
                     </div>
                     <span className="flex shrink-0 items-center gap-3">
                       <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
-                      <Link href={`/finance/${r.id}?retour=previsionnel`} className="text-xs text-muted hover:text-primary">Modifier</Link>
+                      <Link href={`/finance/${r.id}?retour=previsionnel`} className={`text-xs hover:text-primary ${echue ? "font-medium text-amber-700 dark:text-amber-500" : "text-muted"}`}>Modifier</Link>
                     </span>
                   </div>
-                );
+                  );
+                };
 
                 // Écritures sans prestation : affichage simple, pas de regroupement.
                 if (!g.nom) return <div key={g.cle} className="px-4">{g.lignes.map((r) => ligne(r, false))}</div>;

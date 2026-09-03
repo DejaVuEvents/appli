@@ -9,7 +9,7 @@ import { extraireMaterielPdf } from "@/lib/gemini";
 import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
 import { ROLES_MEMBRE } from "@/lib/roles";
 import { coutKmVehicule } from "@/lib/vehicule";
-import { synchroniserEcritureDevisSigne } from "@/lib/tresorerie-sync";
+import { synchroniserEcritureDevisSigne, rattacherOuCreerEcritureFacture } from "@/lib/tresorerie-sync";
 import { ecartSolde } from "@/lib/acompte";
 
 function num(v: FormDataEntryValue | null): number | null {
@@ -187,6 +187,8 @@ export async function importerDocumentPdf(formData: FormData) {
       prix_total: montant, est_accessoire_auto: false,
     });
   }
+  let resultatEcriture: "rattachee" | "creee" | "ignoree" = "ignoree";
+
   // 4) Document émis : on enregistre le numéro d'origine. Sans cette ligne, une émission
   //    ultérieure depuis l'outil attribuerait un NOUVEAU numéro par-dessus celui de Tiime.
   if (type === "devis" && devis) {
@@ -202,24 +204,20 @@ export async function importerDocumentPdf(formData: FormData) {
       montant_ht: montant ?? 0, taux_tva: 0, montant_ttc: montant ?? 0,
       date_emission: date, statut_paiement: "en_attente",
     }).select("id").single();
-    // Une facture importée alimente la trésorerie comme une facture émise (entrée
-    // prévisionnelle, à valider), dès lors qu'elle a un numéro et un montant.
+    // Trésorerie : on se rattache à l'encaissement réel s'il existe déjà (facture
+    // ancienne, déjà réglée et synchronisée depuis Qonto), sinon on crée la prévision.
     if (df && numeroNorm && montant) {
       const { data: { user: u2 } } = await supabase.auth.getUser();
-      await supabase.from("ecriture_financiere").insert({
-        date: date ?? new Date().toISOString().slice(0, 10),
-        denomination: `Facture N° ${numeroNorm}`,
-        type: "Prestation_Tech", specification: "Location de matériel",
-        sens: "entree", statut: "previsionnel", montant_ttc: montant,
-        prestation_id: prest.id, devis_facture_id: df.id, valide: false,
-        created_by: u2?.id ?? null,
+      resultatEcriture = await rattacherOuCreerEcritureFacture(supabase, {
+        factureId: df.id, prestationId: prest.id, numero: numeroNorm,
+        montant, date, createdBy: u2?.id ?? null,
       });
       revaliderTresorerie();
     }
   }
 
   revalidatePath("/prestations");
-  redirect(`/prestations?tab=${type === "facture" ? "factures" : "devis"}`);
+  redirect(`/prestations?tab=${type === "facture" ? "factures" : "devis"}&import=${resultatEcriture}`);
 }
 
 /**

@@ -50,10 +50,17 @@ type DevisDocRow = {
 export default async function PrestationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; import?: string }>;
 }) {
   const sp = await searchParams;
   const tab = sp?.tab === "factures" ? "factures" : "devis";
+  // Retour d'import : dit si l'encaissement existant a été retrouvé ou si une prévision
+  // a été créée — sans quoi on ne sait pas si la trésorerie vient d'être gonflée.
+  const messageImport =
+    sp?.import === "rattachee" ? "Document importé et rattaché à l'encaissement déjà présent au journal — aucune écriture créée en double."
+    : sp?.import === "creee" ? "Document importé. Aucun encaissement correspondant au journal : une entrée prévisionnelle a été créée, à valider."
+    : sp?.import === "ignoree" ? "Document importé. Montant nul ou numéro absent : rien n'a été ajouté à la trésorerie."
+    : null;
 
   const supabase = await createClient();
 
@@ -157,6 +164,10 @@ export default async function PrestationsPage({
         action={action}
       />
       <SubTabs tab={tab} />
+
+      {messageImport && (
+        <p className="mb-4 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted">{messageImport}</p>
+      )}
 
       {docs.length === 0 ? (
         <EmptyState

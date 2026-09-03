@@ -7,7 +7,8 @@ import { Tooltip } from "@/components/tooltip";
  *  Si `label` est fourni, le déclencheur est un bouton texte ; sinon une icône œil. */
 export function JustificatifPreview({ url, libelle, label, className }: { url: string; libelle?: string | null; label?: string; className?: string }) {
   const [open, setOpen] = useState(false);
-  const isPdf = /\.pdf(\?|$)/i.test(url);
+  // Fichier .pdf, ou route qui en génère un (/notes-frais/<id>/pdf).
+  const isPdf = /\.pdf(\?|$)|\/pdf(\?|$)/i.test(url);
   const isImg = /\.(png|jpe?g|webp|gif|heic|avif)(\?|$)/i.test(url);
 
   return (

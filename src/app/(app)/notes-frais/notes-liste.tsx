@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DateInput } from "@/components/date-input";
+import { JustificatifPreview } from "@/components/justificatif-preview";
 import Link from "next/link";
 import { euros, dateFr } from "@/lib/format";
 import { FilterDrawer } from "@/components/filter-drawer";
@@ -141,6 +142,8 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
                         )}
                       </div>
                     </Link>
+                    {/* Aperçu du PDF sans quitter la liste */}
+                    <JustificatifPreview url={`/notes-frais/${n.id}/pdf`} libelle={n.titre || "Note de frais"} />
                     <form action={deleteNoteFrais.bind(null, n.id)}>
                       <ConfirmButton confirm={`Supprimer la note de frais « ${n.titre || "Note de frais"} » ?`} className={delBtn} title="Supprimer">✕</ConfirmButton>
                     </form>

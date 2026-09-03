@@ -33,7 +33,7 @@ export function SoldeProjeteChart({
   const projete = fenetre.some((p) => p.key >= moisCourant);
 
   return (
-    <Card className="max-w-2xl p-5">
+    <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Solde projeté cumulé</h2>
         <div className="flex items-center gap-1">

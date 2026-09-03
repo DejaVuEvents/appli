@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { FinanceTabs } from "./finance-tabs";
 import { SoldeProjeteChart } from "./solde-chart";
+import { InfoHint } from "@/components/info-hint";
 import { syntheseMensuelle } from "@/lib/finance";
 import { euros, dateFr } from "@/lib/format";
 import type { EcritureFinanciere, ParametresEntreprise } from "@/lib/types";
@@ -106,13 +107,72 @@ export default async function FinanceDashboard({
         </Card>
       </div>
 
-      {/* Créances : qui nous doit / à qui nous devons */}
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        {/* Factures clients en retard de paiement */}
+      {/* Paiement en attente (moitié gauche) + graphe du solde projeté (moitié droite) */}
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
         <Card className="p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Factures en retard</h2>
-            <span className="text-sm font-bold text-red-600">{euros(totalDu)}</span>
+          <h2 className="mb-3 text-sm font-semibold">Paiement en attente</h2>
+
+          {/* Sortie — ce qu'on doit */}
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">
+              Sortie
+              <InfoHint text="Factures reçues non payées : échéances fournisseurs et notes de frais à rembourser." />
+            </span>
+            <span className={`text-sm font-bold tabular-nums ${totalAPayer > 0 ? "text-red-600" : "text-muted"}`}>
+              {euros(totalAPayer)}
+            </span>
+          </div>
+          {ndfAPayer.length === 0 && fournisseurs.length === 0 ? (
+            <p className="mb-4 text-sm text-muted">Rien à rembourser ni à payer</p>
+          ) : (
+            <div className="mb-4 space-y-3">
+              {ndfAPayer.length > 0 && (
+                <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                  {ndfAPayer.map((n) => (
+                    <Link key={n.id} href={`/notes-frais/${n.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{n.titre}</span>
+                        <span className="text-xs text-muted">NDF · {n.qui}</span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-semibold tabular-nums">{euros(n.montant)}</span>
+                        <span className="text-[10px] font-semibold text-amber-600">à rembourser</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {fournisseurs.length > 0 && (
+                <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                  {fournisseurs.map((f) => {
+                    const enRetard = f.statut_paiement === "retard" || (f.date_echeance && f.date_echeance < today);
+                    return (
+                      <Link key={f.id} href="/finance/fournisseurs" className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{f.fournisseur ?? "Fournisseur"}</span>
+                          <span className="text-xs text-muted">{f.numero ? `N°${f.numero}` : ""}{f.date_echeance ? ` · échéance ${dateFr(f.date_echeance)}` : ""}</span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="block font-semibold tabular-nums">{euros(f.montant_ttc)}</span>
+                          {enRetard && <span className="text-[10px] font-semibold text-red-600">en retard</span>}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Entrée — ce qu'on nous doit */}
+          <div className="mb-2 flex items-center justify-between border-t border-border pt-4">
+            <span className="text-sm font-medium">
+              Entrée
+              <InfoHint text="Retard client : factures émises dont l'échéance est dépassée et le règlement non reçu." />
+            </span>
+            <span className={`text-sm font-bold tabular-nums ${totalDu > 0 ? "text-amber-600" : "text-muted"}`}>
+              {euros(totalDu)}
+            </span>
           </div>
           {clients.length === 0 ? (
             <p className="text-sm text-muted">Aucune facture en retard</p>
@@ -134,58 +194,6 @@ export default async function FinanceDashboard({
           )}
         </Card>
 
-        {/* À payer — NDF à rembourser + fournisseurs */}
-        <Card className="p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">On doit (à payer)</h2>
-            <span className="text-sm font-bold text-red-600">{euros(totalAPayer)}</span>
-          </div>
-          {ndfAPayer.length === 0 && fournisseurs.length === 0 ? (
-            <p className="text-sm text-muted">Rien à rembourser ni à payer</p>
-          ) : (
-            <div className="space-y-3">
-            {ndfAPayer.length > 0 && (
-              <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-                {ndfAPayer.map((n) => (
-                  <Link key={n.id} href={`/notes-frais/${n.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{n.titre}</span>
-                      <span className="text-xs text-muted">NDF · {n.qui}</span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block font-semibold tabular-nums">{euros(n.montant)}</span>
-                      <span className="text-[10px] font-semibold text-amber-600">à rembourser</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-            {fournisseurs.length > 0 && (
-            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {fournisseurs.map((f) => {
-                const enRetard = f.statut_paiement === "retard" || (f.date_echeance && f.date_echeance < today);
-                return (
-                  <Link key={f.id} href="/finance/fournisseurs" className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-background">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{f.fournisseur ?? "Fournisseur"}</span>
-                      <span className="text-xs text-muted">{f.numero ? `N°${f.numero}` : ""}{f.date_echeance ? ` · échéance ${dateFr(f.date_echeance)}` : ""}</span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block font-semibold tabular-nums">{euros(f.montant_ttc)}</span>
-                      {enRetard && <span className="text-[10px] font-semibold text-red-600">en retard</span>}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-            )}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Graphe solde projeté — fenêtre glissante navigable (◀ ▶) */}
-      <div className="mt-6">
         <SoldeProjeteChart points={serieSolde} defautStart={12} seuil={seuil} />
       </div>
 

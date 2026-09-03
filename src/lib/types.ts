@@ -189,6 +189,11 @@ export interface LignePrestation {
   est_accessoire_auto: boolean;
   ligne_parent_id: string | null;
   charge: boolean;
+  /** Specs saisies sur la ligne quand aucune référence catalogue ne correspond. */
+  poids_kg: number | null;
+  puissance_w: number | null;
+  intensite_a: number | null;
+  phase: "mono" | "tri" | null;
 }
 
 export type TypeMouvement = "sortie" | "retour";

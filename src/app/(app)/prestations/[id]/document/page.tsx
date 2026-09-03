@@ -289,7 +289,8 @@ function DocGroup({ nom, items, sousLoc }: { nom: string; items: LigneRow[]; sou
         const remise = brut - Number(l.prix_total ?? 0);
         return (
           <tr key={l.id} className="border-b border-border align-top">
-            <td className="py-1.5">
+            <td className={`py-1.5 ${l.ligne_parent_id ? "pl-4" : ""}`}>
+              {l.ligne_parent_id && <span className="mr-1 text-muted">↳</span>}
               {l.designation}
               {l.reference_id && sousLoc.get(l.reference_id) && (
                 <span className="ml-1 inline-flex align-middle">

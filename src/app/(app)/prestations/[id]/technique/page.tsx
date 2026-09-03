@@ -15,6 +15,11 @@ type LigneRow = {
   designation: string | null;
   quantite: number;
   reference_id: string | null;
+  // Specs saisies sur la ligne : priment sur la référence, et servent seules aux lignes libres.
+  poids_kg: number | null;
+  puissance_w: number | null;
+  intensite_a: number | null;
+  phase: "mono" | "tri" | null;
   reference: { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null } | null;
 };
 
@@ -40,7 +45,7 @@ export default async function TechniquePage({
     planId ? supabase.from("circuit_elec").select("*").eq("plan_id", planId).order("nom") : Promise.resolve({ data: [] }),
     supabase
       .from("ligne_prestation")
-      .select("id, designation, quantite, reference_id, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase)")
+      .select("id, designation, quantite, reference_id, poids_kg, puissance_w, intensite_a, phase, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase)")
       .eq("prestation_id", id),
   ]);
 
@@ -78,17 +83,25 @@ export default async function TechniquePage({
   // Toutes les lignes de MATÉRIEL sont proposées au levage, y compris celles dont le poids
   // n'est pas renseigné : les masquer donnait une charge sous-estimée sans le signaler.
   // Seules la main-d'œuvre et le transport sont écartés (rien à suspendre).
+  // Une valeur saisie sur la ligne l'emporte sur celle de la référence.
+  const poidsDe = (l: LigneRow) => l.poids_kg ?? l.reference?.poids_kg ?? null;
+  const elecDe = (l: LigneRow) => ({
+    puissance_w: l.puissance_w ?? l.reference?.puissance_w ?? null,
+    intensite_a: l.intensite_a ?? l.reference?.intensite_a ?? null,
+    phase: l.phase ?? l.reference?.phase ?? null,
+  });
+
   const lignesPoids = lignes.filter((l) => {
     const b = bucketPour(l.designation, null);
     return b !== BUCKETS.TECH && b !== BUCKETS.TRANSPORT;
   });
-  const lignesElec = lignes.filter((l) => courantLigne(l.reference ?? { puissance_w: null, intensite_a: null, phase: null }, l.quantite) > 0);
+  const lignesElec = lignes.filter((l) => courantLigne(elecDe(l), l.quantite) > 0);
 
   // Exemplaires élec : une entrée par unité de chaque ligne (placement individuel sur les circuits).
   const noValElec = { puissance_w: null, intensite_a: null, phase: null };
   const exemplairesElec = lignesElec.flatMap((l) => {
     const q = Math.max(1, Math.floor(l.quantite));
-    const courantUnite = courantLigne(l.reference ?? noValElec, 1);
+    const courantUnite = courantLigne(elecDe(l), 1);
     const serials = l.reference_id ? serialsParRef.get(l.reference_id) ?? [] : [];
     return Array.from({ length: q }, (_, rang) => {
       const serial = serials[rang]?.numero_serie ?? null;
@@ -106,7 +119,7 @@ export default async function TechniquePage({
   });
 
   const totalPont = (pontId: string) =>
-    lignes.filter((l) => pontDeLigne.get(l.id) === pontId).reduce((s, l) => s + poidsLigne(l.reference?.poids_kg ?? null, l.quantite), 0);
+    lignes.filter((l) => pontDeLigne.get(l.id) === pontId).reduce((s, l) => s + poidsLigne(poidsDe(l), l.quantite), 0);
 
   // --- Arborescence électrique ---
   const enfantsDe = new Map<string | null, CircuitElec[]>();
@@ -156,8 +169,8 @@ export default async function TechniquePage({
             id: l.id,
             designation: l.designation,
             quantite: l.quantite,
-            poids: poidsLigne(l.reference?.poids_kg ?? null, l.quantite),
-            poidsConnu: (l.reference?.poids_kg ?? 0) > 0,
+            poids: poidsLigne(poidsDe(l), l.quantite),
+            poidsConnu: (poidsDe(l) ?? 0) > 0,
             referenceId: l.reference_id,
             pontId: pontDeLigne.get(l.id) ?? null,
           }))}

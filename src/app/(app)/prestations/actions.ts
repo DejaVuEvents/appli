@@ -762,6 +762,29 @@ export async function lierLigneAuCatalogue(prestationId: string, ligneId: string
   revalidatePath(`/prestations/${prestationId}`);
 }
 
+/**
+ * Poids et caractéristiques électriques saisis directement sur une ligne de devis.
+ * Utile quand aucune référence catalogue ne correspond : sans ces valeurs, la ligne
+ * reste absente du plan de levage et du plan électrique.
+ */
+export async function setSpecsLigne(prestationId: string, ligneId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const ph = str(formData.get("phase"));
+  const { data: l } = await supabase.from("ligne_prestation").select("devis_id").eq("id", ligneId).maybeSingle();
+  const { error } = await supabase
+    .from("ligne_prestation")
+    .update({
+      poids_kg: num(formData.get("poids_kg")),
+      puissance_w: num(formData.get("puissance_w")),
+      intensite_a: num(formData.get("intensite_a")),
+      phase: ph === "mono" || ph === "tri" ? ph : null,
+    })
+    .eq("id", ligneId);
+  if (error) throw new Error(error.message);
+  if (l?.devis_id) await toucherDevis(supabase, l.devis_id);
+  revalidatePath(`/prestations/${prestationId}`);
+}
+
 export async function updateLigne(prestationId: string, ligneId: string, formData: FormData) {
   const supabase = await createSupabase();
   const L = await resoudreLigne(supabase, formData);

@@ -117,8 +117,8 @@ function DocPDF({ contenu, doc, logo }: { contenu: DocContenu; doc: { type: "dev
                 const remise = brut - Number(l.prix_total ?? 0);
                 return (
                   <View key={l.id} style={s.tr}>
-                    <View style={s.cDes}>
-                      <Text>{l.designation}</Text>
+                    <View style={[s.cDes, l.ligne_parent_id ? { paddingLeft: 10 } : {}]}>
+                      <Text>{l.ligne_parent_id ? `— ${l.designation}` : l.designation}</Text>
                       {remise > 0 ? (
                         <Text style={[s.muted, { fontSize: 7 }]}>Remise {l.remise_type === "montant" ? eur(l.remise_valeur) : `${l.remise_valeur}%`}</Text>
                       ) : null}

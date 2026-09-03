@@ -458,9 +458,10 @@ export default async function DevisEditorPage({
             <div className="border-b border-border bg-surface px-4 py-2 text-sm font-semibold">{g.nom}</div>
             <div className="divide-y divide-border">
               {g.items.map((l) => (
-                <div key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <div key={l.id} className={`flex items-center justify-between gap-3 py-2.5 text-sm ${l.ligne_parent_id ? "border-l-2 border-primary/30 bg-background/40 pl-6 pr-4" : "px-4"}`}>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-1.5">
+                      {l.ligne_parent_id && <span className="shrink-0 text-muted">↳</span>}
                       <span className="truncate font-medium">{l.designation}</span>
                       {l.reference_id && sousLocParRef.get(l.reference_id) && (
                         <SousLocationBadge sl={sousLocParRef.get(l.reference_id)!} quantite={l.quantite} />

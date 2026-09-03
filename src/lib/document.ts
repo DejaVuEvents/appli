@@ -16,6 +16,8 @@ export type DocLigne = {
   remise_valeur: number;
   categorie_id: string | null;
   reference_id: string | null;
+  /** Accessoire rattaché à une autre ligne (pieds d'un praticable, élingue d'une lyre…). */
+  ligne_parent_id: string | null;
 };
 
 export type DocContenu = {
@@ -62,7 +64,26 @@ export async function assemblerContenuDocument(
     nom: string;
     client: { nom: string; adresse: string | null } | null;
   };
-  const lignes = (lignesData ?? []) as DocLigne[];
+  const brut = (lignesData ?? []) as DocLigne[];
+  // Les accessoires suivent immédiatement la ligne qui les entraîne : sans ce tri, les
+  // 4 pieds d'un praticable se retrouvent n'importe où dans la liste.
+  const enfants = new Map<string, DocLigne[]>();
+  for (const l of brut) {
+    if (!l.ligne_parent_id) continue;
+    const arr = enfants.get(l.ligne_parent_id) ?? [];
+    arr.push(l);
+    enfants.set(l.ligne_parent_id, arr);
+  }
+  const lignes: DocLigne[] = [];
+  for (const l of brut) {
+    if (l.ligne_parent_id) continue;
+    lignes.push(l);
+    for (const e of enfants.get(l.id) ?? []) lignes.push(e);
+  }
+  // Accessoires dont le parent a disparu : on ne les perd pas.
+  for (const l of brut) {
+    if (l.ligne_parent_id && !lignes.some((x) => x.id === l.id)) lignes.push(l);
+  }
   // Regroupement en 4 familles (Lumière & Effets / Son / Structure / Technique),
   // cohérent avec le constructeur — voir src/lib/devis-buckets.ts.
   type CatRow = { id: string; nom: string; parent_id: string | null; ordre: number | null };

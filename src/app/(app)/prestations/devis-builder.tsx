@@ -104,6 +104,8 @@ export async function DevisBuilder(props: {
       prix_unitaire: Number(l.prix_unitaire ?? 0), prix_total: l.prix_total,
       remise_type: (l.remise_type as string) ?? "pct", remise_valeur: Number(l.remise_valeur ?? 0),
       est_accessoire_auto: l.est_accessoire_auto,
+      ligne_parent_id: l.ligne_parent_id,
+      poids_kg: l.poids_kg, puissance_w: l.puissance_w, intensite_a: l.intensite_a, phase: l.phase,
       options: optionsPourLigne(l).map((o) => ({ ruleId: o.id, nom: o.accessoire?.nom ?? "" })),
     })),
   }));

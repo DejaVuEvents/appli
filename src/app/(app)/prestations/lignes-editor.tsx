@@ -6,17 +6,20 @@ import Link from "next/link";
 import { Card } from "@/components/ui";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { LigneForm } from "./ligne-form";
+import { SubmitButton } from "@/components/submit-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IconHorsCatalogue } from "@/components/icons";
 import { SousLocationBadge } from "@/components/sous-location-badge";
 import { euros } from "@/lib/format";
 import { ETAT_LABELS, type EtatUnite } from "@/lib/types";
-import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel, lierLigneAuCatalogue } from "./actions";
+import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel, lierLigneAuCatalogue, setSpecsLigne } from "./actions";
 
 export type LigneData = {
   id: string; reference_id: string | null; designation: string | null; quantite: number; unite: string | null;
   prix_unitaire: number; prix_total: number | null; remise_type: string; remise_valeur: number;
-  est_accessoire_auto: boolean; options: { ruleId: string; nom: string }[];
+  est_accessoire_auto: boolean; ligne_parent_id?: string | null;
+  poids_kg?: number | null; puissance_w?: number | null; intensite_a?: number | null; phase?: string | null;
+  options: { ruleId: string; nom: string }[];
 };
 export type BlocData = { catId: string | null; nom: string; lignes: LigneData[] };
 export type RefInfo = {
@@ -380,9 +383,33 @@ function LierAuCatalogue({
   const recherche = q.trim().toLowerCase();
   // Sans recherche, on propose les références dont le nom reprend des mots de la désignation.
   const mots = (ligne.designation ?? "").toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((m) => m.length > 3);
-  const liste = recherche
-    ? references.filter((r) => r.nom.toLowerCase().includes(recherche)).slice(0, 60)
-    : references.filter((r) => mots.some((m) => r.nom.toLowerCase().includes(m))).slice(0, 20);
+  const retenues = recherche
+    ? references.filter((r) => r.nom.toLowerCase().includes(recherche))
+    : references.filter((r) => mots.some((m) => r.nom.toLowerCase().includes(m)));
+  // Notre parc d'un côté, la sous-location de l'autre : la distinction change le coût.
+  const aNous = retenues.filter((r) => r.cout_location_jour == null).slice(0, 40);
+  const externes = retenues.filter((r) => r.cout_location_jour != null).slice(0, 40);
+
+  const groupe = (titre: string, refs: Ref[]) =>
+    refs.length === 0 ? null : (
+      <div key={titre}>
+        <div className="sticky top-0 bg-surface px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          {titre} ({refs.length})
+        </div>
+        {refs.map((r) => (
+          <button
+            key={r.id}
+            type="submit"
+            name="reference_id"
+            value={r.id}
+            className="flex w-full items-center justify-between gap-3 border-t border-border px-3 py-2 text-left text-sm hover:bg-background"
+          >
+            <span className="min-w-0 truncate">{r.nom}</span>
+            <span className="shrink-0 text-xs text-muted">{euros(r.prix_location_jour)}/j</span>
+          </button>
+        ))}
+      </div>
+    );
 
   return (
     <div>
@@ -404,27 +431,57 @@ function LierAuCatalogue({
         className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
       />
       <ModalForm action={lierLigneAuCatalogue.bind(null, prestationId, ligne.id)}>
-        <div className="max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border">
-          {liste.length === 0 && (
+        <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
+          {aNous.length === 0 && externes.length === 0 && (
             <p className="px-3 py-4 text-sm text-muted">
               {recherche ? "Aucune référence trouvée." : "Aucune correspondance évidente — tape pour chercher."}
             </p>
           )}
-          {liste.map((r) => (
-            <button
-              key={r.id}
-              type="submit"
-              name="reference_id"
-              value={r.id}
-              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-background"
-            >
-              <span className="min-w-0 truncate">{r.nom}</span>
-              <span className="shrink-0 text-xs text-muted">{euros(r.prix_location_jour)}/j</span>
-            </button>
-          ))}
+          {groupe("Notre matériel", aNous)}
+          {groupe("Sous-location", externes)}
         </div>
-        <div className="mt-3"><ModalCancelButton /></div>
       </ModalForm>
+
+      {/* À défaut de référence : saisie directe des specs qui alimentent les plans */}
+      <details className="mt-4 border-t border-border pt-4">
+        <summary className="cursor-pointer text-sm font-medium">
+          Pas de référence correspondante ? Saisir le poids et l&apos;électricité
+        </summary>
+        <p className="mb-3 mt-2 text-sm text-muted">
+          Ces valeurs suffisent à faire entrer la ligne dans le plan de levage et le plan
+          électrique, sans passer par le catalogue.
+        </p>
+        <ModalForm action={setSpecsLigne.bind(null, prestationId, ligne.id)} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Poids unitaire (kg)</span>
+              <input type="number" step="0.01" name="poids_kg" defaultValue={ligne.poids_kg ?? ""} className={CHAMP} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Consommation (W)</span>
+              <input type="number" step="0.01" name="puissance_w" defaultValue={ligne.puissance_w ?? ""} className={CHAMP} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Intensité (A)</span>
+              <input type="number" step="0.01" name="intensite_a" defaultValue={ligne.intensite_a ?? ""} className={CHAMP} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Phase</span>
+              <select name="phase" defaultValue={ligne.phase ?? ""} className={CHAMP}>
+                <option value="">—</option>
+                <option value="mono">Monophasé</option>
+                <option value="tri">Triphasé</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <SubmitButton>Enregistrer les specs</SubmitButton>
+            <ModalCancelButton />
+          </div>
+        </ModalForm>
+      </details>
     </div>
   );
 }
+
+const CHAMP = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm";

@@ -32,17 +32,18 @@ export function SelecteurPrestation({
 
   const recherche = q.trim().toLowerCase();
   const { liste, nbPasses } = useMemo(() => {
+    const passe = (o: OptionPrestation) => !!o.date && o.date < aujourdhui;
     if (recherche) {
       return { liste: options.filter((o) => o.nom.toLowerCase().includes(recherche)), nbPasses: 0 };
     }
-    const futurs = options.filter((o) => !estPasse(o));
+    const futurs = options.filter((o) => !passe(o));
     // L'événement déjà rattaché reste proposé même s'il est passé.
-    const actuel = options.find((o) => o.id === choisi && estPasse(o));
+    const actuel = options.find((o) => o.id === choisi && passe(o));
     return {
       liste: actuel ? [actuel, ...futurs] : futurs,
       nbPasses: options.length - futurs.length - (actuel ? 1 : 0),
     };
-  }, [options, recherche, choisi]);
+  }, [options, recherche, choisi, aujourdhui]);
 
   const nomChoisi = options.find((o) => o.id === choisi)?.nom ?? "";
 

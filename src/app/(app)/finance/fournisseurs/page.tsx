@@ -28,7 +28,7 @@ export default async function FournisseursPage({
 
   const [{ data: ffData }, { data: prestData }] = await Promise.all([
     supabase.from("facture_fournisseur").select("*").order("date_echeance", { ascending: true, nullsFirst: false }),
-    supabase.from("prestation").select("id, nom").order("date_event_debut", { ascending: false }),
+    supabase.from("prestation").select("id, nom, est_evenement").order("date_event_debut", { ascending: false }),
   ]);
   const factures = (ffData ?? []) as FactureFournisseur[];
   const prestations = (prestData ?? []) as { id: string; nom: string }[];

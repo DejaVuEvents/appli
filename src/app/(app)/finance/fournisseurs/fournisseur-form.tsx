@@ -17,7 +17,7 @@ export function FournisseurForm({
 }: {
   action: (formData: FormData) => void | Promise<void>;
   facture?: FactureFournisseur;
-  prestations: { id: string; nom: string }[];
+  prestations: { id: string; nom: string; est_evenement?: boolean }[];
 }) {
   return (
     <ModalForm action={action} className="space-y-4">
@@ -37,7 +37,8 @@ export function FournisseurForm({
             label="Événement lié (optionnel)"
             name="prestation_id"
             defaultValue={facture?.prestation_id ?? ""}
-            options={[{ value: "", label: "— Aucun —" }, ...prestations.map((p) => ({ value: p.id, label: p.nom }))]}
+            options={[{ value: "", label: "— Aucun —" }, ...[...prestations].sort((a, b) => Number(b.est_evenement ?? true) - Number(a.est_evenement ?? true))
+              .map((p) => ({ value: p.id, label: p.est_evenement === false ? `${p.nom} (document importé)` : p.nom }))]}
           />
         )}
       </div>

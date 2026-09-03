@@ -21,7 +21,7 @@ export default async function JournalPage({
   const supabase = await createClient();
   const [{ data }, { data: prestData }, { data: justifData }] = await Promise.all([
     supabase.from("ecriture_financiere").select("*").order("date", { ascending: false }),
-    supabase.from("prestation").select("id, nom, client(nom)").order("date_event_debut", { ascending: false }),
+    supabase.from("prestation").select("id, nom, est_evenement, client(nom)").order("date_event_debut", { ascending: false }),
     supabase.from("justificatif").select("ecriture_id").not("ecriture_id", "is", null),
   ]);
 

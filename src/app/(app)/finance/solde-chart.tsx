@@ -20,7 +20,6 @@ export function SoldeProjeteChart({
   seuil: number;
 }) {
   const WIN = 12;
-  const H = 56;
   const maxStart = Math.max(0, points.length - WIN);
   const [start, setStart] = useState(Math.min(Math.max(0, defautStart), maxStart));
   const fenetre = points.slice(start, start + WIN);
@@ -29,8 +28,14 @@ export function SoldeProjeteChart({
   // Mois non encore écoulés : le solde n'y est qu'une projection. Le mois en cours en
   // fait partie, il n'est pas terminé. On les hachure pour ne pas les lire comme du réel.
   const moisCourant = new Date().toISOString().slice(0, 7);
-  const HACHURES = "repeating-linear-gradient(45deg, rgba(255,255,255,.5) 0 2px, transparent 2px 5px)";
+  const HACHURES =
+    "repeating-linear-gradient(45deg, rgba(255,255,255,.95) 0 3px, rgba(0,0,0,.25) 3px 4px, transparent 4px 9px)";
   const projete = fenetre.some((p) => p.key >= moisCourant);
+
+  // Sans valeur négative dans la fenêtre, la moitié basse ne sert à rien : on la retire
+  // et les bougies occupent toute la hauteur disponible.
+  const aNegatif = fenetre.some((p) => p.value < 0);
+  const H = aNegatif ? 60 : 118;
 
   return (
     <Card className="p-5">
@@ -70,12 +75,14 @@ export function SoldeProjeteChart({
           return (
             <div key={p.key} className="flex-1" title={`${p.label} : ${euros(v)}${futur ? " (projeté)" : ""}`}>
               <div className="flex items-end justify-center" style={{ height: H }}>
-                {v >= 0 && <div className={`w-3.5 rounded-t ${color}`} style={styleBarre(h)} />}
+                {v >= 0 && <div className={`w-5 rounded-t ${color}`} style={styleBarre(Math.max(h, 2))} />}
               </div>
               <div className="h-px bg-border" />
-              <div className="flex items-start justify-center" style={{ height: H }}>
-                {v < 0 && <div className={`w-3.5 rounded-b ${color}`} style={styleBarre(h)} />}
-              </div>
+              {aNegatif && (
+                <div className="flex items-start justify-center" style={{ height: H }}>
+                  {v < 0 && <div className={`w-5 rounded-b ${color}`} style={styleBarre(Math.max(h, 2))} />}
+                </div>
+              )}
               <div className={`mt-1 text-center text-[10px] ${futur ? "italic text-muted/70" : "text-muted"}`}>{p.label}</div>
             </div>
           );
@@ -84,7 +91,7 @@ export function SoldeProjeteChart({
       {projete && (
         <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted">
           <span
-            className="inline-block h-2.5 w-4 rounded-sm bg-green-500 align-middle"
+            className="inline-block h-3 w-5 rounded-sm bg-green-500 align-middle"
             style={{ backgroundImage: HACHURES }}
           />
           Mois non écoulés — solde projeté

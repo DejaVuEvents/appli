@@ -69,12 +69,13 @@ export default async function FinanceDashboard({
   const totalAPayer = fournisseurs.reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0) + ndfAPayer.reduce((s, n) => s + n.montant, 0);
 
   // Série multi-années pour le graphe à fenêtre glissante navigable.
-  // Libellés courts DISTINCTS (Juin ≠ Juil) + clé unique par mois.
+  // Libellés courts DISTINCTS (Juin ≠ Juil) + clé AAAA-MM, comparable en tant que
+  // chaîne (« 2026-02 » et non « 2026-1 », qui passerait pour postérieur à « 2026-09 »).
   const MOIS_COURT = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
   const anneesSerie = [annee - 1, annee, annee + 1];
   const serieSolde = anneesSerie.flatMap((y) =>
     syntheseMensuelle(ecritures, Number(ent?.solde_initial ?? 0), y, seuil, ent?.solde_initial_date ?? null)
-      .months.map((mo, i) => ({ key: `${y}-${i}`, label: `${MOIS_COURT[i]} ${String(y).slice(2)}`, value: mo.soldeProjCum })),
+      .months.map((mo, i) => ({ key: `${y}-${String(i + 1).padStart(2, "0")}`, label: `${MOIS_COURT[i]} ${String(y).slice(2)}`, value: mo.soldeProjCum })),
   );
 
   const stat = (label: string, value: number, cls: string) => (

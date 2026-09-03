@@ -46,3 +46,22 @@ export function niveauAlerte(
   if (ratio >= seuilWarn) return "warn";
   return "ok";
 }
+
+/**
+ * Une ligne peut-elle être suspendue à un pont ?
+ *
+ * Le plan de levage ne doit proposer que ce qui se rigge. En sont exclus, en plus de la
+ * main-d'œuvre et du transport : les câbles (ils cheminent, ils ne se suspendent pas),
+ * les praticables et leurs pieds (ils sont au sol), et les armoires de distribution
+ * électrique. Les laisser dans la liste noyait le matériel réellement accroché.
+ */
+const NON_SUSPENDABLE_NOM =
+  /\bc[âa]bl|multipaire|multiprise|\btouret\b|passe.?c[âa]ble|praticable|\barmoire|distribution [ée]lec|\bgradateur|rallonge|datalink|\baes50\b/i;
+
+const NON_SUSPENDABLE_CAT = /c[âa]bles?|praticable|armoire|distribution|transport|technique/i;
+
+export function estSuspendable(designation: string | null, categorieNom: string | null): boolean {
+  if (designation && NON_SUSPENDABLE_NOM.test(designation)) return false;
+  if (categorieNom && NON_SUSPENDABLE_CAT.test(categorieNom)) return false;
+  return true;
+}

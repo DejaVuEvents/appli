@@ -3,7 +3,7 @@ import { bucketPour, BUCKETS } from "@/lib/devis-buckets";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
-import { poidsLigne, courantLigne } from "@/lib/technique";
+import { poidsLigne, courantLigne, estSuspendable } from "@/lib/technique";
 import { type Pont, type CircuitElec } from "@/lib/types";
 import { ElecTree } from "./elec-tree";
 import { LevagePlan } from "./levage-plan";
@@ -20,7 +20,8 @@ type LigneRow = {
   puissance_w: number | null;
   intensite_a: number | null;
   phase: "mono" | "tri" | null;
-  reference: { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null } | null;
+  categorie_id: string | null;
+  reference: { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null; categorie_id: string | null } | null;
 };
 
 export default async function TechniquePage({
@@ -45,7 +46,7 @@ export default async function TechniquePage({
     planId ? supabase.from("circuit_elec").select("*").eq("plan_id", planId).order("nom") : Promise.resolve({ data: [] }),
     supabase
       .from("ligne_prestation")
-      .select("id, designation, quantite, reference_id, poids_kg, puissance_w, intensite_a, phase, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase)")
+      .select("id, designation, quantite, reference_id, categorie_id, poids_kg, puissance_w, intensite_a, phase, reference:materiel_reference(poids_kg, charge_max_kg, intensite_a, puissance_w, phase, categorie_id)")
       .eq("prestation_id", id),
   ]);
 
@@ -91,9 +92,16 @@ export default async function TechniquePage({
     phase: l.phase ?? l.reference?.phase ?? null,
   });
 
+  // Catégories, pour écarter du levage ce qui ne se suspend pas.
+  const { data: catsData } = await supabase.from("categorie").select("id, nom");
+  const nomCat = new Map((catsData ?? []).map((c) => [c.id as string, c.nom as string]));
+  const categorieDeLigne = (l: LigneRow) =>
+    nomCat.get(l.categorie_id ?? l.reference?.categorie_id ?? "") ?? null;
+
   const lignesPoids = lignes.filter((l) => {
-    const b = bucketPour(l.designation, null);
-    return b !== BUCKETS.TECH && b !== BUCKETS.TRANSPORT;
+    const b = bucketPour(l.designation, categorieDeLigne(l));
+    if (b === BUCKETS.TECH || b === BUCKETS.TRANSPORT) return false;
+    return estSuspendable(l.designation, categorieDeLigne(l));
   });
   const lignesElec = lignes.filter((l) => courantLigne(elecDe(l), l.quantite) > 0);
 

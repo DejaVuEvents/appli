@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 
+// Même échelle que les événements : les deux listes cohabitent dans Planification.
 const LOCATION_STATUT_LABELS: Record<string, string> = {
-  prevu: "Prévu",
-  confirme: "Confirmé",
-  en_cours: "En cours",
-  rendu: "Rendu",
+  brouillon: "Brouillon",
+  envoye: "Envoyé",
+  signe: "Signé",
+  realise: "Réalisé",
   annule: "Annulé",
 };
 

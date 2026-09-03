@@ -23,3 +23,14 @@ export function statutFactureAffichage(emis: boolean, statut: string | null | un
   const s = (statut ?? "en_attente") as StatutPaiement;
   return { label: STATUT_PAIEMENT_LABELS[s] ?? STATUT_PAIEMENT_LABELS.en_attente, cls: STATUT_PAIEMENT_CLS[s] ?? STATUT_PAIEMENT_CLS.en_attente };
 }
+
+/**
+ * Libellé/style d'un DEVIS, sur la même échelle que l'événement :
+ * Brouillon (pas encore émis) → Envoyé (numéroté, sans réponse) → Signé / Refusé.
+ */
+export function statutDevisAffichage(emis: boolean, statutSignature: string | null | undefined): { label: string; cls: string } {
+  if (statutSignature === "signe") return { label: "Signé", cls: "bg-green-100 text-green-700" };
+  if (statutSignature === "refuse") return { label: "Refusé", cls: "bg-red-100 text-red-700" };
+  if (!emis) return { label: "Brouillon", cls: BROUILLON_CLS };
+  return { label: "Envoyé", cls: "bg-blue-100 text-blue-700" };
+}

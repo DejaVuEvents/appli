@@ -20,7 +20,7 @@ import { ROLES_MEMBRE } from "@/lib/roles";
 import { euros, dateFr } from "@/lib/format";
 import { IconReceipt, IconFile } from "@/components/icons";
 import { calculerTotaux } from "@/lib/devis";
-import { statutFactureAffichage } from "@/lib/facture-statut";
+import { statutFactureAffichage, statutDevisAffichage } from "@/lib/facture-statut";
 import type { LignePrestation, Prestation, PrestationStatut, Devis } from "@/lib/types";
 
 type TransportRow = { id: string; devis_id: string | null; cout_calcule: number | null };
@@ -57,12 +57,14 @@ export default async function PrestationDetailPage({
   };
 
   const devisList = (devisData ?? []) as Devis[];
+  // Documents émis, devis ET factures : chacun porte son propre statut dans la liste.
   const { data: dfData } = await supabase
     .from("devis_facture")
-    .select("devis_id, numero, statut_paiement")
-    .eq("prestation_id", id)
-    .eq("type", "facture");
-  const factureMap = new Map((dfData ?? []).map((d) => [d.devis_id as string, d as { numero: string | null; statut_paiement: string | null }]));
+    .select("devis_id, type, numero, statut_paiement")
+    .eq("prestation_id", id);
+  const docsEmis = (dfData ?? []) as { devis_id: string; type: string; numero: string | null; statut_paiement: string | null }[];
+  const factureMap = new Map(docsEmis.filter((d) => d.type === "facture").map((d) => [d.devis_id, d]));
+  const devisEmisMap = new Map(docsEmis.filter((d) => d.type === "devis").map((d) => [d.devis_id, d]));
   const allLignes = (lignesData ?? []) as Pick<LignePrestation, "id" | "devis_id" | "reference_id" | "prix_unitaire" | "quantite" | "prix_total">[];
   const allTransports = (transportsData ?? []) as unknown as TransportRow[];
 
@@ -256,12 +258,14 @@ export default async function PrestationDetailPage({
             <Card className="divide-y divide-border overflow-hidden">
               {devisList.map((d) => {
                 const df = d.type === "facture" ? factureMap.get(d.id) : undefined;
-                const badge = d.type === "facture" ? statutFactureAffichage(!!df?.numero, df?.statut_paiement) : null;
+                const badge = d.type === "facture"
+                  ? statutFactureAffichage(!!df?.numero, df?.statut_paiement)
+                  : statutDevisAffichage(!!devisEmisMap.get(d.id)?.numero, (d as { statut_signature?: string | null }).statut_signature);
                 return (
                   <Link key={d.id} href={`/prestations/devis/${d.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
                     <span className="flex min-w-0 items-center gap-2">
                       {d.type === "facture" ? <IconReceipt className="h-4 w-4 shrink-0 text-muted" /> : <IconFile className="h-4 w-4 shrink-0 text-muted" />}
-                      <span className="truncate">{d.nom || (d.type === "facture" ? "Facture" : "Devis")}{df?.numero ? ` · n°${df.numero}` : ""}</span>
+                      <span className="truncate">{d.nom || (d.type === "facture" ? "Facture" : "Devis")}{(df?.numero ?? devisEmisMap.get(d.id)?.numero) ? ` · n°${df?.numero ?? devisEmisMap.get(d.id)?.numero}` : ""}</span>
                       {!compteDansTotal(d) && (
                         <span className="shrink-0 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted" title="Tranche d'un devis déjà compté dans le total">
                           tranche

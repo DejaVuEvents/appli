@@ -30,7 +30,7 @@ function locationFromForm(formData: FormData) {
     date_debut: str(formData.get("date_debut")),
     date_fin: str(formData.get("date_fin")) ?? str(formData.get("date_debut")),
     montant: num(formData.get("montant")),
-    statut: String(formData.get("statut") ?? "prevu"),
+    statut: String(formData.get("statut") ?? "brouillon"),
     notes: str(formData.get("notes")),
   };
 }
@@ -119,7 +119,7 @@ export async function creerDevisLocation(locationId: string, type: "devis" | "fa
 /** Change le statut d'une location (sélecteur d'en-tête, comme un événement). */
 export async function updateLocationStatut(id: string, formData: FormData) {
   const supabase = await createSupabase();
-  const statut = String(formData.get("statut") ?? "prevu");
+  const statut = String(formData.get("statut") ?? "brouillon");
   const { error } = await supabase.from("location").update({ statut }).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath(`/planification/location/${id}`);

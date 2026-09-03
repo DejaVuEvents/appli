@@ -25,11 +25,7 @@ const STATUT_CLS: Record<string, string> = {
   brouillon: "bg-surface text-muted",
   envoye: "bg-blue-100 text-blue-700",
   signe: "bg-indigo-100 text-indigo-700",
-  en_cours: "bg-amber-100 text-amber-800",
   realise: "bg-green-100 text-green-700",
-  termine: "bg-green-100 text-green-700",
-  rendu: "bg-green-100 text-green-700",
-  prevu: "bg-surface text-muted",
   annule: "bg-red-100 text-red-700",
 };
 

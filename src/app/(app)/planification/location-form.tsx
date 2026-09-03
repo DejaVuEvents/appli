@@ -44,11 +44,11 @@ export function LocationForm({
             <option value="entree">Entrée — je sous-loue du matériel</option>
           </select>
         </div>
-        <Select label="Statut" name="statut" defaultValue={location?.statut ?? "prevu"} options={[
-          { value: "prevu", label: "Prévu" },
-          { value: "confirme", label: "Confirmé" },
-          { value: "en_cours", label: "En cours" },
-          { value: "rendu", label: "Rendu / terminé" },
+        <Select label="Statut" name="statut" defaultValue={location?.statut ?? "brouillon"} options={[
+          { value: "brouillon", label: "Brouillon" },
+          { value: "envoye", label: "Envoyé" },
+          { value: "signe", label: "Signé" },
+          { value: "realise", label: "Réalisé" },
           { value: "annule", label: "Annulé" },
         ]} />
       </div>

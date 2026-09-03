@@ -49,19 +49,20 @@ export function PhotoField({ photoUrl }: { photoUrl?: string | null }) {
             onChange={(e) => setNomFichier(e.target.files?.[0]?.name ?? null)}
           />
 
-          {photoUrl && (
-            <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs text-red-600">
-              <input
-                type="checkbox"
-                name="remove_photo"
-                value="1"
-                checked={supprimer}
-                onChange={(e) => setSupprimer(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-border"
-              />
-              Supprimer la photo actuelle
-            </label>
-          )}
+          {photoUrl &&
+            (supprimer ? (
+              <div className="flex items-center gap-2 text-xs">
+                <input type="hidden" name="remove_photo" value="1" />
+                <span className="text-red-600">Photo retirée à l&apos;enregistrement</span>
+                <button type="button" onClick={() => setSupprimer(false)} className="text-muted underline hover:text-foreground">
+                  Annuler
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setSupprimer(true)} className="block text-xs text-red-600 hover:underline">
+                Supprimer la photo
+              </button>
+            ))}
           <p className="text-xs text-muted">JPG, PNG ou WebP · max 5 Mo</p>
         </div>
       </div>

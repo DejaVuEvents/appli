@@ -26,6 +26,12 @@ export function SoldeProjeteChart({
   const fenetre = points.slice(start, start + WIN);
   const maxAbs = Math.max(1, ...fenetre.map((p) => Math.abs(p.value)));
 
+  // Mois non encore écoulés : le solde n'y est qu'une projection. Le mois en cours en
+  // fait partie, il n'est pas terminé. On les hachure pour ne pas les lire comme du réel.
+  const moisCourant = new Date().toISOString().slice(0, 7);
+  const HACHURES = "repeating-linear-gradient(45deg, rgba(255,255,255,.5) 0 2px, transparent 2px 5px)";
+  const projete = fenetre.some((p) => p.key >= moisCourant);
+
   return (
     <Card className="max-w-2xl p-5">
       <div className="mb-4 flex items-center justify-between">
@@ -56,20 +62,34 @@ export function SoldeProjeteChart({
           const v = p.value;
           const h = Math.round((Math.abs(v) / maxAbs) * H);
           const color = v < 0 ? "bg-red-500" : v < seuil ? "bg-amber-500" : "bg-green-500";
+          const futur = p.key >= moisCourant;
+          const styleBarre = (hauteur: number) => ({
+            height: `${hauteur}px`,
+            ...(futur ? { backgroundImage: HACHURES } : {}),
+          });
           return (
-            <div key={p.key} className="flex-1" title={`${p.label} : ${euros(v)}`}>
+            <div key={p.key} className="flex-1" title={`${p.label} : ${euros(v)}${futur ? " (projeté)" : ""}`}>
               <div className="flex items-end justify-center" style={{ height: H }}>
-                {v >= 0 && <div className={`w-3.5 rounded-t ${color}`} style={{ height: `${h}px` }} />}
+                {v >= 0 && <div className={`w-3.5 rounded-t ${color}`} style={styleBarre(h)} />}
               </div>
               <div className="h-px bg-border" />
               <div className="flex items-start justify-center" style={{ height: H }}>
-                {v < 0 && <div className={`w-3.5 rounded-b ${color}`} style={{ height: `${h}px` }} />}
+                {v < 0 && <div className={`w-3.5 rounded-b ${color}`} style={styleBarre(h)} />}
               </div>
-              <div className="mt-1 text-center text-[10px] text-muted">{p.label}</div>
+              <div className={`mt-1 text-center text-[10px] ${futur ? "italic text-muted/70" : "text-muted"}`}>{p.label}</div>
             </div>
           );
         })}
       </div>
+      {projete && (
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted">
+          <span
+            className="inline-block h-2.5 w-4 rounded-sm bg-green-500 align-middle"
+            style={{ backgroundImage: HACHURES }}
+          />
+          Mois non écoulés — solde projeté
+        </p>
+      )}
     </Card>
   );
 }

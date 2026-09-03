@@ -27,9 +27,14 @@ export function ListePlanification({
   const [ouvert, setOuvert] = useState(false);
 
   const recherche = q.trim().toLowerCase();
-  const filtrer = (l: Entree[]) => (recherche ? l.filter((e) => e.cle.includes(recherche)) : l);
-  const futures = useMemo(() => filtrer(aVenir), [aVenir, recherche]);
-  const anciennes = useMemo(() => filtrer(passees), [passees, recherche]);
+  const futures = useMemo(
+    () => (recherche ? aVenir.filter((e) => e.cle.includes(recherche)) : aVenir),
+    [aVenir, recherche],
+  );
+  const anciennes = useMemo(
+    () => (recherche ? passees.filter((e) => e.cle.includes(recherche)) : passees),
+    [passees, recherche],
+  );
   const passeesVisibles = ouvert || recherche.length > 0;
 
   return (

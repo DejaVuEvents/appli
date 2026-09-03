@@ -211,12 +211,14 @@ export async function rattacherOuCreerEcritureFacture(
     factureId: string;
     prestationId: string;
     numero: string;
+    /** Intitulé du document — le n° seul ne dit pas de quoi il s'agit. */
+    libelle?: string | null;
     montant: number;
     date: string | null;
     createdBy: string | null;
   },
 ): Promise<"rattachee" | "creee" | "ignoree"> {
-  const { factureId, prestationId, numero, montant, date, createdBy } = args;
+  const { factureId, prestationId, numero, libelle, montant, date, createdBy } = args;
   if (!montant) return "ignoree"; // facture annulée / à 0 € : rien à comptabiliser
 
   const ref = date ?? new Date().toISOString().slice(0, 10);
@@ -251,7 +253,7 @@ export async function rattacherOuCreerEcritureFacture(
 
   await supabase.from("ecriture_financiere").insert({
     date: ref,
-    denomination: `Facture N° ${numero}`,
+    denomination: `${libelle ? `${libelle} — ` : ""}Facture N° ${numero}`,
     type: "Prestation_Tech",
     specification: "Location de matériel",
     sens: montant < 0 ? "sortie" : "entree",

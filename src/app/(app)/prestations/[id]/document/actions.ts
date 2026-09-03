@@ -33,6 +33,7 @@ async function synchroniserEcritureFacture(supabase: Supa, devisId: string) {
     .eq("type", "facture")
     .maybeSingle();
   if (!fac || !fac.numero) return; // pas de facture émise → rien à alimenter
+  const { data: dvNom } = await supabase.from("devis").select("nom").eq("id", devisId).maybeSingle();
 
   const { data: existante } = await supabase
     .from("ecriture_financiere")
@@ -68,7 +69,7 @@ async function synchroniserEcritureFacture(supabase: Supa, devisId: string) {
   const today = new Date().toISOString().slice(0, 10);
   const payload = {
     date: paye ? today : (fac.date_echeance ?? fac.date_emission ?? today),
-    denomination: `Facture N° ${fac.numero}${clientNom ? ` — ${clientNom}` : ""}`,
+    denomination: `${dvNom?.nom ? `${dvNom.nom} — ` : ""}Facture N° ${fac.numero}${clientNom ? ` (${clientNom})` : ""}`,
     type,
     specification,
     sens: "entree",

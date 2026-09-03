@@ -209,7 +209,7 @@ export async function importerDocumentPdf(formData: FormData) {
     if (df && numeroNorm && montant) {
       const { data: { user: u2 } } = await supabase.auth.getUser();
       resultatEcriture = await rattacherOuCreerEcritureFacture(supabase, {
-        factureId: df.id, prestationId: prest.id, numero: numeroNorm,
+        factureId: df.id, prestationId: prest.id, numero: numeroNorm, libelle: nom,
         montant, date, createdBy: u2?.id ?? null,
       });
       revaliderTresorerie();

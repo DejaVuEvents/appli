@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { bucketPour, BUCKETS } from "@/lib/devis-buckets";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
@@ -74,7 +75,13 @@ export default async function TechniquePage({
     serialsParRef.set(u.reference_id, arr);
   }
 
-  const lignesPoids = lignes.filter((l) => poidsLigne(l.reference?.poids_kg ?? null, l.quantite) > 0);
+  // Toutes les lignes de MATÉRIEL sont proposées au levage, y compris celles dont le poids
+  // n'est pas renseigné : les masquer donnait une charge sous-estimée sans le signaler.
+  // Seules la main-d'œuvre et le transport sont écartés (rien à suspendre).
+  const lignesPoids = lignes.filter((l) => {
+    const b = bucketPour(l.designation, null);
+    return b !== BUCKETS.TECH && b !== BUCKETS.TRANSPORT;
+  });
   const lignesElec = lignes.filter((l) => courantLigne(l.reference ?? { puissance_w: null, intensite_a: null, phase: null }, l.quantite) > 0);
 
   // Exemplaires élec : une entrée par unité de chaque ligne (placement individuel sur les circuits).
@@ -148,7 +155,10 @@ export default async function TechniquePage({
           lignes={lignesPoids.map((l) => ({
             id: l.id,
             designation: l.designation,
+            quantite: l.quantite,
             poids: poidsLigne(l.reference?.poids_kg ?? null, l.quantite),
+            poidsConnu: (l.reference?.poids_kg ?? 0) > 0,
+            referenceId: l.reference_id,
             pontId: pontDeLigne.get(l.id) ?? null,
           }))}
           lignesLevage={lignes

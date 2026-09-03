@@ -4,6 +4,7 @@ import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addPont, deletePont, affecterPont } from "./actions";
 import { AssignSelect } from "./assign-select";
+import Link from "next/link";
 import { ConfirmButton } from "@/components/confirm-button";
 import { niveauAlerte } from "@/lib/technique";
 
@@ -12,7 +13,7 @@ const BAR_CLS = { ok: "bg-green-500", warn: "bg-amber-500", depasse: "bg-red-500
 const kg = (n: number) => `${n.toFixed(1)} kg`;
 
 type Pont = { id: string; nom: string; capacite_kg: number | null; total: number };
-type LigneP = { id: string; designation: string | null; poids: number; pontId: string | null };
+type LigneP = { id: string; designation: string | null; quantite: number; poids: number; poidsConnu: boolean; referenceId: string | null; pontId: string | null };
 type LigneLevage = { designation: string; chargeUnitaire: number; quantite: number };
 
 export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: { prestationId: string; ponts: Pont[]; lignes: LigneP[]; lignesLevage?: LigneLevage[] }) {
@@ -56,13 +57,27 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
     startT(async () => { await affecterPont(prestationId, ligneId, fd); router.refresh(); });
   };
 
+  const detacher = (ligneId: string) => {
+    const fd = new FormData(); fd.set("pont_id", "");
+    startT(async () => { await affecterPont(prestationId, ligneId, fd); router.refresh(); });
+  };
+
   const pontOptions = ponts.map((p) => ({ id: p.id, nom: p.nom }));
   const nonAffectees = lignes.filter((l) => !l.pontId);
+  // Un poids manquant ne fait pas baisser l'alerte : il la rend fausse. On le dit.
+  const sansPoids = lignes.filter((l) => !l.poidsConnu);
 
   return (
     <div className="lg:flex lg:items-start lg:gap-6">
       {/* Colonne gauche : ponts (cibles de dépôt) */}
       <div className="min-w-0 flex-1 space-y-3">
+        {sansPoids.length > 0 && (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+            <strong>{sansPoids.length}</strong> élément{sansPoids.length > 1 ? "s" : ""} sans poids renseigné : la charge
+            affichée est <strong>sous-estimée</strong>. Complète la fiche produit dans le{" "}
+            <Link href="/catalogue" className="underline">catalogue</Link> pour un calcul juste.
+          </p>
+        )}
         {dragId && (
           <div data-drop="root" className={`rounded-xl border-2 border-dashed py-2.5 text-center text-xs ${overId === "root" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted"}`}>
             Déposer ici → détacher (non affecté)
@@ -88,12 +103,46 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
                   <div className={`h-full rounded-full ${BAR_CLS[al]}`} style={{ width: `${pct}%` }} />
                 </div>
               ) : null}
-              {/* Charges affectées à ce pont */}
-              <div className="mt-2 flex flex-wrap gap-1">
-                {lignes.filter((l) => l.pontId === p.id).map((l) => (
-                  <span key={l.id} className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted">{l.designation} · {kg(l.poids)}</span>
-                ))}
-              </div>
+              {/* Charges affectées — une ligne par élément, comme l'arborescence élec */}
+              {(() => {
+                const dessus = lignes.filter((l) => l.pontId === p.id);
+                if (dessus.length === 0) {
+                  return <p className="mt-3 text-xs text-muted">Aucune charge affectée.</p>;
+                }
+                return (
+                  <div className="mt-3 divide-y divide-border rounded-lg border border-border">
+                    {dessus.map((l) => (
+                      <div key={l.id} className="flex items-center gap-2 px-2.5 py-1.5 text-sm">
+                        <button
+                          type="button"
+                          onPointerDown={(e) => onDown(e, l.id)}
+                          onPointerMove={onMove}
+                          onPointerUp={onUp}
+                          className="shrink-0 cursor-grab touch-none text-muted active:cursor-grabbing"
+                          title="Déplacer vers un autre pont"
+                        >
+                          ⠿
+                        </button>
+                        <span className="min-w-0 flex-1 truncate">
+                          {l.designation}
+                          {l.quantite > 1 && <span className="text-muted"> ×{l.quantite}</span>}
+                        </span>
+                        <span className={`shrink-0 tabular-nums ${l.poidsConnu ? "text-muted" : "text-amber-600"}`}>
+                          {l.poidsConnu ? kg(l.poids) : "poids ?"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => detacher(l.id)}
+                          className="shrink-0 text-muted hover:text-red-600"
+                          title="Retirer du pont"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
@@ -135,7 +184,7 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
         <div className="overflow-hidden rounded-xl border border-border">
           <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">À affecter</div>
           {nonAffectees.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-muted">{lignes.length === 0 ? "Aucun matériel avec poids." : "Tout est affecté ✓"}</p>
+            <p className="px-3 py-4 text-sm text-muted">{lignes.length === 0 ? "Aucun matériel sur ce devis." : "Tout est affecté ✓"}</p>
           ) : (
             <div className="divide-y divide-border">
               {nonAffectees.map((l) => {
@@ -153,8 +202,13 @@ export function LevagePlan({ prestationId, ponts, lignes, lignesLevage = [] }: {
                       ⠿
                     </button>
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words leading-tight">{l.designation}</span>
-                      <span className="text-xs text-muted">{kg(l.poids)}</span>
+                      <span className="block break-words leading-tight">
+                        {l.designation}
+                        {l.quantite > 1 && <span className="text-muted"> ×{l.quantite}</span>}
+                      </span>
+                      <span className={`text-xs ${l.poidsConnu ? "text-muted" : "text-amber-600"}`}>
+                        {l.poidsConnu ? kg(l.poids) : "poids non renseigné"}
+                      </span>
                     </span>
                     <AssignSelect action={affecterPont.bind(null, prestationId, l.id)} fieldName="pont_id" value={l.pontId} options={pontOptions} />
                   </div>

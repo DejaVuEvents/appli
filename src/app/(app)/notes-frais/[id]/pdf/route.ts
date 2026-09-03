@@ -10,8 +10,10 @@ export const runtime = "nodejs";
 
 const A4 = { w: 595.28, h: 841.89 };
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // ?apercu=1 → affichage dans l'iframe de la lightbox ; sans lui, téléchargement.
+  const apercu = request.nextUrl.searchParams.get("apercu") === "1";
   const supabase = await createClient();
   const args = await assemblerNdfPdfArgs(supabase, id);
   if (!args) return new Response("Introuvable", { status: 404 });
@@ -68,7 +70,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   return new Response(new Uint8Array(out), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": dispositionFichier(nom),
+      "Content-Disposition": dispositionFichier(nom, apercu ? "inline" : "attachment"),
       "Cache-Control": "no-store",
     },
   });

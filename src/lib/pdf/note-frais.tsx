@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image, renderToBuffer } from "@react-pdf/renderer";
 import { euros, dateFr } from "@/lib/format";
 import type { ParametresEntreprise } from "@/lib/types";
+import { resoudreLogo } from "./logo";
 
 export type NdfPersonne = {
   nom: string | null;
@@ -25,36 +26,38 @@ export type NdfPdfArgs = {
   total: number;
 };
 
-const GREEN = "#d9ead3";
-const GREY = "#e0e0e0";
-const LINE = "#bbb";
+// Mêmes conventions que le devis / la facture : filets fins, aucun aplat de couleur,
+// une seule police, la hiérarchie portée par la graisse et les règles horizontales.
+const C = { border: "#222", muted: "#666", line: "#ccc", bg: "#f3f4f6" };
 
 const s = StyleSheet.create({
-  page: { padding: 32, fontSize: 8.5, color: "#111", fontFamily: "Helvetica" },
-  headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  logo: { width: 54, height: 54, objectFit: "contain" },
-  title: { fontSize: 24, fontFamily: "Helvetica-Bold" },
-  soc: { textAlign: "right", fontSize: 7.5, color: "#333", lineHeight: 1.3 },
-  divider: { flexDirection: "row", alignItems: "center", marginTop: 14, marginBottom: 6 },
-  divLabel: { fontSize: 10, fontFamily: "Helvetica-Bold", marginRight: 6 },
-  divLine: { flex: 1, borderBottomWidth: 1, borderBottomColor: LINE, borderBottomStyle: "dashed" },
-  twoCol: { flexDirection: "row", gap: 16 },
-  box: { borderWidth: 1, borderColor: LINE },
-  boxHeadG: { backgroundColor: GREEN, textAlign: "center", paddingVertical: 3, fontFamily: "Helvetica-Bold" },
-  boxHeadR: { backgroundColor: GREY, textAlign: "center", paddingVertical: 3, fontFamily: "Helvetica-Bold" },
-  infoRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: LINE },
-  infoKey: { width: 64, paddingVertical: 2.5, paddingHorizontal: 4, borderRightWidth: 1, borderRightColor: LINE, textAlign: "center" },
-  infoVal: { flex: 1, paddingVertical: 2.5, paddingHorizontal: 4 },
-  th: { flexDirection: "row", backgroundColor: GREEN, borderWidth: 1, borderColor: LINE, fontFamily: "Helvetica-Bold" },
-  tr: { flexDirection: "row", borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: LINE },
-  cDate: { width: 70, padding: 4, borderRightWidth: 1, borderRightColor: LINE },
-  cObjet: { flex: 1, padding: 4, borderRightWidth: 1, borderRightColor: LINE },
-  cMt: { width: 80, padding: 4, textAlign: "right" },
-  totRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 4 },
-  remarque: { fontSize: 7.5, color: "#444", marginTop: 3, lineHeight: 1.3 },
-  signBox: { borderWidth: 1, borderColor: LINE, height: 80 },
-  signImg: { height: 50, objectFit: "contain", marginTop: 4, marginHorizontal: 6 },
-  signCaption: { textAlign: "center", fontSize: 7, color: "#666", marginTop: 3 },
+  page: { padding: 36, fontSize: 9, color: "#111", fontFamily: "Helvetica" },
+  logo: { height: 48, marginBottom: 6, objectFit: "contain" },
+  soc: { fontSize: 13, fontFamily: "Helvetica-Bold" },
+  muted: { color: C.muted },
+  title: { fontSize: 16, fontFamily: "Helvetica-Bold" },
+  metaRow: { flexDirection: "row", gap: 24, marginTop: 4, fontSize: 8 },
+
+  section: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.muted, letterSpacing: 0.6, marginTop: 18, marginBottom: 5 },
+
+  twoCol: { flexDirection: "row", gap: 24 },
+  infoRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: C.line, paddingVertical: 2.5 },
+  infoKey: { width: 62, color: C.muted },
+  infoVal: { flex: 1 },
+
+  th: { flexDirection: "row", borderBottomWidth: 2, borderBottomColor: C.border, paddingBottom: 3, fontFamily: "Helvetica-Bold" },
+  tr: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: C.line, paddingVertical: 3 },
+  cDate: { width: "18%" },
+  cObjet: { flex: 1 },
+  cMt: { width: "22%", textAlign: "right" },
+
+  totBox: { width: 230, marginLeft: "auto", marginTop: 14 },
+  totStrong: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: C.border, paddingTop: 2, marginTop: 2, fontFamily: "Helvetica-Bold" },
+
+  mentions: { fontSize: 8, color: C.muted, marginTop: 3, lineHeight: 1.35 },
+  signBox: { width: 170, height: 64, borderWidth: 1, borderColor: C.line, marginTop: 4 },
+  signImg: { height: 52, objectFit: "contain", margin: 5 },
+  signCaption: { fontSize: 7.5, color: C.muted, marginTop: 3 },
 });
 
 function eur(n: number | null | undefined) {
@@ -76,60 +79,59 @@ function InfoRow({ k, v }: { k: string; v: string | null }) {
   );
 }
 
-function Divider({ label }: { label: string }) {
-  return (
-    <View style={s.divider}>
-      <Text style={s.divLabel}>{label}</Text>
-      <View style={s.divLine} />
-    </View>
-  );
-}
-
-function NdfPDF({ a }: { a: NdfPdfArgs }) {
-  const villeLigne = [a.ent?.code_postal, a.ent?.ville].filter(Boolean).join(", ");
+function NdfPDF({ a, logo }: { a: NdfPdfArgs; logo: string | Buffer | null }) {
+  const villeLigne = [a.ent?.code_postal, a.ent?.ville].filter(Boolean).join(" ");
   const d = a.demandeur;
   const r = a.responsable;
+
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        {/* En-tête */}
-        <View style={s.headRow}>
-          {a.ent?.logo ? <Image style={s.logo} src={a.ent.logo} /> : <View style={{ width: 54 }} />}
+        {/* En-tête société — identique au devis */}
+        <View>
+          {logo ? <Image style={s.logo} src={logo as string} /> : null}
+          <Text style={s.soc}>{a.ent?.raison_sociale ?? "DEJA VU"}</Text>
+          <Text style={s.muted}>Association loi 1901</Text>
+          {a.ent?.adresse ? <Text>{a.ent.adresse}</Text> : null}
+          {villeLigne ? <Text>{villeLigne}{a.ent?.pays ? `, ${a.ent.pays}` : ""}</Text> : null}
+          {a.ent?.siren ? <Text style={[s.muted, { marginTop: 4, fontSize: 8 }]}>SIREN : {a.ent.siren}</Text> : null}
+        </View>
+
+        {/* Titre */}
+        <View style={{ marginTop: 22 }}>
           <Text style={s.title}>Note de frais</Text>
-          <View style={s.soc}>
-            <Text>{a.ent?.raison_sociale ?? "DEJA VU"} (Association Loi 1901)</Text>
-            {a.ent?.adresse ? <Text>{a.ent.adresse}</Text> : null}
-            {villeLigne ? <Text>{villeLigne}</Text> : null}
-            {a.ent?.siren ? <Text>SIREN : {a.ent.siren}</Text> : null}
+          {a.titre ? <Text style={s.muted}>{a.titre}</Text> : null}
+          <View style={s.metaRow}>
+            <Text>Demandeur : {nomComplet(d)}</Text>
+            <Text>Statut : {a.statutLabel}</Text>
+            {d.signeLe ? <Text>Signée le {dateFr(d.signeLe)}</Text> : null}
           </View>
         </View>
 
-        {/* Informations légales */}
-        <Divider label="INFORMATIONS LÉGALES" />
+        {/* Demandeur / responsable */}
+        <Text style={s.section}>INFORMATIONS LÉGALES</Text>
         <View style={s.twoCol}>
-          <View style={[s.box, { flex: 1.3 }]}>
-            <Text style={s.boxHeadG}>DEMANDEUR</Text>
-            <InfoRow k="Nom" v={d.nom} />
-            <InfoRow k="Prénom" v={d.prenom} />
+          <View style={{ flex: 1.3 }}>
+            <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 3 }}>Demandeur</Text>
+            <InfoRow k="Nom" v={nomComplet(d)} />
             <InfoRow k="Adresse" v={d.adresse} />
-            <InfoRow k="Tel" v={d.telephone} />
+            <InfoRow k="Tél." v={d.telephone} />
             <InfoRow k="Mail" v={d.email} />
             <InfoRow k="IBAN" v={d.iban} />
           </View>
-          <View style={[s.box, { flex: 1, alignSelf: "flex-start" }]}>
-            <Text style={s.boxHeadR}>RESPONSABLE</Text>
-            <InfoRow k="Nom" v={r?.nom ?? ""} />
-            <InfoRow k="Prénom" v={r?.prenom ?? ""} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 3 }}>Responsable</Text>
+            <InfoRow k="Nom" v={nomComplet(r)} />
             <InfoRow k="Fonction" v={r?.fonction ?? ""} />
           </View>
         </View>
 
-        {/* Dépenses */}
-        <Divider label="DÉPENSES" />
+        {/* Dépenses — tableau au gabarit du devis */}
+        <Text style={s.section}>DÉPENSES</Text>
         <View style={s.th}>
           <Text style={s.cDate}>Date</Text>
           <Text style={s.cObjet}>Objet</Text>
-          <Text style={s.cMt}>Montant (TTC)</Text>
+          <Text style={s.cMt}>Montant TTC</Text>
         </View>
         {a.lignes.map((l, i) => (
           <View key={i} style={s.tr}>
@@ -138,25 +140,25 @@ function NdfPDF({ a }: { a: NdfPdfArgs }) {
             <Text style={s.cMt}>{eur(l.montant_ttc)}</Text>
           </View>
         ))}
-        <View style={s.totRow}>
-          <View style={{ flexDirection: "row", borderWidth: 1, borderColor: LINE, backgroundColor: GREEN }}>
-            <Text style={{ padding: 4, fontFamily: "Helvetica-Bold" }}>Total : </Text>
-            <Text style={{ width: 80, padding: 4, textAlign: "right", fontFamily: "Helvetica-Bold" }}>{eur(a.total)}</Text>
+        <View style={s.totBox}>
+          <View style={s.totStrong}>
+            <Text>Total TTC</Text>
+            <Text>{eur(a.total)}</Text>
           </View>
         </View>
 
         {/* Remarques */}
-        <Divider label="REMARQUES" />
-        <Text style={s.remarque}>Les notes de frais doivent être soumises dans un délai d&apos;un mois maximum et doivent être associées à une dépense validée par le bureau.</Text>
-        <Text style={s.remarque}>Tous les frais engagés, pour être acceptés, doivent être réalisés dans l&apos;intérêt de l&apos;association et accompagnés par un justificatif valide faisant apparaître la TVA si celle-ci est applicable, le nom du membre ainsi que de l&apos;association {a.ent?.raison_sociale ?? "DEJA VU"} (facture ou ticket de caisse).</Text>
-        <Text style={s.remarque}>Le bureau se réserve le droit de refuser le remboursement d&apos;une note de frais suivant les mentions précédentes.</Text>
+        <Text style={s.section}>REMARQUES</Text>
+        <Text style={s.mentions}>Les notes de frais doivent être soumises dans un délai d&apos;un mois maximum et doivent être associées à une dépense validée par le bureau.</Text>
+        <Text style={s.mentions}>Tous les frais engagés, pour être acceptés, doivent être réalisés dans l&apos;intérêt de l&apos;association et accompagnés d&apos;un justificatif valide faisant apparaître la TVA si celle-ci est applicable, le nom du membre ainsi que celui de l&apos;association {a.ent?.raison_sociale ?? "DEJA VU"} (facture ou ticket de caisse).</Text>
+        <Text style={s.mentions}>Le bureau se réserve le droit de refuser le remboursement d&apos;une note de frais suivant les mentions précédentes.</Text>
 
-        {/* Validation et signatures */}
-        <Divider label="VALIDATION ET SIGNATURES" />
-        <Text style={s.remarque}>Je certifie que les informations fournies dans cette demande sont exactes et que cette dépense est nécessaire au bon fonctionnement ou au développement des activités de l&apos;association.</Text>
-        <View style={[s.twoCol, { marginTop: 8 }]}>
+        {/* Signatures */}
+        <Text style={s.section}>VALIDATION ET SIGNATURES</Text>
+        <Text style={s.mentions}>Je certifie que les informations fournies dans cette demande sont exactes et que cette dépense est nécessaire au bon fonctionnement ou au développement des activités de l&apos;association.</Text>
+        <View style={[s.twoCol, { marginTop: 10 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={s.boxHeadG}>DEMANDEUR</Text>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>Demandeur</Text>
             <View style={s.signBox}>
               {d.signeLe && d.signatureUrl ? <Image style={s.signImg} src={d.signatureUrl} /> : null}
             </View>
@@ -165,7 +167,7 @@ function NdfPDF({ a }: { a: NdfPdfArgs }) {
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.boxHeadR}>RESPONSABLE</Text>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>Responsable</Text>
             <View style={s.signBox}>
               {r?.signeLe && r?.signatureUrl ? <Image style={s.signImg} src={r.signatureUrl} /> : null}
             </View>
@@ -175,12 +177,17 @@ function NdfPDF({ a }: { a: NdfPdfArgs }) {
           </View>
         </View>
 
-        {a.motifRefus ? <Text style={[s.remarque, { marginTop: 8, color: "#b00" }]}>Refusée — motif : {a.motifRefus}</Text> : null}
+        {a.motifRefus ? (
+          <Text style={[s.mentions, { marginTop: 10, color: "#b00" }]}>Refusée — motif : {a.motifRefus}</Text>
+        ) : null}
       </Page>
     </Document>
   );
 }
 
 export async function genererNoteFraisPdf(a: NdfPdfArgs): Promise<Buffer> {
-  return renderToBuffer(<NdfPDF a={a} />);
+  // Le logo était passé tel quel : un chemin relatif (« /logo.png ») n'était pas résolu
+  // par le moteur PDF, la note sortait donc sans logo.
+  const logo = await resoudreLogo(a.ent?.logo);
+  return renderToBuffer(<NdfPDF a={a} logo={logo} />);
 }

@@ -143,7 +143,7 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
                       </div>
                     </Link>
                     {/* Aperçu du PDF sans quitter la liste */}
-                    <JustificatifPreview url={`/notes-frais/${n.id}/pdf`} libelle={n.titre || "Note de frais"} />
+                    <JustificatifPreview url={`/notes-frais/${n.id}/pdf?apercu=1`} libelle={n.titre || "Note de frais"} />
                     <form action={deleteNoteFrais.bind(null, n.id)}>
                       <ConfirmButton confirm={`Supprimer la note de frais « ${n.titre || "Note de frais"} » ?`} className={delBtn} title="Supprimer">✕</ConfirmButton>
                     </form>

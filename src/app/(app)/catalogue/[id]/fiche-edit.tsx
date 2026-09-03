@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, Badge } from "@/components/ui";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
+import { InfoHint } from "@/components/info-hint";
 import { IconEdit, IconDownload } from "@/components/icons";
 import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
@@ -53,12 +54,12 @@ export function FicheEdit({
       {/* Unités sérialisées — panneau de droite, une ligne par unité */}
       {/* Accessoires (obligatoires + optionnels) */}
       <section>
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">Accessoires</h2>
-        <p className="mb-4 text-sm text-muted">
-          Pour chaque unité de « {reference.nom} », les accessoires <strong>obligatoires</strong> sont
-          ajoutés automatiquement au devis et à la check-list ; les <strong>optionnels</strong> seront
-          proposés (à cocher) au moment de la création du devis.
-        </p>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+          Accessoires
+          <InfoHint
+            text={`Pour chaque unité de « ${reference.nom} », les accessoires obligatoires sont ajoutés automatiquement au devis et à la check-list ; les optionnels seront proposés (à cocher) au moment de la création du devis.`}
+          />
+        </h2>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
@@ -92,46 +93,56 @@ export function FicheEdit({
           </div>
         </div>
 
-        {/* Ajout d'un accessoire */}
-        <Card className="mt-4 p-4">
-          <form action={addKitRegle.bind(null, id)} className="grid gap-3 sm:grid-cols-4 sm:items-end">
-            <div className="sm:col-span-2">
-              <label htmlFor="accessoire_nom" className="block text-sm font-medium mb-1">
-                Accessoire <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="accessoire_nom"
-                name="accessoire_nom"
-                list="refs-accessoires"
-                required
-                placeholder="Câble DMX 3m, Élingue 1m, Crochet…"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
-              <datalist id="refs-accessoires">
-                {autresRefs.map((r) => (
-                  <option key={r.id} value={r.nom} />
-                ))}
-              </datalist>
-            </div>
-            <Field label="Quantité / unité" name="quantite_par_unite" type="number" step="0.01" defaultValue={1} />
-            <Select
-              label="Type"
-              name="obligatoire"
-              defaultValue="obligatoire"
-              options={[
-                { value: "obligatoire", label: "Obligatoire" },
-                { value: "optionnel", label: "Optionnel" },
-              ]}
-            />
-            <div className="sm:col-span-4">
-              <SubmitButton>+ Ajouter l&apos;accessoire</SubmitButton>
-            </div>
-          </form>
-          <p className="mt-2 text-xs text-muted">
-            Si l&apos;accessoire n&apos;existe pas encore, tape son nom : il sera créé automatiquement
-            (comme consommable, modifiable ensuite dans le catalogue).
-          </p>
-        </Card>
+        <div className="mt-4">
+          <Modal
+            trigger={<>+ Ajouter un accessoire</>}
+            title="Ajouter un accessoire"
+            triggerClassName="rounded-lg border border-dashed border-border px-4 py-2 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+          >
+            <ModalForm action={addKitRegle.bind(null, id)} className="space-y-4">
+              <div>
+                <label htmlFor="accessoire_nom" className="mb-1 block text-sm font-medium">
+                  Accessoire <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="accessoire_nom"
+                  name="accessoire_nom"
+                  list="refs-accessoires"
+                  required
+                  autoFocus
+                  placeholder="Câble DMX 3m, Élingue 1m, Crochet…"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <datalist id="refs-accessoires">
+                  {autresRefs.map((r) => (
+                    <option key={r.id} value={r.nom} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-muted">
+                  Si l&apos;accessoire n&apos;existe pas encore, tape son nom : il sera créé automatiquement
+                  (comme consommable, modifiable ensuite dans le catalogue).
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Quantité / unité" name="quantite_par_unite" type="number" step="0.01" defaultValue={1} />
+                <Select
+                  label="Type"
+                  name="obligatoire"
+                  defaultValue="obligatoire"
+                  options={[
+                    { value: "obligatoire", label: "Obligatoire" },
+                    { value: "optionnel", label: "Optionnel" },
+                  ]}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <SubmitButton>+ Ajouter</SubmitButton>
+                <ModalCancelButton />
+              </div>
+            </ModalForm>
+          </Modal>
+        </div>
+
       </section>
 
         </div>

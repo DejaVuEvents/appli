@@ -164,6 +164,28 @@ export async function setVehiculeTournee(prestationId: string, formData: FormDat
   revalidatePath(`/planification/${prestationId}`);
 }
 
+/**
+ * Journées de location du véhicule, saisies à la main.
+ * Le coût se calculait sur toute la période préparation → retour ; en pratique le camion
+ * n'est souvent loué que la veille et le lendemain, deux journées distinctes.
+ */
+export async function ajouterJourVehicule(prestationId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const date = str(formData.get("date"));
+  if (!date) return;
+  await supabase.from("vehicule_jour").upsert(
+    { prestation_id: prestationId, date },
+    { onConflict: "prestation_id,date" },
+  );
+  revalidatePath(`/planification/${prestationId}`);
+}
+
+export async function supprimerJourVehicule(prestationId: string, jourId: string) {
+  const supabase = await createSupabase();
+  await supabase.from("vehicule_jour").delete().eq("id", jourId);
+  revalidatePath(`/planification/${prestationId}`);
+}
+
 export async function addEtape(prestationId: string, formData: FormData) {
   const supabase = await createSupabase();
   const { data: last } = await supabase

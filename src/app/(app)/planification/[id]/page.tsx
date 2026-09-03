@@ -10,6 +10,7 @@ import { dateFr, euros } from "@/lib/format";
 import { addEtape, deleteEtape, toggleEtapeFait, deplacerEtape, calculerItineraire, setVehiculeTournee } from "../actions";
 import { orsConfigured } from "@/lib/ors";
 import { coutKmVehicule } from "@/lib/vehicule";
+import { ajouterJourVehicule, supprimerJourVehicule } from "../actions";
 import { InfoHint } from "@/components/info-hint";
 import { EventTabBar } from "@/components/event-tab-bar";
 
@@ -56,16 +57,18 @@ const TYPE_CLS: Record<string, string> = {
 export default async function PlanificationDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data: prestData }, { data: etapesData }, { data: vehData }, { data: paramData }] = await Promise.all([
+  const [{ data: prestData }, { data: etapesData }, { data: vehData }, { data: jourData }, { data: paramData }] = await Promise.all([
     supabase.from("prestation").select("id, nom, lieu, date_prepa, date_event_debut, date_event_fin, date_retour, vehicule_id, client(nom)").eq("id", id).single(),
     supabase.from("etape_logistique").select("*").eq("prestation_id", id).order("ordre", { ascending: true }),
     supabase.from("vehicule").select("id, nom, cout_location_jour, cout_km, conso_l_100km, type_carburant").order("nom"),
+    supabase.from("vehicule_jour").select("id, date").eq("prestation_id", id).order("date"),
     supabase.from("parametres_entreprise").select("prix_essence, prix_diesel").limit(1).maybeSingle(),
   ]);
   if (!prestData) notFound();
   const p = prestData as unknown as Presta;
   const etapes = (etapesData ?? []) as Etape[];
   const vehicules = (vehData ?? []) as Vehicule[];
+  const joursVehicule = (jourData ?? []) as { id: string; date: string }[];
   const prixCarb = { essence: Number(paramData?.prix_essence ?? 0), diesel: Number(paramData?.prix_diesel ?? 0) };
 
   const totalKm = Math.round(etapes.reduce((s, e) => s + Number(e.distance_km ?? 0), 0) * 10) / 10;
@@ -75,7 +78,10 @@ export default async function PlanificationDetail({ params }: { params: Promise<
 
   // Coût estimé de la tournée avec le véhicule choisi.
   const vehicule = vehicules.find((v) => v.id === p.vehicule_id) ?? null;
+  // Journées saisies à la main si elles existent, sinon toute la période prépa → retour.
+  const joursManuels = joursVehicule.length > 0;
   const nbJours = (() => {
+    if (joursManuels) return joursVehicule.length;
     if (!p.date_prepa || !p.date_retour) return 1;
     const d = Math.round((new Date(p.date_retour).getTime() - new Date(p.date_prepa).getTime()) / 86400000) + 1;
     return d > 0 ? d : 1;
@@ -162,6 +168,42 @@ export default async function PlanificationDetail({ params }: { params: Promise<
           </div>
           {vehicule && !aDistances && (
             <p className="mt-1 text-xs text-muted">Calcule l&apos;itinéraire ci-dessus pour estimer le coût kilométrique.</p>
+          )}
+
+          {/* Journées de location — le camion n'est pas forcément pris sur toute la période */}
+          {vehicule && (
+            <div className="mt-3 border-t border-border pt-3 print:hidden">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">Journées de location</span>
+                <span className="text-xs text-muted">
+                  {joursManuels
+                    ? `${nbJours} journée${nbJours > 1 ? "s" : ""} facturée${nbJours > 1 ? "s" : ""}`
+                    : `${nbJours} jour${nbJours > 1 ? "s" : ""} — toute la période préparation → retour, faute de dates saisies`}
+                </span>
+              </div>
+              {joursVehicule.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {joursVehicule.map((j) => (
+                    <span key={j.id} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs">
+                      {dateFr(j.date)}
+                      <form action={supprimerJourVehicule.bind(null, id, j.id)}>
+                        <button className="text-muted hover:text-red-600" title="Retirer cette journée">✕</button>
+                      </form>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <form action={ajouterJourVehicule.bind(null, id)} className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  name="date"
+                  required
+                  defaultValue={p.date_event_debut ?? undefined}
+                  className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+                />
+                <SubmitButton className="!px-3 !py-1.5 !text-sm">+ Ajouter une journée</SubmitButton>
+              </form>
+            </div>
           )}
         </div>
 

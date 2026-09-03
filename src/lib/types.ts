@@ -124,11 +124,12 @@ export interface Vehicule {
   capacite_m3: number | null;
 }
 
-export type PrestationStatut = "devis" | "confirme" | "realise" | "annule";
+export type PrestationStatut = "brouillon" | "envoye" | "signe" | "realise" | "annule";
 
 export const PRESTATION_STATUT_LABELS: Record<PrestationStatut, string> = {
-  devis: "Devis",
-  confirme: "Confirmé",
+  brouillon: "Brouillon",
+  envoye: "Envoyé",
+  signe: "Signé",
   realise: "Réalisé",
   annule: "Annulé",
 };

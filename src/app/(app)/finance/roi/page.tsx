@@ -202,7 +202,7 @@ export default async function RoiPage({
   const revenuReel = new Map<string, number>();
   for (const l of lignes) {
     if (!l.reference_id || !l.prestation) continue;
-    if (!["confirme", "realise"].includes(l.prestation.statut)) continue;
+    if (!["signe", "realise"].includes(l.prestation.statut)) continue;
     const dateStr = l.prestation.date_event_debut;
     if (!dateStr || new Date(dateStr).getFullYear() !== annee) continue;
     const montant = l.prix_total ?? (l.prix_unitaire ?? 0) * l.quantite;

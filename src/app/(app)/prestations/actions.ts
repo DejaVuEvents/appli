@@ -176,7 +176,7 @@ export async function importerDocumentPdf(formData: FormData) {
   } else {
     const { data: cree, error: pErr } = await supabase
       .from("prestation")
-      .insert({ nom, client_id: clientId, statut: "devis", est_evenement: true, date_event_debut: date, created_by: user?.id ?? null })
+      .insert({ nom, client_id: clientId, statut: "brouillon", est_evenement: true, date_event_debut: date, created_by: user?.id ?? null })
       .select("id")
       .single();
     if (pErr) throw new Error(pErr.message);
@@ -291,7 +291,7 @@ function prestationFromForm(formData: FormData) {
     date_event_debut: str(formData.get("date_event_debut")),
     date_event_fin: str(formData.get("date_event_fin")),
     date_retour: str(formData.get("date_retour")),
-    statut: str(formData.get("statut")) ?? "devis",
+    statut: str(formData.get("statut")) ?? "brouillon",
   };
 }
 
@@ -395,7 +395,7 @@ export async function updatePrestation(id: string, formData: FormData) {
 
 export async function updateStatut(id: string, formData: FormData) {
   const supabase = await createSupabase();
-  const statut = str(formData.get("statut")) ?? "devis";
+  const statut = str(formData.get("statut")) ?? "brouillon";
   const { error } = await supabase.from("prestation").update({ statut }).eq("id", id);
   if (error) throw new Error(error.message);
 

@@ -54,8 +54,8 @@ function Fields({
           options={[{ value: "", label: "— Facture vierge —" }, ...devisModeles.map((d) => ({ value: d.id, label: `Copier : ${d.label}` }))]}
         />
       )}
-      {!prestation && <input type="hidden" name="statut" value="devis" />}
-      {prestation && <Select label="Statut" name="statut" defaultValue={prestation.statut ?? "devis"} options={statutOptions} />}
+      {!prestation && <input type="hidden" name="statut" value="brouillon" />}
+      {prestation && <Select label="Statut" name="statut" defaultValue={prestation.statut ?? "brouillon"} options={statutOptions} />}
     </div>
   );
 }

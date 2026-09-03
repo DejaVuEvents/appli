@@ -91,7 +91,7 @@ async function assurerPrestationLocation(
   const { data: p, error } = await supabase
     .from("prestation")
     .insert({
-      nom: loc.titre, client_id: loc.client_id, statut: "devis", est_evenement: false,
+      nom: loc.titre, client_id: loc.client_id, statut: "brouillon", est_evenement: false,
       date_event_debut: loc.date_debut, date_event_fin: loc.date_fin, created_by: userId,
     })
     .select("id")

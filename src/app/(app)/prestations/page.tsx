@@ -11,10 +11,12 @@ import { calculerTotaux, type RemiseType } from "@/lib/devis";
 type DevisModeleRow = { id: string; nom: string | null; type: string; prestation: { nom: string } | null };
 
 async function chargerModales(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const [{ data: clientsData }, { data: devisData }] = await Promise.all([
+  const [{ data: clientsData }, { data: devisData }, { data: prestData }] = await Promise.all([
     supabase.from("client").select("id, nom").order("nom"),
     supabase.from("devis").select("id, nom, type, prestation:prestation_id(nom)").order("created_at", { ascending: false }),
+    supabase.from("prestation").select("id, nom").order("date_event_debut", { ascending: false }),
   ]);
+  const prestations = (prestData ?? []) as { id: string; nom: string }[];
   const clients = (clientsData ?? []) as { id: string; nom: string }[];
   const modeles = ((devisData ?? []) as unknown as DevisModeleRow[]).map((d) => ({
     id: d.id,
@@ -32,7 +34,7 @@ async function chargerModales(supabase: Awaited<ReturnType<typeof createClient>>
       <PrestationForm action={createPrestation} clients={clients} cancelHref="/prestations" inModal type="facture" devisModeles={modeles} />
     </Modal>
   );
-  return { creerDevis, creerFacture, clients };
+  return { creerDevis, creerFacture, clients, prestations };
 }
 
 type DevisDocRow = {
@@ -64,7 +66,7 @@ export default async function PrestationsPage({
 
   const supabase = await createClient();
 
-  const { creerDevis, creerFacture, clients } = await chargerModales(supabase);
+  const { creerDevis, creerFacture, clients, prestations } = await chargerModales(supabase);
 
   // Tous les documents (devis + factures) + statut d'émission + lignes/transport (pour le montant).
   const [{ data: devisData }, { data: dfData }, { data: lignesData }, { data: transData }] = await Promise.all([
@@ -152,7 +154,7 @@ export default async function PrestationsPage({
   const action = (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {tab === "factures" ? creerFacture : creerDevis}
-      <ImportPdf clients={clients} defaultType={tab === "factures" ? "facture" : "devis"} />
+      <ImportPdf clients={clients} prestations={prestations} defaultType={tab === "factures" ? "facture" : "devis"} />
     </div>
   );
 

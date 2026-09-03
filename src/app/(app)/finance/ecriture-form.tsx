@@ -45,10 +45,6 @@ export function EcritureForm({
 
   const Wrapper = (inModal ? ModalForm : "form") as React.ElementType;
 
-  // Événements réels d'un côté, conteneurs nés d'un import de document de l'autre.
-  const evenements = prestations.filter((p) => p.est_evenement !== false);
-  const conteneurs = prestations.filter((p) => p.est_evenement === false);
-
   return (
     <Wrapper action={action} className="space-y-3">
       {retour && <input type="hidden" name="retour" value={retour} />}
@@ -121,18 +117,9 @@ export function EcritureForm({
             <span className="mb-1 block text-sm font-medium">Prestation liée</span>
             <select name="prestation_id" defaultValue={ecriture?.prestation_id ?? ""} className={input}>
               <option value="">— Aucune —</option>
-              {/* Chaque document importé crée son propre conteneur : sans ce regroupement
-                  la liste mélange 3 événements et des dizaines de conteneurs. */}
-              {evenements.length > 0 && (
-                <optgroup label="Événements">
-                  {evenements.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-                </optgroup>
-              )}
-              {conteneurs.length > 0 && (
-                <optgroup label="Documents importés">
-                  {conteneurs.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-                </optgroup>
-              )}
+              {prestations.map((p) => (
+                <option key={p.id} value={p.id}>{p.nom}</option>
+              ))}
             </select>
           </label>
         )}

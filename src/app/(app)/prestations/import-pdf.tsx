@@ -6,7 +6,7 @@ import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { importerDocumentPdf } from "./actions";
 
-export function ImportPdf({ clients, defaultType }: { clients: { id: string; nom: string }[]; defaultType: "devis" | "facture" }) {
+export function ImportPdf({ clients, prestations = [], defaultType }: { clients: { id: string; nom: string }[]; prestations?: { id: string; nom: string }[]; defaultType: "devis" | "facture" }) {
   const [type, setType] = useState<"devis" | "facture">(defaultType);
   const radio = (v: "devis" | "facture", label: string) => (
     <label className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium ${type === v ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-background"}`}>
@@ -32,6 +32,16 @@ export function ImportPdf({ clients, defaultType }: { clients: { id: string; nom
           name="client_id"
           options={[{ value: "", label: "— Aucun —" }, ...clients.map((c) => ({ value: c.id, label: c.nom }))]}
         />
+        <div>
+          <Select
+            label="Rattacher à un événement existant"
+            name="prestation_id"
+            options={[{ value: "", label: "— Créer un nouvel événement —" }, ...prestations.map((p) => ({ value: p.id, label: p.nom }))]}
+          />
+          <p className="mt-1 text-xs text-muted">
+            Un acompte, un devis et sa facture doivent pointer sur le même événement.
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Date du document" name="date" type="date" />
           <Field label="Montant (€)" name="montant" type="number" step="0.01" />

@@ -89,14 +89,16 @@ export function Modal({
       {open && (
         <div
           onClick={close}
-          className="fixed inset-0 flex items-start justify-center overflow-y-auto p-4 sm:p-6 print:hidden"
+          className="fixed inset-0 flex items-center justify-center p-4 sm:p-6 print:hidden"
           style={{ zIndex: 100, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
         >
+          {/* Centrée et bornée en hauteur : elle ne vient plus buter contre le header
+              collant, et c'est son contenu qui défile quand le formulaire est long. */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`relative my-6 w-full ${panelClassName} rounded-2xl border border-border bg-surface shadow-2xl`}
+            className={`relative flex max-h-full w-full flex-col ${panelClassName} rounded-2xl border border-border bg-surface shadow-2xl`}
           >
-            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-3">
               <h2 className="text-base font-semibold">{title}</h2>
               <button
                 type="button"
@@ -109,7 +111,7 @@ export function Modal({
                 </svg>
               </button>
             </div>
-            <div className="p-5">
+            <div className="overflow-y-auto p-5">
               <ModalCtx.Provider value={{ close }}>{children}</ModalCtx.Provider>
             </div>
           </div>

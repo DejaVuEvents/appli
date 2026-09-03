@@ -166,13 +166,23 @@ export async function importerDocumentPdf(formData: FormData) {
   });
   if (upErr) throw new Error(`Upload : ${upErr.message}`);
 
-  // 2) Conteneur (non-événement) + document.
-  const { data: prest, error: pErr } = await supabase
-    .from("prestation")
-    .insert({ nom, client_id: clientId, statut: "devis", est_evenement: false, date_event_debut: date, created_by: user?.id ?? null })
-    .select("id")
-    .single();
-  if (pErr) throw new Error(pErr.message);
+  // 2) Événement porteur : celui choisi dans le formulaire, sinon un nouvel événement.
+  //    (Un document importé ne crée plus de « conteneur » à part : chaque prestation de
+  //    la base est un événement, et les listes de l'app sont enfin cohérentes.)
+  let prest: { id: string } | null = null;
+  const prestationExistante = str(formData.get("prestation_id"));
+  if (prestationExistante) {
+    prest = { id: prestationExistante };
+  } else {
+    const { data: cree, error: pErr } = await supabase
+      .from("prestation")
+      .insert({ nom, client_id: clientId, statut: "devis", est_evenement: true, date_event_debut: date, created_by: user?.id ?? null })
+      .select("id")
+      .single();
+    if (pErr) throw new Error(pErr.message);
+    prest = cree;
+  }
+  if (!prest) throw new Error("Impossible de déterminer l'événement.");
   const { data: devis } = await supabase
     .from("devis")
     .insert({ prestation_id: prest.id, nom, type, pdf_import: path, created_by: user?.id ?? null })

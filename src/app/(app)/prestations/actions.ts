@@ -717,6 +717,51 @@ export async function addLigne(prestationId: string, devisId: string, formData: 
   revalidatePath(`/prestations/${prestationId}`);
 }
 
+/**
+ * Relie une ligne saisie librement à une référence du catalogue.
+ *
+ * On ne touche ni à la désignation ni au prix : ils ont été fixés à la main et souvent
+ * négociés. Seul le lien est posé — c'est lui qui fait entrer la ligne dans le plan de
+ * levage, le plan électrique et la réservation d'unités. Les accessoires obligatoires de
+ * la référence sont générés dans la foulée.
+ */
+export async function lierLigneAuCatalogue(prestationId: string, ligneId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const referenceId = str(formData.get("reference_id"));
+  if (!referenceId) return;
+
+  const { data: ligne } = await supabase
+    .from("ligne_prestation")
+    .select("devis_id, quantite, categorie_id")
+    .eq("id", ligneId)
+    .maybeSingle();
+  if (!ligne) return;
+
+  const { data: ref } = await supabase
+    .from("materiel_reference")
+    .select("categorie_id")
+    .eq("id", referenceId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("ligne_prestation")
+    .update({ reference_id: referenceId, categorie_id: ligne.categorie_id ?? ref?.categorie_id ?? null })
+    .eq("id", ligneId);
+  if (error) throw new Error(error.message);
+
+  if (ligne.devis_id) {
+    await genererAccessoiresAuto(supabase, {
+      prestationId,
+      devisId: ligne.devis_id,
+      parentId: ligneId,
+      referenceId,
+      quantiteParent: ligne.quantite,
+    });
+    await toucherDevis(supabase, ligne.devis_id);
+  }
+  revalidatePath(`/prestations/${prestationId}`);
+}
+
 export async function updateLigne(prestationId: string, ligneId: string, formData: FormData) {
   const supabase = await createSupabase();
   const L = await resoudreLigne(supabase, formData);

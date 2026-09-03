@@ -4,14 +4,13 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { Modal } from "@/components/modal";
+import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { LigneForm } from "./ligne-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { IconInfo } from "@/components/icons";
+import { IconInfo, IconHorsCatalogue } from "@/components/icons";
 import { SousLocationBadge } from "@/components/sous-location-badge";
-import { HorsCatalogueBadge } from "@/components/hors-catalogue-badge";
 import { euros } from "@/lib/format";
-import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel } from "./actions";
+import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel, lierLigneAuCatalogue } from "./actions";
 
 export type LigneData = {
   id: string; reference_id: string | null; designation: string | null; quantite: number; unite: string | null;
@@ -230,7 +229,9 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                             <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
                               <span className="truncate">{l.designation}</span>
                               {l.est_accessoire_auto && <span className="shrink-0 text-xs text-muted">(accessoire)</span>}
-                              {!l.reference_id && <HorsCatalogueBadge />}
+                              {!l.reference_id && (
+                                <LierAuCatalogue prestationId={prestationId} ligne={l} references={references} />
+                              )}
                             </span>
                           )}
                           {/* Qté (pas de 1) */}
@@ -335,5 +336,73 @@ function FicheProduit({ info, unitePrefix }: { info: RefInfo; unitePrefix: strin
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Pastille « ? » cliquable : ouvre le choix d'une référence du catalogue pour une ligne
+ * saisie librement. Tant qu'elle n'est reliée à rien, la ligne est ignorée par le plan de
+ * levage, le plan électrique et la réservation d'unités.
+ */
+function LierAuCatalogue({
+  prestationId,
+  ligne,
+  references,
+}: {
+  prestationId: string;
+  ligne: LigneData;
+  references: Ref[];
+}) {
+  const [q, setQ] = useState("");
+  const recherche = q.trim().toLowerCase();
+  // Sans recherche, on propose les références dont le nom ressemble à la désignation.
+  const mots = (ligne.designation ?? "").toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((m) => m.length > 3);
+  const liste = recherche
+    ? references.filter((r) => r.nom.toLowerCase().includes(recherche)).slice(0, 60)
+    : references.filter((r) => mots.some((m) => r.nom.toLowerCase().includes(m))).slice(0, 20);
+
+  return (
+    <Modal
+      trigger={<IconHorsCatalogue className="h-3.5 w-3.5 text-amber-600" />}
+      triggerTitle="Hors catalogue — cliquer pour relier à une référence"
+      triggerClassName="shrink-0 rounded p-0.5 hover:bg-background"
+      title="Relier au catalogue"
+      panelClassName="max-w-lg"
+    >
+      <p className="mb-3 text-sm text-muted">
+        <strong className="text-foreground">{ligne.designation}</strong> est saisie librement : elle
+        n&apos;apparaît ni dans le plan de levage, ni dans le plan électrique, et ne réserve aucune unité.
+        Choisis la référence correspondante — la désignation et le prix de la ligne ne changent pas.
+      </p>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Rechercher dans le catalogue…"
+        autoFocus
+        className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+      />
+      <ModalForm action={lierLigneAuCatalogue.bind(null, prestationId, ligne.id)}>
+        <div className="max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+          {liste.length === 0 && (
+            <p className="px-3 py-4 text-sm text-muted">
+              {recherche ? "Aucune référence trouvée." : "Aucune correspondance évidente — tape pour chercher."}
+            </p>
+          )}
+          {liste.map((r) => (
+            <button
+              key={r.id}
+              type="submit"
+              name="reference_id"
+              value={r.id}
+              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-background"
+            >
+              <span className="min-w-0 truncate">{r.nom}</span>
+              <span className="shrink-0 text-xs text-muted">{euros(r.prix_location_jour)}/j</span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-3"><ModalCancelButton /></div>
+      </ModalForm>
+    </Modal>
   );
 }

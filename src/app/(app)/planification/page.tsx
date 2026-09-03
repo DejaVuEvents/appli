@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader, Card, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
+import { ListePlanification, type Entree } from "./liste-planification";
 import { Modal } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { PrestationForm } from "../prestations/prestation-form";
@@ -133,10 +134,17 @@ export default async function PlanificationPage({ searchParams }: { searchParams
     );
   };
 
-  // Rendu commun : 2 sections À venir / Passées.
+  // Rendu commun : 2 sections À venir / Passées, avec recherche côté client.
   const estLoc = onglet === "location";
-  const rowsAVenir = estLoc ? locAVenir.map((l) => <LocRow key={l.id} l={l} />) : aVenir.map((p) => <Row key={p.id} p={p} />);
-  const rowsPassees = estLoc ? locPassees.map((l) => <LocRow key={l.id} l={l} />) : passees.map((p) => <Row key={p.id} p={p} />);
+  // Clé de recherche : tout ce qui est affiché sur la ligne.
+  const cleP = (p: PrestaRow) => `${p.nom} ${p.client?.nom ?? ""} ${refDate(p)} ${dateFr(refDate(p))} ${p.statut ?? ""}`.toLowerCase();
+  const cleL = (l: LocationRow) =>
+    `${l.titre} ${l.sens === "sortie" ? (l.client_id ? clientNom.get(l.client_id) ?? "" : l.tiers ?? "") : l.tiers ?? ""} ${l.lieu ?? ""} ${l.date_debut ?? ""} ${dateFr(l.date_debut)} ${l.statut ?? ""}`.toLowerCase();
+
+  const entrees = (av: boolean): Entree[] =>
+    estLoc
+      ? (av ? locAVenir : locPassees).map((l) => ({ cle: cleL(l), node: <LocRow key={l.id} l={l} /> }))
+      : (av ? aVenir : passees).map((p) => ({ cle: cleP(p), node: <Row key={p.id} p={p} /> }));
   const motVide = estLoc ? "location" : "prestation";
 
   return (
@@ -146,23 +154,13 @@ export default async function PlanificationPage({ searchParams }: { searchParams
         action={estLoc ? ajouterLocation : ajouterEvenement}
       />
 
-      <section className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">À venir</h2>
-        {rowsAVenir.length === 0 ? (
-          <Card className="px-4 py-3 text-sm text-muted">Aucune {motVide} à venir.</Card>
-        ) : (
-          <Card className="divide-y divide-border overflow-hidden">{rowsAVenir}</Card>
-        )}
-      </section>
+      <ListePlanification
+        aVenir={entrees(true)}
+        passees={entrees(false)}
+        motVide={motVide}
+        descriptionVide={estLoc ? "Les locations terminées apparaîtront ici." : "Les prestations terminées apparaîtront ici."}
+      />
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">Passées</h2>
-        {rowsPassees.length === 0 ? (
-          <EmptyState title={`Aucune ${motVide} passée`} description={estLoc ? "Les locations terminées apparaîtront ici." : "Les prestations terminées apparaîtront ici."} />
-        ) : (
-          <Card className="divide-y divide-border overflow-hidden">{rowsPassees}</Card>
-        )}
-      </section>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConnectorMultiSelect } from "@/components/connector-multiselect";
 import { Card } from "@/components/ui";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
+import { PhotoField } from "./photo-field";
 import {
   type MaterielReference,
   CONNECTEURS_PUISSANCE,
@@ -35,29 +36,7 @@ export function ReferenceForm({
           <Field label="Nom interne" name="nom" required defaultValue={reference?.nom} placeholder="Shehed 10R" />
         </div>
 
-        {/* Photo */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Photo / illustration</label>
-          {reference?.photo_url && (
-            <div className="mb-2 flex items-center gap-3">
-              <img src={reference.photo_url} alt="Photo actuelle" className="h-20 w-20 rounded-lg object-cover border border-border" />
-              <div className="text-xs text-muted space-y-1">
-                <p>Photo actuelle</p>
-                <label className="flex items-center gap-1.5 cursor-pointer text-red-600">
-                  <input type="checkbox" name="remove_photo" value="1" className="h-3.5 w-3.5" />
-                  Supprimer la photo
-                </label>
-              </div>
-            </div>
-          )}
-          <input
-            type="file"
-            name="photo"
-            accept="image/*"
-            className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:cursor-pointer hover:file:bg-background"
-          />
-          <p className="mt-1 text-xs text-muted">JPG, PNG ou WebP · max 5 Mo</p>
-        </div>
+        <PhotoField photoUrl={reference?.photo_url} />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

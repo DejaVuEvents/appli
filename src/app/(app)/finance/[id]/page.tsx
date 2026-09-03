@@ -32,7 +32,7 @@ export default async function EditEcriturePage({
   const supabase = await createClient();
   const [{ data }, { data: prestData }, { data: justifData }, { data: liensData }] = await Promise.all([
     supabase.from("ecriture_financiere").select("*").eq("id", id).single(),
-    supabase.from("prestation").select("id, nom, est_evenement").order("date_event_debut", { ascending: false }),
+    supabase.from("prestation").select("id, nom, date_event_debut").order("date_event_debut", { ascending: false }),
     supabase.from("justificatif").select("*").eq("ecriture_id", id).order("created_at"),
     supabase.from("ecriture_facture").select("devis_facture:devis_facture_id(id, numero, montant_ttc, type, prestation_id)").eq("ecriture_id", id),
   ]);

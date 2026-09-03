@@ -142,7 +142,7 @@ export default async function DocumentPage({
         </div>
 
         <a href={`/prestations/${id}/document/pdf?devis=${devisId}&type=${type}`} download className={card}>
-          <IconDownload className="h-4 w-4" /> Télécharger le PDF
+          <IconDownload className="h-4 w-4" /> PDF
         </a>
 
         <PrintButton label="Imprimer" />

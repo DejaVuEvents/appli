@@ -10,7 +10,9 @@ import type { EcritureFinanciere, SensFinancier } from "@/lib/types";
 const input =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
-type Prestation = { id: string; nom: string; est_evenement?: boolean };
+type Prestation = { id: string; nom: string; date_event_debut?: string | null };
+
+import { SelecteurPrestation } from "@/components/selecteur-prestation";
 
 export function EcritureForm({
   action,
@@ -115,12 +117,12 @@ export function EcritureForm({
         {prestations.length > 0 && (
           <label className="block">
             <span className="mb-1 block text-sm font-medium">Prestation liée</span>
-            <select name="prestation_id" defaultValue={ecriture?.prestation_id ?? ""} className={input}>
-              <option value="">— Aucune —</option>
-              {prestations.map((p) => (
-                <option key={p.id} value={p.id}>{p.nom}</option>
-              ))}
-            </select>
+            <SelecteurPrestation
+              name="prestation_id"
+              defaultValue={ecriture?.prestation_id ?? ""}
+              options={prestations.map((p) => ({ id: p.id, nom: p.nom, date: p.date_event_debut }))}
+              placeholder="Aucun événement — cliquer pour chercher"
+            />
           </label>
         )}
       </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconDownload } from "@/components/icons";
 import { Card, Badge } from "@/components/ui";
 import { euros, dateFr } from "@/lib/format";
 import {
@@ -148,9 +149,10 @@ export function FicheView({
                         <a
                           href={`/api/unite/${u.id}/qrcode`}
                           download
-                          className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
+                          title="Télécharger le QR code"
                         >
-                          Télécharger le QR
+                          <IconDownload className="h-4 w-4" /> QR
                         </a>
                         <Link href={`/u/${u.qr_code}`} className="text-primary hover:underline">
                           Ouvrir la fiche

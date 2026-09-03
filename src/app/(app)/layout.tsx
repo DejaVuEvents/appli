@@ -29,14 +29,18 @@ export default async function AppLayout({
   const notifications = await chargerNotifications(supabase, moi);
   // État « lu » persistant (par membre) : la pastille rouge ne réapparaît plus à tort.
   const { data: luesData } = moi
-    ? await supabase.from("notification_lue").select("notif_id").eq("membre_id", moi.id)
+    ? await supabase.from("notification_lue").select("notif_id, masquee").eq("membre_id", moi.id)
     : { data: [] };
-  const notifsLues = (luesData ?? []).map((l) => l.notif_id as string);
+  const lignesLues = (luesData ?? []) as { notif_id: string; masquee: boolean | null }[];
+  const notifsLues = lignesLues.map((l) => l.notif_id);
+  // Notifications supprimées à la croix : elles ne réapparaissent plus.
+  const masquees = new Set(lignesLues.filter((l) => l.masquee).map((l) => l.notif_id));
+  const notifsVisibles = notifications.filter((n) => !masquees.has(n.id));
 
   return (
     <div className="min-h-dvh">
       {/* Décalage du contenu / largeur sidebar — inline pour être insensible au cache du bundler. */}
-      <style>{`@media (min-width:768px){.app-shift{padding-left:13rem}.app-sidebar{width:13rem}}`}</style>
+      <style>{`@media (min-width:768px){.app-shift{padding-left:13rem}.app-sidebar{width:13rem}}\n/* Chaque page pose son propre max-width : on les centre toutes d'un coup. */\nmain > *{margin-left:auto;margin-right:auto}`}</style>
       <AutoLogout />
       <Nav role={moi?.role ?? "membre"} />
       <div className="app-shift print:pl-0">
@@ -51,7 +55,7 @@ export default async function AppLayout({
           </Link>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-sm text-muted sm:inline">{moi?.prenom?.trim() || (moi?.nom ? nomMembre(moi) : user?.email)}</span>
-            <NotificationBell notifications={notifications} lues={notifsLues} />
+            <NotificationBell notifications={notifsVisibles} lues={notifsLues} />
             <ProfileMenu
               avatarUrl={avatarUrl}
               nom={moi?.prenom?.trim() || (moi?.nom ? nomMembre(moi) : user?.email) || "Compte"}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, Badge } from "@/components/ui";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
-import { IconEdit } from "@/components/icons";
+import { IconEdit, IconDownload } from "@/components/icons";
 import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { ReferenceForm } from "../reference-form";
@@ -183,9 +183,10 @@ export function FicheEdit({
                           <a
                             href={`/api/unite/${u.id}/qrcode`}
                             download
-                            className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
+                            title="Télécharger le QR code"
                           >
-                            Télécharger le QR
+                            <IconDownload className="h-4 w-4" /> QR
                           </a>
                           <Link href={`/u/${u.qr_code}`} className="text-primary hover:underline">
                             Ouvrir la fiche

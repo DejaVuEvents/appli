@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconDownload } from "@/components/icons";
 import { Modal } from "@/components/modal";
 
 /** Bouton « Exporter » ouvrant une popup : plage de dates + format CSV/PDF + téléchargement. */
@@ -53,9 +54,9 @@ export function ExportModal({ annee }: { annee: number }) {
 
         <a
           href={href}
-          className="block w-full rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground hover:opacity-90"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
-          Télécharger
+          <IconDownload className="h-4 w-4" /> {format === "pdf" ? "PDF" : "CSV"}
         </a>
         <p className="text-xs text-muted">
           Le {format === "pdf" ? "PDF" : "fichier CSV"} inclut le solde cumulé projeté. Le CSV s&apos;ouvre dans Excel / Google Sheets.

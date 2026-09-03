@@ -11,7 +11,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
 import { updateStatut, associerDevisAEvenement, creerAcompteSolde, recalculerSolde } from "../../actions";
-import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck } from "@/components/icons";
+import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck, IconDownload } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture, redaterDevis } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
 import { AssocierEvenement } from "../../associer-evenement";
@@ -296,8 +296,7 @@ export default async function DevisEditorPage({
           </div>
           <div className="flex gap-2">
             <a href={pdfUrl} download className={halfBtn} title="Télécharger le PDF">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              PDF
+              <IconDownload className="h-4 w-4" /> PDF
             </a>
             {mailto && <EnvoyerClientButton mailto={mailto} pdfUrl={pdfUrl} className={halfBtn} />}
           </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconDownload } from "@/components/icons";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -72,8 +73,11 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         subtitle={`${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
         action={
           <div className="flex items-center gap-2">
-            <a href={`/notes-frais/${id}/pdf`} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">PDF</a>
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>{STATUT_NDF_LABELS[ndf.statut]}</span>
+            <a href={`/notes-frais/${id}/pdf`} download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background" title="Télécharger le PDF"><IconDownload className="h-4 w-4" /> PDF</a>
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>
+              {/* Validée = signée et approuvée ; le remboursement est une étape de plus. */}
+              {estRemboursee ? "Remboursée" : STATUT_NDF_LABELS[ndf.statut]}
+            </span>
           </div>
         }
       />
@@ -86,7 +90,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
       )}
       {ndf.statut === "validee" && (
         <Card className="border-green-200 bg-green-50 p-4 text-sm text-green-800">
-          <strong>{estPredepense ? "Achat autorisé" : "Validée"}</strong> par {mMap.get(ndf.valide_par ?? "") ?? "—"} le {dateFr(ndf.valide_le)}.
+          <strong>{estPredepense ? "Achat autorisé" : estRemboursee ? "Remboursée" : "Validée"}</strong> par {mMap.get(ndf.valide_par ?? "") ?? "—"} le {dateFr(ndf.valide_le)}.
           {estPredepense && <div className="mt-1">Tu peux procéder à l&apos;achat. Crée ensuite une note de frais « Dépenses » avec le justificatif pour le remboursement.</div>}
           {!estPredepense && ndf.ecriture_id && (
             estRemboursee ? (

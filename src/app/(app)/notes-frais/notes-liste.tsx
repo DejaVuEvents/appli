@@ -134,7 +134,7 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
                       <div className="flex shrink-0 items-center gap-3">
                         <span className="font-semibold">{euros(n.total)}</span>
                         {n.paye ? (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">Payée</span>
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">Remboursée</span>
                         ) : (
                           <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[n.statut]}`}>{STATUT_NDF_LABELS[n.statut]}</span>
                         )}

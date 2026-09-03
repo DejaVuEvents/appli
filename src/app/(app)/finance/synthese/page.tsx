@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconDownload } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { FinanceTabs } from "../finance-tabs";
@@ -130,7 +131,7 @@ function MensuellePage({
         <span>Solde réel : <strong className={soldeActuelReel < 0 ? "text-red-600" : "text-green-700"}>{euros(soldeActuelReel)}</strong></span>
         <span className="text-muted">·</span>
         <span>Solde projeté fin d&apos;année : <strong className={soldeProjete < 0 ? "text-red-600" : "text-green-700"}>{euros(soldeProjete)}</strong></span>
-        <a href={`/finance/bilan/pdf?annee=${annee}`} className="ml-auto rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">Compte de résultat + bilan {annee} (PDF)</a>
+        <a href={`/finance/bilan/pdf?annee=${annee}`} download className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background" title="Compte de résultat + bilan {annee}"><IconDownload className="h-4 w-4" /> PDF</a>
       </div>
 
       <Card className="mb-8 overflow-x-auto">

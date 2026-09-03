@@ -170,14 +170,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                {justifUrl.get(l.id) && (
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <JustificatifPreview url={justifUrl.get(l.id)!} libelle={l.libelle} />
-                    {l.justificatif_nom && (
-                      <span className="hidden max-w-40 truncate text-xs text-muted sm:inline">{l.justificatif_nom}</span>
-                    )}
-                  </span>
-                )}
+                {justifUrl.get(l.id) && <JustificatifPreview url={justifUrl.get(l.id)!} libelle={l.libelle} />}
                 <span className="font-semibold">{euros(l.montant_ttc)}</span>
                 {editable && (
                   <>

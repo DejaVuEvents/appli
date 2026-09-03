@@ -344,6 +344,7 @@ export interface LigneNoteFrais {
   date: string | null;
   montant_ttc: number;
   justificatif_url: string | null;
+  justificatif_nom: string | null;
   depart: string | null;
   arrivee: string | null;
   distance_km: number | null;

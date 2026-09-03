@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DateInput } from "@/components/date-input";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMembreActuel } from "@/lib/membre";
@@ -231,7 +232,7 @@ export default async function DevisEditorPage({
                 </p>
                 <label className="block text-sm font-medium">
                   Nouvelle date d&apos;émission
-                  <input type="date" name="date" defaultValue={aujourdhui} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                  <DateInput name="date" defaultValue={aujourdhui} className="mt-1" />
                 </label>
                 <SubmitButton>Redater</SubmitButton>
               </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateInput } from "@/components/date-input";
 import { IconDownload } from "@/components/icons";
 import { Modal } from "@/components/modal";
 
@@ -24,11 +25,11 @@ export function ExportModal({ annee }: { annee: number }) {
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1 block text-xs text-muted">Du</span>
-            <input type="date" value={debut} onChange={(e) => setDebut(e.target.value)} className={input} />
+            <DateInput value={debut} onChange={setDebut} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs text-muted">Au</span>
-            <input type="date" value={fin} onChange={(e) => setFin(e.target.value)} className={input} />
+            <DateInput value={fin} onChange={setFin} />
           </label>
         </div>
 

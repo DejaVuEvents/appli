@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateInput } from "@/components/date-input";
 import Link from "next/link";
 import { creerRecurrent, supprimerRecurrent, toggleRecurrent, creerPrevisionPonctuelle } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -189,7 +190,7 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
         <label className="block"><span className="mb-1 block text-xs font-medium">Montant (€)</span>
           <input name="montant_ttc" type="number" step="0.01" min="0" required className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Date prévue</span>
-          <input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <DateInput name="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Catégorie</span>
           <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="">—</option>

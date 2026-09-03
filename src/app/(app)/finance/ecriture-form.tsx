@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DateInput } from "@/components/date-input";
 import { useState } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
@@ -72,7 +73,7 @@ export function EcritureForm({
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Date</span>
-          <input name="date" type="date" defaultValue={ecriture?.date ?? ""} className={input} />
+          <DateInput name="date" defaultValue={ecriture?.date ?? ""} />
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Montant TTC (€)</span>

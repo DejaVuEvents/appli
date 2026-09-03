@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DateInput } from "@/components/date-input";
 import Link from "next/link";
 import { euros, dateFr } from "@/lib/format";
 import { FilterDrawer } from "@/components/filter-drawer";
@@ -99,8 +100,8 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
           <div>
             <span className="mb-1 block text-sm font-medium">Période</span>
             <div className="grid grid-cols-2 gap-2">
-              <input type="date" value={dateMin} onChange={(e) => setDateMin(e.target.value)} className={input} />
-              <input type="date" value={dateMax} onChange={(e) => setDateMax(e.target.value)} className={input} />
+              <DateInput value={dateMin} onChange={setDateMin} />
+              <DateInput value={dateMax} onChange={setDateMax} />
             </div>
           </div>
           <div>

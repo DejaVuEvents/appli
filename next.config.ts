@@ -17,6 +17,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // @react-pdf/renderer doit rester externe au bundle serveur (sinon erreurs de build).
   serverExternalPackages: ["@react-pdf/renderer"],
+  experimental: {
+    // Les Server Actions plafonnent le corps de requête à 1 Mo par défaut : un
+    // justificatif PDF ou une photo de téléphone le dépasse et l'envoi échoue.
+    // 4 Mo est le maximum utile, Vercel refusant les corps au-delà de 4,5 Mo.
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

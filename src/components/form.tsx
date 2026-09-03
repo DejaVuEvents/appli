@@ -2,6 +2,8 @@
 
 /** Champs de formulaire stylés et réutilisables. */
 
+import { DateInput } from "./date-input";
+
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
@@ -28,11 +30,26 @@ export function Field({
 }) {
   // Clavier mobile adapté : champ nombre → pavé décimal par défaut.
   const im = inputMode ?? (type === "number" ? "decimal" : undefined);
+  const etiquette = (
+    <label htmlFor={name} className="block text-left text-sm font-medium mb-1">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+  );
+
+  // Les dates passent par notre champ jj/mm/aaaa : le champ natif s'affiche dans la
+  // locale du navigateur, souvent en mm/jj/aaaa.
+  if (type === "date") {
+    return (
+      <div className={className}>
+        {etiquette}
+        <DateInput id={name} name={name} defaultValue={defaultValue == null ? null : String(defaultValue)} required={required} />
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
-      <label htmlFor={name} className="block text-left text-sm font-medium mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+      {etiquette}
       <input
         id={name}
         name={name}

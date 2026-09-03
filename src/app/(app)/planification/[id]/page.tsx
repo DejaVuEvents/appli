@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DateInput } from "@/components/date-input";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -194,13 +195,7 @@ export default async function PlanificationDetail({ params }: { params: Promise<
                 </div>
               )}
               <form action={ajouterJourVehicule.bind(null, id)} className="flex flex-wrap items-center gap-2">
-                <input
-                  type="date"
-                  name="date"
-                  required
-                  defaultValue={p.date_event_debut ?? undefined}
-                  className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
-                />
+                <DateInput name="date" defaultValue={p.date_event_debut ?? undefined} required className="w-40" />
                 <SubmitButton className="!px-3 !py-1.5 !text-sm">+ Ajouter une journée</SubmitButton>
               </form>
             </div>

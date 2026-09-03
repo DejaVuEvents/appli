@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { IconDownload, IconEdit } from "@/components/icons";
+import { DateInput } from "@/components/date-input";
+import { IconDownload, IconEdit, IconFile } from "@/components/icons";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -12,7 +13,7 @@ import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre } from "@/lib/membre";
 import {
-  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF } from "../actions";
+  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF } from "../actions";
 import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
@@ -108,8 +109,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                   <form action={marquerNDFRemboursee.bind(null, ndf.id)} className="mt-2 flex flex-wrap items-end gap-2">
                     <label className="text-xs">
                       <span className="mb-1 block font-medium">Date du virement</span>
-                      <input type="date" name="date_virement" defaultValue={new Date().toISOString().slice(0, 10)}
-                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground" />
+                      <DateInput name="date_virement" defaultValue={new Date().toISOString().slice(0, 10)} />
                     </label>
                     <SubmitButton className="!py-1.5 !text-xs">Marquer comme remboursée</SubmitButton>
                   </form>
@@ -170,7 +170,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                {justifUrl.get(l.id) && <JustificatifPreview url={justifUrl.get(l.id)!} libelle={l.libelle} />}
+                {justifUrl.get(l.id) && (
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <JustificatifPreview url={justifUrl.get(l.id)!} libelle={l.libelle} />
+                    {l.justificatif_nom && (
+                      <span className="hidden max-w-40 truncate text-xs text-muted sm:inline">{l.justificatif_nom}</span>
+                    )}
+                  </span>
+                )}
                 <span className="font-semibold">{euros(l.montant_ttc)}</span>
                 {editable && (
                   <>
@@ -187,12 +194,32 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                         </div>
                         <Field label="Montant TTC (€)" name="montant_ttc" type="number" step="0.01" defaultValue={l.montant_ttc ?? ""} />
                         <div>
-                          <span className="mb-1 block text-sm font-medium">
-                            Justificatif {justifUrl.get(l.id) ? "(remplacer)" : "(photo / PDF)"}
-                          </span>
+                          <span className="mb-1 block text-sm font-medium">Justificatif</span>
+                          {justifUrl.get(l.id) && (
+                            <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                              <IconFile className="h-4 w-4 shrink-0 text-muted" />
+                              <a
+                                href={justifUrl.get(l.id)!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="min-w-0 flex-1 truncate hover:underline"
+                              >
+                                {l.justificatif_nom || "Justificatif joint"}
+                              </a>
+                              <button
+                                type="button"
+                                formAction={retirerJustificatifNDF.bind(null, id, l.id)}
+                                title="Retirer ce justificatif"
+                                aria-label="Retirer ce justificatif"
+                                className="shrink-0 rounded p-0.5 text-muted hover:text-red-600"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
                           <FileDropzone name="justificatif" accept="image/*,application/pdf" />
                           {justifUrl.get(l.id) && (
-                            <p className="mt-1 text-xs text-muted">Laisse vide pour conserver le justificatif actuel.</p>
+                            <p className="mt-1 text-xs text-muted">Déposer un fichier remplace le justificatif actuel ; laisser vide le conserve.</p>
                           )}
                         </div>
                         <div className="flex items-center gap-3 pt-1">

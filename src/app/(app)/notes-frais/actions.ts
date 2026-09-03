@@ -21,7 +21,10 @@ function str(v: FormDataEntryValue | null): string | null {
   return s === "" ? null : s;
 }
 
-async function uploadJustificatif(supabase: Supa, file: File | null): Promise<string | null> {
+async function uploadJustificatif(
+  supabase: Supa,
+  file: File | null,
+): Promise<{ path: string; nom: string } | null> {
   if (!file || file.size === 0) return null;
   const ext = file.name.split(".").pop() ?? "pdf";
   const path = `ndf/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -32,7 +35,7 @@ async function uploadJustificatif(supabase: Supa, file: File | null): Promise<st
     upsert: false,
   });
   if (error) throw new Error(`Upload justificatif : ${error.message}`);
-  return data.path;
+  return { path: data.path, nom: file.name };
 }
 
 export async function createNoteFrais(formData: FormData) {
@@ -73,7 +76,8 @@ export async function addLigneNDF(noteId: string, formData: FormData) {
     libelle: str(formData.get("libelle")),
     date: str(formData.get("date")),
     montant_ttc: num(formData.get("montant_ttc")),
-    justificatif_url: justificatif,
+    justificatif_url: justificatif?.path ?? null,
+    justificatif_nom: justificatif?.nom ?? null,
   });
   if (error) throw new Error(error.message);
   revalidatePath(`/notes-frais/${noteId}`);
@@ -101,7 +105,8 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
     depart: t.departLabel || depart,
     arrivee: t.arriveeLabel || arrivee,
     distance_km: km,
-    justificatif_url: justificatif,
+    justificatif_url: justificatif?.path ?? null,
+    justificatif_nom: justificatif?.nom ?? null,
   });
   if (error) throw new Error(error.message);
   revalidatePath(`/notes-frais/${noteId}`);
@@ -119,8 +124,22 @@ export async function updateLigneNDF(noteId: string, ligneId: string, formData: 
     date: str(formData.get("date")),
     montant_ttc: num(formData.get("montant_ttc")),
   };
-  if (justificatif) patch.justificatif_url = justificatif;
+  if (justificatif) {
+    patch.justificatif_url = justificatif.path;
+    patch.justificatif_nom = justificatif.nom;
+  }
   const { error } = await supabase.from("ligne_note_frais").update(patch).eq("id", ligneId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/notes-frais/${noteId}`);
+}
+
+/** Retire le justificatif d'une ligne sans toucher au reste (croix ✕ à côté du nom). */
+export async function retirerJustificatifNDF(noteId: string, ligneId: string) {
+  const supabase = await createSupabase();
+  const { error } = await supabase
+    .from("ligne_note_frais")
+    .update({ justificatif_url: null, justificatif_nom: null })
+    .eq("id", ligneId);
   if (error) throw new Error(error.message);
   revalidatePath(`/notes-frais/${noteId}`);
 }

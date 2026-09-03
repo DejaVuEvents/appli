@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { IconDownload } from "@/components/icons";
 import { SousLocationBadge } from "@/components/sous-location-badge";
+import { HorsCatalogueBadge } from "@/components/hors-catalogue-badge";
 import { chargerSousLocation, type SousLocInfo } from "@/lib/sous-location";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -293,6 +294,11 @@ function DocGroup({ nom, items, sousLoc }: { nom: string; items: LigneRow[]; sou
               {l.reference_id && sousLoc.get(l.reference_id) && (
                 <span className="ml-1 inline-flex align-middle">
                   <SousLocationBadge sl={sousLoc.get(l.reference_id)!} quantite={l.quantite} />
+                </span>
+              )}
+              {!l.reference_id && (
+                <span className="ml-1 inline-flex align-middle">
+                  <HorsCatalogueBadge />
                 </span>
               )}
               {remise > 0 && (

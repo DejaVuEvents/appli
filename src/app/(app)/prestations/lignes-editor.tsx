@@ -9,6 +9,7 @@ import { LigneForm } from "./ligne-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IconInfo } from "@/components/icons";
 import { SousLocationBadge } from "@/components/sous-location-badge";
+import { HorsCatalogueBadge } from "@/components/hors-catalogue-badge";
 import { euros } from "@/lib/format";
 import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel } from "./actions";
 
@@ -226,9 +227,10 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                               {infosRef[l.reference_id].sousLoc && <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} />}
                             </span>
                           ) : (
-                            <span className="min-w-0 flex-1 truncate text-sm">
-                              {l.designation}
-                              {l.est_accessoire_auto && <span className="ml-1.5 text-xs text-muted">(accessoire)</span>}
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+                              <span className="truncate">{l.designation}</span>
+                              {l.est_accessoire_auto && <span className="shrink-0 text-xs text-muted">(accessoire)</span>}
+                              {!l.reference_id && <HorsCatalogueBadge />}
                             </span>
                           )}
                           {/* Qté (pas de 1) */}

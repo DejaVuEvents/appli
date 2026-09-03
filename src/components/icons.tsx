@@ -60,3 +60,6 @@ export const IconTag = (p: P) => (<svg {...base(p)}><path d="M20.6 13.4 12 22l-9
 
 /** Sous-location : caisse de matériel loué à un fournisseur (flèche entrante). */
 export const IconSousLocation = (p: P) => (<svg {...base(p)}><path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5z" /><path d="M12 20v-8" /><path d="M3 8.5 12 13l9-4.5" /></svg>);
+
+/** Ligne libre, non reliée au catalogue (ni poids, ni conso, ni disponibilité). */
+export const IconHorsCatalogue = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .9-1 1.6v.4" /><path d="M12 17h.01" /></svg>);

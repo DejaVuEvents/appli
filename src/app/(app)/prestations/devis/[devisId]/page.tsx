@@ -25,6 +25,7 @@ import { JustificatifPreview } from "@/components/justificatif-preview";
 import { periodeReservation, joursSuggeres, facteurJours } from "@/lib/devis";
 import { euros, dateFr } from "@/lib/format";
 import { SousLocationBadge } from "@/components/sous-location-badge";
+import { HorsCatalogueBadge } from "@/components/hors-catalogue-badge";
 import { chargerSousLocation } from "@/lib/sous-location";
 
 /** Date compacte « 18/09/26 » pour les encadrés étroits. */
@@ -464,6 +465,7 @@ export default async function DevisEditorPage({
                       {l.reference_id && sousLocParRef.get(l.reference_id) && (
                         <SousLocationBadge sl={sousLocParRef.get(l.reference_id)!} quantite={l.quantite} />
                       )}
+                      {!l.reference_id && <HorsCatalogueBadge />}
                     </div>
                     <div className="text-xs text-muted">{l.quantite}{l.unite ? ` ${l.unite}` : ""} × {euros(l.prix_unitaire)}</div>
                   </div>

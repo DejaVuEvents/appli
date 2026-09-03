@@ -36,7 +36,11 @@ export function ImportPdf({ clients, defaultType }: { clients: { id: string; nom
           <Field label="Date du document" name="date" type="date" />
           <Field label="Montant (€)" name="montant" type="number" step="0.01" />
         </div>
-        {type === "facture" && <Field label="N° de facture" name="numero" placeholder="Ex. 2024-000012" />}
+        <Field
+          label={type === "facture" ? "N° de facture" : "N° de devis"}
+          name="numero"
+          placeholder="Ex. 000042 (numéro Tiime, conservé tel quel)"
+        />
         <div>
           <label className="mb-1 block text-sm font-medium">Fichier PDF *</label>
           <input

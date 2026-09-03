@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMembreActuel } from "@/lib/membre";
 import { PageHeader, Card } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { FileSubmit } from "@/components/file-submit";
 import { Modal, ModalForm } from "@/components/modal";
 import { Field } from "@/components/form";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -386,8 +387,15 @@ export default async function DevisEditorPage({
             {sigStatut === "valide" && (
               <form action={uploaderDevisSigne.bind(null, devisId, prestationId)} className="mt-2 space-y-1.5">
                 <span className="block text-xs font-medium">Déposer la signature du client</span>
-                <input type="file" name="pdf_signe" accept="application/pdf,image/*" className="block w-full text-xs text-muted file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-foreground" />
-                <SubmitButton className="w-full gap-1 !py-1.5 !text-xs"><IconUpload className="h-3.5 w-3.5" /> Déposer la signature</SubmitButton>
+                <FileSubmit
+                  name="pdf_signe"
+                  accept="application/pdf,image/*"
+                  inputClassName="block w-full text-xs text-muted file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary-foreground"
+                  buttonClassName="w-full gap-1 !py-1.5 !text-xs"
+                  pendingLabel="Envoi…"
+                >
+                  <IconUpload className="h-3.5 w-3.5" /> Déposer la signature
+                </FileSubmit>
               </form>
             )}
           </Card>

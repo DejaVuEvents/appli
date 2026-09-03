@@ -107,6 +107,24 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   revalidatePath(`/notes-frais/${noteId}`);
 }
 
+/**
+ * Modifie une ligne existante (libellé, date, montant, justificatif).
+ * Le justificatif n'est remplacé que si un nouveau fichier est fourni.
+ */
+export async function updateLigneNDF(noteId: string, ligneId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
+  const patch: Record<string, unknown> = {
+    libelle: str(formData.get("libelle")),
+    date: str(formData.get("date")),
+    montant_ttc: num(formData.get("montant_ttc")),
+  };
+  if (justificatif) patch.justificatif_url = justificatif;
+  const { error } = await supabase.from("ligne_note_frais").update(patch).eq("id", ligneId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/notes-frais/${noteId}`);
+}
+
 export async function deleteLigneNDF(noteId: string, ligneId: string) {
   const supabase = await createSupabase();
   await supabase.from("ligne_note_frais").delete().eq("id", ligneId);

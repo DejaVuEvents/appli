@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconDownload } from "@/components/icons";
+import { IconDownload, IconEdit } from "@/components/icons";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -8,11 +8,11 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { FileDropzone } from "@/components/file-dropzone";
 import { JustificatifPreview } from "@/components/justificatif-preview";
+import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre } from "@/lib/membre";
 import {
-  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee,
-} from "../actions";
+  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF } from "../actions";
 import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
@@ -73,6 +73,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         subtitle={`${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
         action={
           <div className="flex items-center gap-2">
+            {!estPredepense && (
+              <span className="mr-1 text-sm">
+                <span className="text-muted">Total </span>
+                <strong className="text-base">{euros(total)}</strong>
+              </span>
+            )}
             <a href={`/notes-frais/${id}/pdf`} download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background" title="Télécharger le PDF"><IconDownload className="h-4 w-4" /> PDF</a>
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>
               {/* Validée = signée et approuvée ; le remboursement est une étape de plus. */}
@@ -167,9 +173,38 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 {justifUrl.get(l.id) && <JustificatifPreview url={justifUrl.get(l.id)!} libelle={l.libelle} />}
                 <span className="font-semibold">{euros(l.montant_ttc)}</span>
                 {editable && (
-                  <form action={deleteLigneNDF.bind(null, id, l.id)}>
-                    <ConfirmButton confirm="Supprimer cette ligne ?" className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
-                  </form>
+                  <>
+                    <Modal
+                      trigger={<IconEdit className="h-4 w-4" />}
+                      triggerTitle="Modifier cette ligne"
+                      triggerClassName="rounded p-1 text-muted hover:bg-background hover:text-foreground"
+                      title="Modifier la dépense"
+                    >
+                      <ModalForm action={updateLigneNDF.bind(null, id, l.id)} className="space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <Field label="Libellé" name="libelle" defaultValue={l.libelle ?? ""} className="sm:col-span-2" />
+                          <Field label="Date" name="date" type="date" defaultValue={l.date ?? ""} />
+                        </div>
+                        <Field label="Montant TTC (€)" name="montant_ttc" type="number" step="0.01" defaultValue={l.montant_ttc ?? ""} />
+                        <div>
+                          <span className="mb-1 block text-sm font-medium">
+                            Justificatif {justifUrl.get(l.id) ? "(remplacer)" : "(photo / PDF)"}
+                          </span>
+                          <FileDropzone name="justificatif" accept="image/*,application/pdf" />
+                          {justifUrl.get(l.id) && (
+                            <p className="mt-1 text-xs text-muted">Laisse vide pour conserver le justificatif actuel.</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 pt-1">
+                          <SubmitButton>Enregistrer</SubmitButton>
+                          <ModalCancelButton />
+                        </div>
+                      </ModalForm>
+                    </Modal>
+                    <form action={deleteLigneNDF.bind(null, id, l.id)}>
+                      <ConfirmButton confirm="Supprimer cette ligne ?" className="text-muted hover:text-red-600" title="Supprimer">✕</ConfirmButton>
+                    </form>
+                  </>
                 )}
               </div>
             </div>

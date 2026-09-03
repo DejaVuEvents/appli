@@ -142,17 +142,18 @@ export async function importerDocumentPdf(formData: FormData) {
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) throw new Error("Sélectionne un fichier PDF.");
 
-  // Le numéro d'un document importé est saisi à la main : il ne passe pas par le
-  // compteur. On vérifie donc qu'il n'entre pas en collision avec un numéro déjà émis
-  // (rien ne l'empêche côté base : `devis_facture.numero` n'est pas unique).
-  if (numero) {
+  // Numéro Tiime : on le conserve tel quel, au format à 6 chiffres (« 58 » → « 000058 »).
+  // Devis et factures ont des séquences indépendantes, la collision se juge par type.
+  const numeroNorm = numero && /^[0-9]+$/.test(numero) ? numero.padStart(6, "0") : numero;
+  if (numeroNorm) {
     const { data: collision } = await supabase
       .from("devis_facture")
-      .select("id, type")
-      .eq("numero", numero)
-      .maybeSingle();
-    if (collision) {
-      throw new Error(`Le numéro ${numero} est déjà utilisé par un autre document (${collision.type}). Corrige-le avant d'importer.`);
+      .select("id")
+      .eq("type", type)
+      .eq("numero", numeroNorm)
+      .limit(1);
+    if (collision && collision.length > 0) {
+      throw new Error(`Le numéro ${numeroNorm} est déjà utilisé par un autre ${type}. Corrige-le avant d'importer.`);
     }
   }
 
@@ -186,20 +187,28 @@ export async function importerDocumentPdf(formData: FormData) {
       prix_total: montant, est_accessoire_auto: false,
     });
   }
-  // 4) Facture → émission (apparaît dans la liste Factures avec un statut).
+  // 4) Document émis : on enregistre le numéro d'origine. Sans cette ligne, une émission
+  //    ultérieure depuis l'outil attribuerait un NOUVEAU numéro par-dessus celui de Tiime.
+  if (type === "devis" && devis) {
+    await supabase.from("devis_facture").insert({
+      prestation_id: prest.id, devis_id: devis.id, type: "devis", numero: numeroNorm,
+      montant_ht: montant ?? 0, taux_tva: 0, montant_ttc: montant ?? 0,
+      date_emission: date,
+    });
+  }
   if (type === "facture" && devis) {
     const { data: df } = await supabase.from("devis_facture").insert({
-      prestation_id: prest.id, devis_id: devis.id, type: "facture", numero,
+      prestation_id: prest.id, devis_id: devis.id, type: "facture", numero: numeroNorm,
       montant_ht: montant ?? 0, taux_tva: 0, montant_ttc: montant ?? 0,
       date_emission: date, statut_paiement: "en_attente",
     }).select("id").single();
     // Une facture importée alimente la trésorerie comme une facture émise (entrée
     // prévisionnelle, à valider), dès lors qu'elle a un numéro et un montant.
-    if (df && numero && montant) {
+    if (df && numeroNorm && montant) {
       const { data: { user: u2 } } = await supabase.auth.getUser();
       await supabase.from("ecriture_financiere").insert({
         date: date ?? new Date().toISOString().slice(0, 10),
-        denomination: `Facture N° ${numero}`,
+        denomination: `Facture N° ${numeroNorm}`,
         type: "Prestation_Tech", specification: "Location de matériel",
         sens: "entree", statut: "previsionnel", montant_ttc: montant,
         prestation_id: prest.id, devis_facture_id: df.id, valide: false,

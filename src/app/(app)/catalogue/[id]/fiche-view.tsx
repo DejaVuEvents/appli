@@ -64,14 +64,16 @@ export function FicheView({
             return (
               <>
                 {r.fournisseur && <Ligne label="Fournisseur" value={r.fournisseur} />}
-                <Ligne label="Tarif public / jour (HT)" value={euros(r.cout_location_jour)} />
                 <Ligne
-                  label="Notre tarif / jour"
+                  label={`Ce qu'on paie / jour`}
                   value={
                     <span>
-                      <strong>{euros(notreHT)} HT</strong>
+                      {/* Seul le TTC compte : la TVA du loueur est décaissée, on ne la récupère
+                          pas (franchise en base). Le HT et la remise ne sont qu'un rappel. */}
+                      <strong>{euros(notreTTC)}</strong>
                       <span className="ml-2 text-xs font-normal text-muted">
-                        soit {euros(notreTTC)} TTC{remise > 0 ? ` · remise ${remise} %` : ""}
+                        tarif public {euros(r.cout_location_jour)} HT
+                        {remise > 0 ? ` − ${remise} %` : ""}
                       </span>
                     </span>
                   }
@@ -81,7 +83,7 @@ export function FicheView({
                   value={
                     <span className={r.prix_location_jour - notreTTC >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}>
                       {euros(r.prix_location_jour - notreTTC)}
-                      <span className="ml-2 text-xs font-normal text-muted">(prix client − coût TTC)</span>
+                      <span className="ml-2 text-xs font-normal text-muted">(prix client − ce qu&apos;on paie)</span>
                     </span>
                   }
                 />

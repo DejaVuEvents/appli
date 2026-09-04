@@ -12,6 +12,7 @@ type RefRow = {
   photo_url: string | null;
   prix_location_jour: number;
   cout_location_jour: number | null;
+  remise_fournisseur_pct: number | null;
   tva_fournisseur_pct: number | null;
   est_consommable: boolean;
   puissance_w: number | null;
@@ -148,10 +149,12 @@ export function CatalogueSearch({
                           )}
                           {r.cout_location_jour != null && (
                             <div className="text-xs text-muted">
-                              Coût fournisseur {euros(r.cout_location_jour)} HT
-                              <span className="ml-1">
-                                ({euros(r.cout_location_jour * (1 + Number(r.tva_fournisseur_pct ?? 20) / 100))} TTC)
-                              </span>
+                              {/* Ce qu'on décaisse réellement : tarif public − remise + TVA. */}
+                              On paie {euros(
+                                r.cout_location_jour
+                                  * (1 - Number(r.remise_fournisseur_pct ?? 0) / 100)
+                                  * (1 + Number(r.tva_fournisseur_pct ?? 20) / 100),
+                              )}/j
                             </div>
                           )}
                         </div>

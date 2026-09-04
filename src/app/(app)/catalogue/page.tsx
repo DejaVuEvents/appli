@@ -32,6 +32,7 @@ type RefRow = {
   photo_url: string | null;
   prix_location_jour: number;
   cout_location_jour: number | null;
+  remise_fournisseur_pct: number | null;
   tva_fournisseur_pct: number | null;
   est_consommable: boolean;
   puissance_w: number | null;
@@ -42,7 +43,7 @@ type RefRow = {
 };
 
 const REF_SELECT =
-  "id, nom, designation, photo_url, prix_location_jour, cout_location_jour, tva_fournisseur_pct, est_consommable, puissance_w, poids_kg, categorie_id, categorie(nom, parent_id), unite(count)";
+  "id, nom, designation, photo_url, prix_location_jour, cout_location_jour, remise_fournisseur_pct, tva_fournisseur_pct, est_consommable, puissance_w, poids_kg, categorie_id, categorie(nom, parent_id), unite(count)";
 
 export default async function CataloguePage({
   searchParams,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DateInput } from "@/components/date-input";
 import Link from "next/link";
 import { creerRecurrent, supprimerRecurrent, toggleRecurrent, creerPrevisionPonctuelle } from "./actions";
+import { deleteEcriture } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
 import { Modal, ModalForm } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -258,6 +259,15 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
                     <span className="flex shrink-0 items-center gap-3">
                       <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
                       <Link href={`/finance/${r.id}?retour=previsionnel`} className={`text-xs hover:text-primary ${echue ? "font-medium text-amber-700 dark:text-amber-500" : "text-muted"}`}>Modifier</Link>
+                      <form action={deleteEcriture.bind(null, r.id)}>
+                        <ConfirmButton
+                          confirm={`Supprimer la prévision « ${r.denomination ?? "sans libellé"} » (${euros(r.montant_ttc)}) ?`}
+                          className="text-muted hover:text-red-600"
+                          title="Supprimer cette prévision"
+                        >
+                          ✕
+                        </ConfirmButton>
+                      </form>
                     </span>
                   </div>
                   );

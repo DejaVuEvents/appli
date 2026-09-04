@@ -138,10 +138,10 @@ export function CatalogueSearch({
                         <div className="mt-2 text-sm">
                           {r.prix_location_jour > 0 ? (
                             <>
-                              {/* Le prix de location est TTC ; sans la mention, on le
-                                  confondait avec le tarif HT du fournisseur. */}
+                              {/* Déjà Vu ne facture pas de TVA (franchise en base) :
+                                  ce prix n'est ni HT ni TTC, c'est le prix de location. */}
                               <span className="font-semibold">{euros(r.prix_location_jour)}</span>
-                              <span className="text-xs text-muted">/j TTC</span>
+                              <span className="text-xs text-muted">/j</span>
                             </>
                           ) : (
                             <span className="text-xs text-muted">Prix non renseigné</span>

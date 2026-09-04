@@ -78,7 +78,7 @@ export function categorieDefaut(
 export type ResultatROI = {
   coutAnnuel: number;
   gainsAnnuels: number;      // prix_location_ttc × 0.8 × volume
-  roiPct: number;            // (gains - coût) / gains
+  roiPct: number;            // (gains − coût) / gains — taux de MARGE, pas un ROI
   gainSansAchat: number | null;  // gain sur durée si on loue à l'extérieur plutôt qu'acheter
   gainsSiAchat: number;      // bénéfice net sur durée en possédant
   moisRentabilite: number | null;

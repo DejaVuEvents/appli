@@ -68,7 +68,7 @@ function TableSection({
               <th className="px-3 py-2 text-center font-medium">Usages prévus/an</th>
               <th className="px-3 py-2 text-right font-medium">Gains attendus/an</th>
               <th className="px-3 py-2 text-right font-medium">Coût annuel</th>
-              <th className="px-3 py-2 text-center font-medium">ROI</th>
+              <th className="px-3 py-2 text-center font-medium">Taux de marge</th>
               <th className="px-3 py-2 text-center font-medium">Rentabilité</th>
               {showReel && <th className="px-3 py-2 text-right font-medium">Réel {annee}</th>}
               {showReel && <th className="px-3 py-2 text-right font-medium">Écart</th>}
@@ -263,7 +263,7 @@ export default async function RoiPage({
           <p className="mt-1 text-lg font-bold">{euros(totalInvesti)}</p>
         </Card>
         <Card className="p-3">
-          <p className="text-xs text-muted">ROI moyen (acheté)</p>
+          <p className="text-xs text-muted">Taux de marge moyen (acheté)</p>
           <p className="mt-1 text-lg font-bold">
             {roiMoyenAchetes !== null ? `${(roiMoyenAchetes * 100).toFixed(1)} %` : "—"}
           </p>
@@ -324,7 +324,7 @@ export default async function RoiPage({
           <p><strong>TVA non applicable</strong> — le prix facturé TTC est encaissé en totalité.</p>
           <p><strong>Gains attendus/an</strong> = (prix client × nb prestations) + (coût location externe × nb utilisations internes)</p>
           <p><strong>Coût annuel</strong> = (achat − revente) ÷ durée + maintenance</p>
-          <p><strong>ROI</strong> = (gains − coût annuel) ÷ gains</p>
+          <p><strong>Taux de marge</strong> = (gains − coût annuel) ÷ gains — part des recettes qui reste en bénéfice, à ne pas confondre avec un retour sur investissement, qui se rapporterait au capital engagé</p>
           <p><strong>Rentabilité</strong> = (achat − revente) ÷ ((gains − maintenance) ÷ 12)</p>
           <p><strong>Réel {annee}</strong> = revenus issus des prestations facturées dans l'app pour les références liées au catalogue.</p>
           <p><strong>4 situations modélisées</strong> : prestation + matériel propre / prestation + location externe / interne + matériel propre / interne + location externe.</p>

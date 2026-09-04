@@ -18,7 +18,21 @@ type Nomenclature = Record<string, Record<string, string[]>>;
 
 const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
-export function PrevisionnelView({ ponctuelles, recurrents, nomenclature }: { ponctuelles: PrevRow[]; recurrents: Recurrent[]; nomenclature: Nomenclature }) {
+export function PrevisionnelView({
+  ponctuelles,
+  recurrents,
+  nomenclature,
+  soldeReel,
+  seuil,
+  recurrentesParMois,
+}: {
+  ponctuelles: PrevRow[];
+  recurrents: Recurrent[];
+  nomenclature: Nomenclature;
+  soldeReel: number;
+  seuil: number;
+  recurrentesParMois: Record<string, number>;
+}) {
   const [vue, setVue] = useState<"ponctuelles" | "recurrents">("ponctuelles");
 
   // Total mensuel équivalent des récurrents actifs (annuel /12).
@@ -37,7 +51,7 @@ export function PrevisionnelView({ ponctuelles, recurrents, nomenclature }: { po
       {vue === "recurrents" ? (
         <RecurrentsView recurrents={recurrents} nomenclature={nomenclature} mensuelEquivalent={mensuelEquivalent} />
       ) : (
-        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} />
+        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} />
       )}
     </div>
   );
@@ -167,7 +181,19 @@ function grouperParPrestation(list: PrevRow[]): { cle: string; nom: string | nul
   return seules.length ? [...groupes, { cle: "__autres", nom: null, lignes: seules }] : groupes;
 }
 
-function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature: Nomenclature }) {
+function PonctuellesView({
+  rows,
+  nomenclature,
+  soldeReel,
+  seuil,
+  recurrentesParMois,
+}: {
+  rows: PrevRow[];
+  nomenclature: Nomenclature;
+  soldeReel: number;
+  seuil: number;
+  recurrentesParMois: Record<string, number>;
+}) {
   const [sens, setSens] = useState<"sortie" | "entree">("sortie");
   const [type, setType] = useState("");
   const map = nomenclature[sens] ?? {};
@@ -177,6 +203,23 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
   const groups = new Map<string, PrevRow[]>();
   for (const r of rows) { const k = r.date.slice(0, 7); if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(r); }
   const entries = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  // Solde projeté fin de mois : on part du réel encaissé et on cumule, mois après mois,
+  // le net des prévisions ponctuelles ET récurrentes. Recalculé à chaque rendu, donc
+  // l'effet d'une modification ou d'une suppression est visible immédiatement.
+  const soldeFinDeMois = new Map<string, number>();
+  {
+    const mois = [...new Set([...groups.keys(), ...Object.keys(recurrentesParMois)])].sort();
+    let cumul = soldeReel;
+    for (const mk of mois) {
+      const netPonctuel = (groups.get(mk) ?? []).reduce(
+        (s2, r) => s2 + (r.sens === "entree" ? r.montant_ttc : -r.montant_ttc),
+        0,
+      );
+      cumul += netPonctuel + (recurrentesParMois[mk] ?? 0);
+      soldeFinDeMois.set(mk, Math.round(cumul * 100) / 100);
+    }
+  }
 
   const formulaire = (
     <Modal trigger={<>+ Nouvelle prévision</>} title="Nouvelle prévision ponctuelle">
@@ -222,6 +265,10 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted">
+        Solde réel à ce jour : <strong className="text-foreground">{euros(soldeReel)}</strong> — point de
+        départ des soldes projetés ci-dessous, récurrentes comprises.
+      </p>
       <div className="flex items-center justify-between gap-3">
         {nbEchues > 0 ? (
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
@@ -237,7 +284,19 @@ function PonctuellesView({ rows, nomenclature }: { rows: PrevRow[]; nomenclature
           <div key={mk} className="overflow-hidden rounded-xl border border-border">
             <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2 text-sm font-semibold">
               <span>{MOIS[parseInt(m, 10) - 1]} {y}</span>
-              <span className={net >= 0 ? "text-green-700" : "text-red-600"}>{net >= 0 ? "+" : ""}{euros(net)}</span>
+              <span className="flex items-center gap-4">
+                <span className={net >= 0 ? "text-green-700" : "text-red-600"}>{net >= 0 ? "+" : ""}{euros(net)}</span>
+                {(() => {
+                  const solde = soldeFinDeMois.get(mk);
+                  if (solde === undefined) return null;
+                  const cls = solde < 0 ? "text-red-600" : solde < seuil ? "text-amber-600" : "text-foreground";
+                  return (
+                    <span className="font-normal text-xs text-muted">
+                      solde projeté <strong className={`text-sm ${cls}`}>{euros(solde)}</strong>
+                    </span>
+                  );
+                })()}
+              </span>
             </div>
             <div className="divide-y divide-border">
               {grouperParPrestation(list).map((g) => {

@@ -9,7 +9,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
   const annee = Number((await searchParams)?.annee) || new Date().getFullYear();
   const supabase = await createClient();
 
-  const [{ data: recData }, { data: prevData }, nomenclature] = await Promise.all([
+  const [{ data: recData }, { data: prevData }, { data: entData }, { data: toutesEcritures }, nomenclature] = await Promise.all([
     supabase.from("depense_recurrente").select("*").order("actif", { ascending: false }).order("nom"),
     supabase
       .from("ecriture_financiere")
@@ -17,8 +17,28 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       .eq("statut", "previsionnel")
       .is("depense_recurrente_id", null)
       .order("date"),
+    supabase.from("parametres_entreprise").select("solde_initial, solde_initial_date, seuil_alerte").limit(1).maybeSingle(),
+    supabase.from("ecriture_financiere").select("date, montant_ttc, sens, statut, depense_recurrente_id"),
     chargerNomenclature(supabase),
   ]);
+
+  // Point de départ du solde projeté : le réel encaissé à ce jour.
+  const ent = entData as { solde_initial: number | null; solde_initial_date: string | null; seuil_alerte: number | null } | null;
+  const lignes = (toutesEcritures ?? []) as { date: string; montant_ttc: number; sens: string; statut: string; depense_recurrente_id: string | null }[];
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const depuis = ent?.solde_initial_date ?? null;
+  const soldeReel = lignes
+    .filter((e) => e.statut === "reel" && e.date <= aujourdhui && (!depuis || e.date >= depuis))
+    .reduce((s2, e) => s2 + (e.sens === "entree" ? Number(e.montant_ttc) : -Number(e.montant_ttc)), Number(ent?.solde_initial ?? 0));
+
+  // Net mensuel des prévisions RÉCURRENTES : absentes de la liste affichée, mais elles
+  // pèsent sur le solde — les ignorer donnerait une projection fausse.
+  const recurrentesParMois: Record<string, number> = {};
+  for (const e of lignes) {
+    if (e.statut !== "previsionnel" || !e.depense_recurrente_id) continue;
+    const cle = e.date.slice(0, 7);
+    recurrentesParMois[cle] = (recurrentesParMois[cle] ?? 0) + (e.sens === "entree" ? Number(e.montant_ttc) : -Number(e.montant_ttc));
+  }
 
   const recurrents = (recData ?? []) as Recurrent[];
   const ponctuelles = ((prevData ?? []) as unknown as (PrevRow & {
@@ -38,7 +58,14 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
         Prévisionnel
         <InfoHint text="Dépenses et recettes à venir : récurrentes (abonnements, assurance, frais bancaires…) et prévisions ponctuelles (devis signés, factures non payées, échéances fournisseurs, saisies manuelles)." />
       </h2>
-      <PrevisionnelView ponctuelles={ponctuelles} recurrents={recurrents} nomenclature={nomenclature as Record<string, Record<string, string[]>>} />
+      <PrevisionnelView
+        ponctuelles={ponctuelles}
+        recurrents={recurrents}
+        nomenclature={nomenclature as Record<string, Record<string, string[]>>}
+        soldeReel={soldeReel}
+        seuil={Number(ent?.seuil_alerte ?? 0)}
+        recurrentesParMois={recurrentesParMois}
+      />
     </div>
   );
 }

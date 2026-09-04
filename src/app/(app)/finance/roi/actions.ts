@@ -46,8 +46,8 @@ export async function updateRoiItem(id: string, formData: FormData) {
     notes: (formData.get("notes") as string) || null,
   }).eq("id", id);
   if (error) throw error;
+  // Pas de redirection : l'édition se fait en modale, depuis la liste elle-même.
   revalider();
-  redirect("/finance/roi");
 }
 
 export async function deleteRoiItem(id: string) {

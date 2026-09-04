@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { Modal } from "@/components/modal";
 import { FinanceTabs } from "../finance-tabs";
-import { deleteRoiItem, createRoiItem } from "./actions";
+import { deleteRoiItem, createRoiItem, updateRoiItem } from "./actions";
 import { RoiForm } from "./roi-form";
 import { calcROI } from "@/lib/finance";
 import { euros } from "@/lib/format";
@@ -45,11 +45,13 @@ function TableSection({
   items,
   annee,
   showReel,
+  references,
 }: {
   title: string;
   items: ItemCalc[];
   annee: number;
   showReel: boolean;
+  references: MaterielReference[];
 }) {
   if (items.length === 0) return null;
   return (
@@ -160,7 +162,14 @@ function TableSection({
                   {/* Actions */}
                   <td className="px-3 py-3 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <Link href={`/finance/roi/${item.id}`} className="text-primary hover:underline"><IconEdit className="h-4 w-4" /></Link>
+                      <Modal
+                        trigger={<IconEdit className="h-4 w-4" />}
+                        triggerTitle="Modifier"
+                        triggerClassName="rounded p-1 text-primary hover:bg-background"
+                        title={`Modifier — ${item.nom}`}
+                      >
+                        <RoiForm action={updateRoiItem.bind(null, item.id)} item={item} references={references} inModal />
+                      </Modal>
                       <form action={deleteRoiItem.bind(null, item.id)}>
                         <button className="text-muted hover:text-red-600" title="Supprimer">✕</button>
                       </form>
@@ -290,6 +299,7 @@ export default async function RoiPage({
         items={achetes}
         annee={annee}
         showReel={true}
+        references={references}
       />
 
       {/* Section projets */}
@@ -298,6 +308,7 @@ export default async function RoiPage({
         items={projets}
         annee={annee}
         showReel={false}
+        references={references}
       />
 
       {items.length === 0 && (

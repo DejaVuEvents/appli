@@ -11,6 +11,8 @@ type RefRow = {
   designation: string | null;
   photo_url: string | null;
   prix_location_jour: number;
+  cout_location_jour: number | null;
+  tva_fournisseur_pct: number | null;
   est_consommable: boolean;
   puissance_w: number | null;
   poids_kg: number | null;
@@ -136,11 +138,21 @@ export function CatalogueSearch({
                         <div className="mt-2 text-sm">
                           {r.prix_location_jour > 0 ? (
                             <>
+                              {/* Le prix de location est TTC ; sans la mention, on le
+                                  confondait avec le tarif HT du fournisseur. */}
                               <span className="font-semibold">{euros(r.prix_location_jour)}</span>
-                              <span className="text-xs text-muted">/j</span>
+                              <span className="text-xs text-muted">/j TTC</span>
                             </>
                           ) : (
                             <span className="text-xs text-muted">Prix non renseigné</span>
+                          )}
+                          {r.cout_location_jour != null && (
+                            <div className="text-xs text-muted">
+                              Coût fournisseur {euros(r.cout_location_jour)} HT
+                              <span className="ml-1">
+                                ({euros(r.cout_location_jour * (1 + Number(r.tva_fournisseur_pct ?? 20) / 100))} TTC)
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>

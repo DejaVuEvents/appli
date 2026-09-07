@@ -125,6 +125,13 @@ export function FicheEdit({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Quantité / unité" name="quantite_par_unite" type="number" step="0.01" defaultValue={1} />
+                <Field
+                  label="Prix dans l'ensemble (€)"
+                  name="prix_dans_kit"
+                  type="number"
+                  step="0.01"
+                  placeholder="Vide = tarif catalogue"
+                />
                 <Select
                   label="Type"
                   name="obligatoire"

@@ -665,7 +665,7 @@ async function genererAccessoiresAuto(
 
   const { data: regles } = await supabase
     .from("kit_regle")
-    .select("reference_accessoire_id, quantite_par_unite, accessoire:materiel_reference!reference_accessoire_id(nom, designation, prix_location_jour, categorie_id)")
+    .select("reference_accessoire_id, quantite_par_unite, prix_dans_kit, accessoire:materiel_reference!reference_accessoire_id(nom, designation, prix_location_jour, categorie_id)")
     .eq("reference_parent_id", args.referenceId)
     .eq("obligatoire", true);
 
@@ -674,7 +674,9 @@ async function genererAccessoiresAuto(
       | { nom: string; designation: string | null; prix_location_jour: number; categorie_id: string | null }
       | null;
     const quantite = args.quantiteParent * Number(r.quantite_par_unite);
-    const prixUnitaire = Number(acc?.prix_location_jour ?? 0);
+    // Un composant compris dans le prix de l'ensemble porte un prix propre (souvent 0),
+    // sinon on facturerait deux fois : l'ensemble puis chacune de ses pièces.
+    const prixUnitaire = r.prix_dans_kit != null ? Number(r.prix_dans_kit) : Number(acc?.prix_location_jour ?? 0);
     await supabase.from("ligne_prestation").insert({
       prestation_id: args.prestationId,
       devis_id: args.devisId,

@@ -244,6 +244,7 @@ export async function addKitRegle(referenceId: string, formData: FormData) {
     reference_accessoire_id: accessoireId,
     quantite_par_unite: num(formData.get("quantite_par_unite")) ?? 1,
     obligatoire: formData.get("obligatoire") === "obligatoire",
+    prix_dans_kit: num(formData.get("prix_dans_kit")),
   });
   if (error) throw new Error(error.message);
   revalidatePath(`/catalogue/${referenceId}`);

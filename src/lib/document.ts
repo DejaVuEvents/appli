@@ -53,7 +53,7 @@ export async function assemblerContenuDocument(
   const [{ data: prest }, { data: lignesData }, { data: cats }, { data: transports }, { data: entData }] =
     await Promise.all([
       supabase.from("prestation").select("nom, client(nom, adresse)").eq("id", devis.prestation_id).single(),
-      supabase.from("ligne_prestation").select("*").eq("devis_id", devisId).order("created_at"),
+      supabase.from("ligne_prestation").select("*, reference:materiel_reference(est_groupe)").eq("devis_id", devisId).order("created_at"),
       supabase.from("categorie").select("id, nom, parent_id, ordre"),
       supabase.from("transport").select("cout_calcule").eq("devis_id", devisId),
       supabase.from("parametres_entreprise").select("*").limit(1).maybeSingle(),
@@ -64,24 +64,28 @@ export async function assemblerContenuDocument(
     nom: string;
     client: { nom: string; adresse: string | null } | null;
   };
-  const brut = (lignesData ?? []) as DocLigne[];
+  const brut = (lignesData ?? []) as (DocLigne & { reference: { est_groupe: boolean } | null })[];
+  // Le détail d'un ENSEMBLE ne regarde pas le client : on facture « Pack 12 tubes LED »,
+  // pas les 12 tubes. Les accessoires ordinaires (pieds d'un praticable) restent visibles.
+  const lignesGroupe = new Set(brut.filter((l) => l.reference?.est_groupe).map((l) => l.id));
+  const visibles = brut.filter((l) => !l.ligne_parent_id || !lignesGroupe.has(l.ligne_parent_id));
   // Les accessoires suivent immédiatement la ligne qui les entraîne : sans ce tri, les
   // 4 pieds d'un praticable se retrouvent n'importe où dans la liste.
   const enfants = new Map<string, DocLigne[]>();
-  for (const l of brut) {
+  for (const l of visibles) {
     if (!l.ligne_parent_id) continue;
     const arr = enfants.get(l.ligne_parent_id) ?? [];
     arr.push(l);
     enfants.set(l.ligne_parent_id, arr);
   }
   const lignes: DocLigne[] = [];
-  for (const l of brut) {
+  for (const l of visibles) {
     if (l.ligne_parent_id) continue;
     lignes.push(l);
     for (const e of enfants.get(l.id) ?? []) lignes.push(e);
   }
   // Accessoires dont le parent a disparu : on ne les perd pas.
-  for (const l of brut) {
+  for (const l of visibles) {
     if (l.ligne_parent_id && !lignes.some((x) => x.id === l.id)) lignes.push(l);
   }
   // Regroupement en 4 familles (Lumière & Effets / Son / Structure / Technique),

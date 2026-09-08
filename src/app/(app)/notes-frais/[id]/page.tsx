@@ -70,21 +70,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
     <div className="max-w-2xl space-y-6">
       <Link href="/notes-frais" className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← Notes de frais</Link>
       <PageHeader
-        title={ndf.titre || "Note de frais"}
-        subtitle={`${ndf.numero ? `${ndf.numero} · ` : ""}${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
-        action={
-          <div className="flex items-center gap-2">
-            {!estPredepense && (
-              <span className="mr-1 text-sm">
-                <span className="text-muted">Total </span>
-                <strong className="text-base">{euros(total)}</strong>
-              </span>
-            )}
+        title={
+          <>
+            <span className="min-w-0 truncate">{ndf.titre || "Note de frais"}</span>
             {editable && (
               <Modal
                 trigger={<IconEdit className="h-4 w-4" />}
                 triggerTitle="Renommer la note"
-                triggerClassName="rounded-lg border border-border p-2 text-muted hover:bg-background hover:text-foreground"
+                triggerClassName="shrink-0 rounded p-1 text-muted hover:bg-background hover:text-foreground"
                 title="Renommer la note de frais"
               >
                 <ModalForm action={renommerNDF.bind(null, id)} className="space-y-3">
@@ -95,6 +88,17 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                   </div>
                 </ModalForm>
               </Modal>
+            )}
+          </>
+        }
+        subtitle={`${ndf.numero ? `${ndf.numero} · ` : ""}${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
+        action={
+          <div className="flex items-center gap-2">
+            {!estPredepense && (
+              <span className="mr-1 text-sm">
+                <span className="text-muted">Total </span>
+                <strong className="text-base">{euros(total)}</strong>
+              </span>
             )}
             <a href={`/notes-frais/${id}/pdf`} download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background" title="Télécharger le PDF"><IconDownload className="h-4 w-4" /> PDF</a>
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>

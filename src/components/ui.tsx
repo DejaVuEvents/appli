@@ -5,14 +5,15 @@ export function PageHeader({
   subtitle,
   action,
 }: {
-  title: string;
+  /** Texte, ou fragment quand une action doit être accolée au titre. */
+  title: React.ReactNode;
   subtitle?: string;
   action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 mb-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
+      <div className="min-w-0">
+        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
         {subtitle && <p className="text-sm text-muted mt-0.5">{subtitle}</p>}
       </div>
       {action}

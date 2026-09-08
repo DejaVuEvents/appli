@@ -113,10 +113,20 @@ export async function creerPrevisionPonctuelle(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   const montant = num(formData.get("montant_ttc"));
   if (!montant) throw new Error("Renseigne un montant.");
-  // Note de frais associée : la prévision suit son remboursement.
+  // Document associé : la prévision suit son remboursement (note de frais) ou son
+  // encaissement (devis/facture). On récupère la prestation du devis pour que la
+  // prévision se regroupe avec les autres écritures du même événement.
   const noteFraisId = str(formData.get("note_frais_id"));
+  const devisId = str(formData.get("devis_id"));
+  let prestationId: string | null = null;
+  if (devisId) {
+    const { data: dv } = await supabase.from("devis").select("prestation_id").eq("id", devisId).maybeSingle();
+    prestationId = (dv?.prestation_id as string | null) ?? null;
+  }
   const { data: cree, error } = await supabase.from("ecriture_financiere").insert({
     note_frais_id: noteFraisId,
+    devis_id: devisId,
+    prestation_id: prestationId,
     date: str(formData.get("date")) ?? ymd(new Date()),
     denomination: String(formData.get("denomination") ?? "").trim() || "Prévision",
     type: str(formData.get("type")),

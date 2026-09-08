@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 
-export type OptionPrestation = { id: string; nom: string; date?: string | null };
+export type OptionPrestation = { id: string; nom: string; date?: string | null; estEvenement?: boolean };
 
 /**
  * Choix d'un événement, avec recherche.
@@ -89,6 +89,11 @@ export function SelecteurPrestation({
               className={`block w-full px-3 py-2 text-left text-sm hover:bg-background ${o.id === choisi ? "font-semibold text-primary" : ""}`}
             >
               {o.nom}
+              {o.estEvenement === false && (
+                <span className="ml-1.5 rounded px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted ring-1 ring-border">
+                  location
+                </span>
+              )}
               {estPasse(o) && <span className="ml-1.5 text-xs text-muted">(passé)</span>}
             </button>
           ))}

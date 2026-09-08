@@ -29,7 +29,7 @@ export function EcritureForm({
   /** Chemin de retour après enregistrement (champ caché lu par l'action). */
   retour?: string;
   ecriture?: EcritureFinanciere;
-  prestations?: Prestation[];
+  prestations?: (Prestation & { est_evenement?: boolean })[];
   submitLabel?: string;
   cancelHref?: string;
   inModal?: boolean;
@@ -121,7 +121,7 @@ export function EcritureForm({
             <SelecteurPrestation
               name="prestation_id"
               defaultValue={ecriture?.prestation_id ?? ""}
-              options={prestations.map((p) => ({ id: p.id, nom: p.nom, date: p.date_event_debut }))}
+              options={prestations.map((p) => ({ id: p.id, nom: p.nom, date: p.date_event_debut, estEvenement: p.est_evenement }))}
               placeholder="Aucun événement — cliquer pour chercher"
             />
           </label>

@@ -9,7 +9,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
   const annee = Number((await searchParams)?.annee) || new Date().getFullYear();
   const supabase = await createClient();
 
-  const [{ data: recData }, { data: prevData }, { data: entData }, { data: toutesEcritures }, { data: ndfData }, nomenclature, { data: suggData }] = await Promise.all([
+  const [{ data: recData }, { data: prevData }, { data: entData }, { data: toutesEcritures }, { data: ndfData }, nomenclature, { data: suggData }, { data: docData }] = await Promise.all([
     supabase.from("depense_recurrente").select("*").order("actif", { ascending: false }).order("nom"),
     supabase
       .from("ecriture_financiere")
@@ -18,7 +18,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       .is("depense_recurrente_id", null)
       .order("date"),
     supabase.from("parametres_entreprise").select("solde_initial, solde_initial_date, seuil_alerte").limit(1).maybeSingle(),
-    supabase.from("ecriture_financiere").select("date, montant_ttc, sens, statut, depense_recurrente_id, note_frais_id"),
+    supabase.from("ecriture_financiere").select("date, montant_ttc, sens, statut, depense_recurrente_id, note_frais_id, devis_id"),
     // Notes de frais validées dont le remboursement n'est pas encore décaissé.
     supabase
       .from("note_frais")
@@ -27,6 +27,15 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       .order("date", { ascending: false }),
     chargerNomenclature(supabase),
     supabase.rpc("suggestions_rapprochement_ndf"),
+    // Devis signés / factures émises, pour les proposer comme source d'une prévision.
+    supabase
+      .from("devis_facture")
+      .select("numero, montant_ttc, date_emission, statut_paiement, devis_id, devis:devis_id(nom, prestation:prestation_id(nom))")
+      .not("devis_id", "is", null)
+      // Une facture payée ou annulée n'a plus rien à prévoir : seuls les documents
+      // dont l'argent reste à encaisser sont proposés.
+      .or("statut_paiement.is.null,statut_paiement.eq.en_attente")
+      .order("date_emission", { ascending: false }),
   ]);
 
   // Point de départ du solde projeté : le réel encaissé à ce jour.
@@ -55,7 +64,27 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       montant: Math.round((n.lignes ?? []).reduce((s2, l) => s2 + Number(l.montant_ttc ?? 0), 0) * 100) / 100,
       date: n.date,
     }))
-    .filter((n) => n.montant > 0);
+    .filter((n) => n.montant > 0)
+    .map((n) => ({ ...n, kind: "ndf" as const }));
+
+  // Un devis/facture déjà porté par une écriture ne doit plus être proposé.
+  const devisLies = new Set(
+    ((toutesEcritures ?? []) as { devis_id?: string | null }[]).map((e) => e.devis_id).filter(Boolean) as string[],
+  );
+  const devisAPrevoir = ((docData ?? []) as unknown as {
+    numero: string | null; montant_ttc: number | null; date_emission: string | null;
+    devis_id: string; devis: { nom: string | null; prestation: { nom: string } | null } | null;
+  }[])
+    .filter((d) => !devisLies.has(d.devis_id) && Number(d.montant_ttc ?? 0) > 0)
+    .map((d) => ({
+      id: d.devis_id,
+      kind: "devis" as const,
+      libelle: `${d.numero ?? "Document"} — ${d.devis?.prestation?.nom ?? d.devis?.nom ?? "Devis"}`,
+      montant: Number(d.montant_ttc),
+      date: d.date_emission,
+    }));
+
+  const docsAPrevoir = [...ndfAPrevoir, ...devisAPrevoir];
 
   // Décaissements réels qui pourraient solder une prévision de note de frais.
   const suggestions = ((suggData ?? []) as {
@@ -100,7 +129,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
         soldeReel={soldeReel}
         seuil={Number(ent?.seuil_alerte ?? 0)}
         recurrentesParMois={recurrentesParMois}
-        ndfAPrevoir={ndfAPrevoir}
+        docsAPrevoir={docsAPrevoir}
         suggestions={suggestions}
       />
     </div>

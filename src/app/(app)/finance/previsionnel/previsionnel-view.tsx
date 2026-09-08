@@ -13,7 +13,7 @@ import { typeLabel } from "@/lib/finance";
 import { CategorieIcon } from "@/components/categorie-icon";
 
 export type PrevRow = { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; type: string | null; specification: string | null; prestation_id?: string | null; prestationNom?: string | null };
-export type DocAPrevoir = { id: string; libelle: string; montant: number; date: string | null };
+export type DocAPrevoir = { id: string; kind: "ndf" | "devis"; libelle: string; montant: number; date: string | null };
 export type Suggestion = { previsionId: string; ecritureId: string; libelle: string; date: string };
 
 export type Recurrent = { id: string; nom: string; sens: string; montant_ttc: number; frequence: string; jour: number; mois: number | null; type: string | null; specification: string | null; actif: boolean };
@@ -28,7 +28,7 @@ export function PrevisionnelView({
   soldeReel,
   seuil,
   recurrentesParMois,
-  ndfAPrevoir = [],
+  docsAPrevoir = [],
   suggestions = [],
 }: {
   ponctuelles: PrevRow[];
@@ -37,7 +37,7 @@ export function PrevisionnelView({
   soldeReel: number;
   seuil: number;
   recurrentesParMois: Record<string, number>;
-  ndfAPrevoir?: DocAPrevoir[];
+  docsAPrevoir?: DocAPrevoir[];
   suggestions?: Suggestion[];
 }) {
   const [vue, setVue] = useState<"ponctuelles" | "recurrents">("ponctuelles");
@@ -58,7 +58,7 @@ export function PrevisionnelView({
       {vue === "recurrents" ? (
         <RecurrentsView recurrents={recurrents} nomenclature={nomenclature} mensuelEquivalent={mensuelEquivalent} />
       ) : (
-        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} ndfAPrevoir={ndfAPrevoir} suggestions={suggestions} />
+        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} docsAPrevoir={docsAPrevoir} suggestions={suggestions} />
       )}
     </div>
   );
@@ -194,7 +194,7 @@ function PonctuellesView({
   soldeReel,
   seuil,
   recurrentesParMois,
-  ndfAPrevoir,
+  docsAPrevoir,
   suggestions,
 }: {
   rows: PrevRow[];
@@ -202,7 +202,7 @@ function PonctuellesView({
   soldeReel: number;
   seuil: number;
   recurrentesParMois: Record<string, number>;
-  ndfAPrevoir: DocAPrevoir[];
+  docsAPrevoir: DocAPrevoir[];
   suggestions: Suggestion[];
 }) {
   const [sens, setSens] = useState<"sortie" | "entree">("sortie");
@@ -210,7 +210,9 @@ function PonctuellesView({
   // Document associé : sélectionner une note de frais remplit libellé, montant et date,
   // et fait suivre son remboursement à la prévision.
   const [docId, setDocId] = useState("");
-  const doc = ndfAPrevoir.find((d) => d.id === docId) ?? null;
+  const doc = docsAPrevoir.find((d) => d.id === docId) ?? null;
+  const notes = docsAPrevoir.filter((d) => d.kind === "ndf");
+  const devis = docsAPrevoir.filter((d) => d.kind === "devis");
   const map = nomenclature[sens] ?? {};
   const types = Object.keys(map);
   const specs = map[type] ?? [];
@@ -239,25 +241,37 @@ function PonctuellesView({
   const formulaire = (
     <Modal trigger={<>+ Nouvelle prévision</>} title="Nouvelle prévision ponctuelle">
       <ModalForm action={creerPrevisionPonctuelle} className="space-y-3">
-      {ndfAPrevoir.length > 0 && (
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium">Note de frais associée (facultatif)</span>
-          <select
-            name="note_frais_id"
-            value={docId}
-            onChange={(e) => { setDocId(e.target.value); if (e.target.value) setSens("sortie"); }}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">— Aucune —</option>
-            {ndfAPrevoir.map((d) => (
-              <option key={d.id} value={d.id}>{d.libelle} — {euros(d.montant)}</option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs text-muted">
-            Le montant se remplit tout seul, et la prévision se retire dès que le remboursement est constaté.
-          </span>
-        </label>
-      )}
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium">Document associé (facultatif)</span>
+        <input type="hidden" name="note_frais_id" value={doc?.kind === "ndf" ? doc.id : ""} />
+        <input type="hidden" name="devis_id" value={doc?.kind === "devis" ? doc.id : ""} />
+        <select
+          value={docId}
+          onChange={(e) => {
+            setDocId(e.target.value);
+            const d = docsAPrevoir.find((x) => x.id === e.target.value);
+            if (d) setSens(d.kind === "devis" ? "entree" : "sortie");
+          }}
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">— Aucun —</option>
+          {notes.length > 0 && (
+            <optgroup label="Notes de frais">
+              {notes.map((d) => <option key={d.id} value={d.id}>{d.libelle} — {euros(d.montant)}</option>)}
+            </optgroup>
+          )}
+          {devis.length > 0 && (
+            <optgroup label="Devis & factures">
+              {devis.map((d) => <option key={d.id} value={d.id}>{d.libelle} — {euros(d.montant)}</option>)}
+            </optgroup>
+          )}
+        </select>
+        <span className="mt-1 block text-xs text-muted">
+          {docsAPrevoir.length === 0
+            ? "Aucun document en attente : toutes les notes de frais et factures sont déjà rattachées."
+            : "Libellé, montant et date se remplissent tout seuls, et la prévision se retire dès que le mouvement réel est constaté."}
+        </span>
+      </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block"><span className="mb-1 block text-xs font-medium">Libellé</span>
           <input name="denomination" required key={`lib-${docId}`} defaultValue={doc ? doc.libelle : ""} placeholder="Achat lyres, subvention…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
@@ -268,7 +282,7 @@ function PonctuellesView({
         <label className="block"><span className="mb-1 block text-xs font-medium">Montant (€)</span>
           <input name="montant_ttc" type="number" step="0.01" min="0" required key={`mt-${docId}`} defaultValue={doc ? doc.montant : ""} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Date prévue</span>
-          <DateInput name="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
+          <DateInput name="date" key={`dt-${docId}`} defaultValue={doc?.date ?? new Date().toISOString().slice(0, 10)} required /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Catégorie</span>
           <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="">—</option>

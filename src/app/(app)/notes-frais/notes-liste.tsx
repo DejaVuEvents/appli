@@ -24,6 +24,7 @@ const MOIS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet
 export type NoteLite = {
   id: string;
   titre: string | null;
+  numero?: string | null;
   type_ndf: TypeNoteFrais;
   statut: StatutNoteFrais;
   demandeur_id: string | null;
@@ -130,7 +131,7 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
                   <div key={n.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
                     <Link href={`/notes-frais/${n.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate font-medium">{n.titre || "Note de frais"}</div>
+                        <div className="truncate font-medium">{n.titre || "Note de frais"}{n.numero ? <span className="ml-1.5 text-xs font-normal text-muted">{n.numero}</span> : null}</div>
                         <div className="text-xs text-muted">{TYPE_NDF_LABELS[n.type_ndf]} · {n.demandeur_nom} · {dateFr(n.created_at)}</div>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">

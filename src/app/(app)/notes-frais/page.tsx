@@ -52,6 +52,7 @@ export default async function NotesFraisPage() {
     .map((n) => ({
       id: n.id,
       titre: n.titre,
+      numero: (n as { numero?: string | null }).numero ?? null,
       type_ndf: n.type_ndf,
       statut: n.statut,
       demandeur_id: n.demandeur_id,
@@ -95,40 +96,38 @@ export default async function NotesFraisPage() {
         <p className="text-xs text-muted">Tu seras enregistré comme demandeur. Selon le type, tu ajouteras des justificatifs ou des trajets, puis tu soumets pour validation.</p>
         <SubmitButton>+ Créer la note</SubmitButton>
       </ModalForm>
-    </Modal>
-  );
 
-  const importerNote = (
-    <Modal
-      trigger={<>Importer une note</>}
-      title="Importer une note de frais"
-      triggerClassName="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-background"
-    >
-      <ModalForm action={importerNoteFrais} className="space-y-3">
-        <p className="text-sm text-muted">
-          Reprise d&apos;une note établie hors de l&apos;outil. Elle est enregistrée comme validée et
-          signée, avec son justificatif.
-        </p>
-        <Field label="Intitulé" name="titre" required placeholder="NDF Théo — janvier" />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Date" name="date" type="date" />
-          <Field label="Montant TTC (€)" name="montant_ttc" type="number" step="0.01" required />
-        </div>
-        <Select
-          label="Demandeur"
-          name="demandeur_id"
-          options={[{ value: "", label: "— Moi —" }, ...membresListe.map((m) => ({ value: m.id, label: m.nom }))]}
-        />
-        <div>
-          <span className="mb-1 block text-sm font-medium">Justificatif (photo / PDF)</span>
-          <FileDropzone name="justificatif" accept="image/*,application/pdf" />
-        </div>
-        <p className="text-xs text-muted">
-          Aucune écriture n&apos;est créée : si un décaissement du même montant existe déjà au journal,
-          la note s&apos;y rattache et apparaît « Remboursée ».
-        </p>
-        <SubmitButton>Importer</SubmitButton>
-      </ModalForm>
+      {/* Reprise d'une note existante : même fenêtre que la création, pas un bouton de plus. */}
+      <details className="mt-5 border-t border-border pt-4">
+        <summary className="cursor-pointer text-sm font-medium">
+          Ou importer une note déjà établie (PDF / photo)
+        </summary>
+        <ModalForm action={importerNoteFrais} className="mt-3 space-y-3">
+          <p className="text-sm text-muted">
+            Reprise d&apos;une note établie hors de l&apos;outil. Elle est enregistrée comme validée et
+            signée, avec son justificatif.
+          </p>
+          <Field label="Intitulé" name="titre" required placeholder="NDF Théo — janvier" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Date" name="date" type="date" />
+            <Field label="Montant TTC (€)" name="montant_ttc" type="number" step="0.01" required />
+          </div>
+          <Select
+            label="Demandeur"
+            name="demandeur_id"
+            options={[{ value: "", label: "— Moi —" }, ...membresListe.map((m) => ({ value: m.id, label: m.nom }))]}
+          />
+          <div>
+            <span className="mb-1 block text-sm font-medium">Justificatif (photo / PDF)</span>
+            <FileDropzone name="justificatif" accept="image/*,application/pdf" />
+          </div>
+          <p className="text-xs text-muted">
+            Aucune écriture n&apos;est créée : si un décaissement du même montant existe déjà au journal,
+            la note s&apos;y rattache et apparaît « Remboursée ».
+          </p>
+          <SubmitButton>Importer</SubmitButton>
+        </ModalForm>
+      </details>
     </Modal>
   );
 
@@ -136,7 +135,7 @@ export default async function NotesFraisPage() {
     <div className="max-w-6xl">
       <PageHeader
         title="Notes de frais"
-        action={<span className="flex items-center gap-2">{importerNote}{nouvelleNote}</span>}
+        action={nouvelleNote}
       />
 
       {/* À valider (co-présidents) */}

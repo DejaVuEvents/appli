@@ -21,6 +21,12 @@ function str(v: FormDataEntryValue | null): string | null {
   return s === "" ? null : s;
 }
 
+/** Numéro de note de frais (NDF0001, NDF0002…), attribué atomiquement côté base. */
+async function numeroNDF(supabase: Supa): Promise<string | null> {
+  const { data } = await supabase.rpc("attribuer_numero_ndf");
+  return (data as string | null) ?? null;
+}
+
 async function uploadJustificatif(
   supabase: Supa,
   file: File | null,
@@ -45,7 +51,7 @@ export async function createNoteFrais(formData: FormData) {
   const type_ndf = raw === "km" || raw === "predepense" ? raw : "depense";
   const { data, error } = await supabase
     .from("note_frais")
-    .insert({ titre: str(formData.get("titre")), type_ndf, demandeur_id: user?.id ?? null, statut: "brouillon" })
+    .insert({ numero: await numeroNDF(supabase), titre: str(formData.get("titre")), type_ndf, demandeur_id: user?.id ?? null, statut: "brouillon" })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
@@ -91,6 +97,7 @@ export async function importerNoteFrais(formData: FormData) {
   const { data: note, error } = await supabase
     .from("note_frais")
     .insert({
+      numero: await numeroNDF(supabase),
       titre, demandeur_id: demandeurId, type_ndf: "depense",
       statut: "validee", valide_par: membre?.id ?? null, valide_le: new Date().toISOString(),
       demandeur_signe_le: new Date().toISOString(),
@@ -134,6 +141,16 @@ export async function importerNoteFrais(formData: FormData) {
 
   revalidatePath("/notes-frais");
   redirect(`/notes-frais/${note.id}`);
+}
+
+/** Renomme une note de frais (l'intitulé n'était modifiable nulle part après création). */
+export async function renommerNDF(noteId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const titre = str(formData.get("titre"));
+  const { error } = await supabase.from("note_frais").update({ titre }).eq("id", noteId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/notes-frais/${noteId}`);
+  revalidatePath("/notes-frais");
 }
 
 export async function addLigneNDF(noteId: string, formData: FormData) {

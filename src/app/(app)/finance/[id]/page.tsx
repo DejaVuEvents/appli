@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -119,7 +120,12 @@ export default async function EditEcriturePage({
           </div>
         )}
 
-        <form action={ajouterJustificatifs.bind(null, id)} className="space-y-2">
+        <Modal
+          trigger={<>+ Ajouter un justificatif</>}
+          title="Ajouter un justificatif"
+          triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+        >
+        <ModalForm action={ajouterJustificatifs.bind(null, id)} className="space-y-3">
           <input
             name="justificatifs"
             type="file"
@@ -132,8 +138,12 @@ export default async function EditEcriturePage({
             placeholder="…ou une référence / lien (optionnel)"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />
-          <SubmitButton pendingLabel="Ajout…">+ Ajouter le(s) justificatif(s)</SubmitButton>
-        </form>
+          <div className="flex items-center gap-3 pt-1">
+            <SubmitButton pendingLabel="Ajout…">+ Ajouter</SubmitButton>
+            <ModalCancelButton />
+          </div>
+        </ModalForm>
+        </Modal>
       </Card>
     </div>
   );

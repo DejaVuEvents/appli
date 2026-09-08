@@ -322,6 +322,7 @@ export const TYPE_NDF_LABELS: Record<TypeNoteFrais, string> = {
 };
 export interface NoteFrais {
   id: string;
+  numero: string | null;
   demandeur_id: string | null;
   titre: string | null;
   type_ndf: TypeNoteFrais;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { DateInput } from "@/components/date-input";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -245,10 +246,14 @@ export default async function PlanificationDetail({ params }: { params: Promise<
           ))}
         </Card>
 
-        {/* Ajout d'étape */}
-        <Card className="mt-3 p-4 print:hidden">
-          <h3 className="mb-3 text-sm font-semibold">Ajouter une étape</h3>
-          <form action={addEtape.bind(null, id)} className="space-y-3">
+        {/* Ajout d'étape — en modale, comme tout ajout de ligne dans l'app */}
+        <div className="mt-3 print:hidden">
+          <Modal
+            trigger={<>+ Ajouter une étape</>}
+            title="Ajouter une étape"
+            triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+          >
+            <ModalForm action={addEtape.bind(null, id)} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-4">
               <Select
                 label="Type"
@@ -269,9 +274,13 @@ export default async function PlanificationDetail({ params }: { params: Promise<
             <Field label="Adresse (optionnel)" name="adresse" placeholder="12 rue…, ville" />
             <Field label="Matériel concerné (optionnel)" name="materiel" placeholder="Son façade, 4 lyres, praticables…" />
             <TextArea label="Notes (optionnel)" name="notes" rows={2} />
-            <SubmitButton>+ Ajouter l&apos;étape</SubmitButton>
-          </form>
-        </Card>
+            <div className="flex items-center gap-3 pt-1">
+              <SubmitButton>+ Ajouter l&apos;étape</SubmitButton>
+              <ModalCancelButton />
+            </div>
+            </ModalForm>
+          </Modal>
+        </div>
       </section>
     </div>
   );

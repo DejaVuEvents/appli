@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
+import { ModalForm } from "@/components/modal";
 import { Field, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { importerDocumentPdf } from "./actions";
 
+/**
+ * Volet « importer » de la fenêtre de création. Il n'ouvre plus sa propre modale : tout
+ * ce qui crée un document part du même endroit, création comme reprise d'un PDF existant.
+ */
 export function ImportPdf({ clients, prestations = [], defaultType }: { clients: { id: string; nom: string }[]; prestations?: { id: string; nom: string }[]; defaultType: "devis" | "facture" }) {
   const [type, setType] = useState<"devis" | "facture">(defaultType);
   const radio = (v: "devis" | "facture", label: string) => (
@@ -16,12 +20,11 @@ export function ImportPdf({ clients, prestations = [], defaultType }: { clients:
   );
 
   return (
-    <Modal
-      trigger={<>Importer un PDF</>}
-      title="Importer un devis / facture (PDF)"
-      triggerClassName="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-background"
-    >
-      <ModalForm action={importerDocumentPdf} className="space-y-4">
+    <details className="mt-5 border-t border-border pt-4">
+      <summary className="cursor-pointer text-sm font-medium">
+        Ou importer un document déjà établi (PDF)
+      </summary>
+      <ModalForm action={importerDocumentPdf} className="mt-3 space-y-4">
         <div className="flex gap-2">
           {radio("devis", "Devis")}
           {radio("facture", "Facture")}
@@ -59,11 +62,8 @@ export function ImportPdf({ clients, prestations = [], defaultType }: { clients:
           />
           <p className="mt-1 text-xs text-muted">Le PDF d&apos;origine sera conservé et affiché tel quel (comme les anciens documents Tiime).</p>
         </div>
-        <div className="flex items-center gap-3 pt-1">
-          <SubmitButton pendingLabel="Import…">Importer</SubmitButton>
-          <ModalCancelButton />
-        </div>
+        <SubmitButton pendingLabel="Import…">Importer</SubmitButton>
       </ModalForm>
-    </Modal>
+    </details>
   );
 }

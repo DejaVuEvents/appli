@@ -13,7 +13,7 @@ import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre } from "@/lib/membre";
 import {
-  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF } from "../actions";
+  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF } from "../actions";
 import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
@@ -71,7 +71,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
       <Link href="/notes-frais" className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← Notes de frais</Link>
       <PageHeader
         title={ndf.titre || "Note de frais"}
-        subtitle={`${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
+        subtitle={`${ndf.numero ? `${ndf.numero} · ` : ""}${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
         action={
           <div className="flex items-center gap-2">
             {!estPredepense && (
@@ -79,6 +79,22 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 <span className="text-muted">Total </span>
                 <strong className="text-base">{euros(total)}</strong>
               </span>
+            )}
+            {editable && (
+              <Modal
+                trigger={<IconEdit className="h-4 w-4" />}
+                triggerTitle="Renommer la note"
+                triggerClassName="rounded-lg border border-border p-2 text-muted hover:bg-background hover:text-foreground"
+                title="Renommer la note de frais"
+              >
+                <ModalForm action={renommerNDF.bind(null, id)} className="space-y-3">
+                  <Field label="Intitulé" name="titre" defaultValue={ndf.titre ?? ""} required />
+                  <div className="flex items-center gap-3">
+                    <SubmitButton>Enregistrer</SubmitButton>
+                    <ModalCancelButton />
+                  </div>
+                </ModalForm>
+              </Modal>
             )}
             <a href={`/notes-frais/${id}/pdf`} download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background" title="Télécharger le PDF"><IconDownload className="h-4 w-4" /> PDF</a>
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>
@@ -236,11 +252,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
       </section>
       )}
 
-      {/* Ajout de ligne (brouillon, demandeur) */}
+      {/* Ajout de ligne — en modale, comme partout ailleurs dans l'app */}
       {editable && ndf.type_ndf === "depense" && (
-        <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold">Ajouter une dépense</h3>
-          <form action={addLigneNDF.bind(null, id)} className="space-y-3">
+        <Modal
+          trigger={<>+ Ajouter une dépense</>}
+          title="Ajouter une dépense"
+          triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+        >
+          <ModalForm action={addLigneNDF.bind(null, id)} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Libellé" name="libelle" placeholder="Péage, repas, matériel…" className="sm:col-span-2" />
               <Field label="Date" name="date" type="date" />
@@ -252,9 +271,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 <FileDropzone name="justificatif" accept="image/*,application/pdf" />
               </div>
             </div>
-            <SubmitButton>+ Ajouter la dépense</SubmitButton>
-          </form>
-        </Card>
+            <div className="flex items-center gap-3 pt-1">
+              <SubmitButton>+ Ajouter la dépense</SubmitButton>
+              <ModalCancelButton />
+            </div>
+          </ModalForm>
+        </Modal>
       )}
 
       {/* Frais de déplacement (véhicule perso) — calcul auto de la distance */}
@@ -262,10 +284,13 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         <Card className="p-4 text-sm text-amber-700">Calcul d&apos;itinéraire non configuré (clé OpenRouteService manquante).</Card>
       )}
       {editable && ndf.type_ndf === "km" && orsConfigured() && (
-        <Card className="p-4">
-          <h3 className="mb-1 text-sm font-semibold">Frais de déplacement (véhicule perso)</h3>
-          <p className="mb-3 text-xs text-muted">Distance calculée automatiquement (OpenRouteService) puis appliquée au barème kilométrique.</p>
-          <form action={ajouterTrajetNDF.bind(null, id)} className="space-y-3">
+        <Modal
+          trigger={<>+ Ajouter un déplacement</>}
+          title="Frais de déplacement (véhicule perso)"
+          triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+        >
+          <p className="mb-3 text-sm text-muted">Distance calculée automatiquement (OpenRouteService) puis appliquée au barème kilométrique.</p>
+          <ModalForm action={ajouterTrajetNDF.bind(null, id)} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Départ (adresse / ville)" name="depart" placeholder="19 rue Achille Viadieu, Toulouse" />
               <Field label="Arrivée (adresse / ville)" name="arrivee" placeholder="Lieu de la prestation" />
@@ -283,9 +308,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
               <FileDropzone name="justificatif" accept="image/*,application/pdf" />
               <p className="mt-1 text-xs text-muted">Un lien Mappy et Google Maps est généré automatiquement pour justifier la distance ; tu peux aussi joindre une capture.</p>
             </div>
-            <SubmitButton pendingLabel="Calcul…">Calculer & ajouter</SubmitButton>
-          </form>
-        </Card>
+            <div className="flex items-center gap-3 pt-1">
+              <SubmitButton pendingLabel="Calcul…">Calculer &amp; ajouter</SubmitButton>
+              <ModalCancelButton />
+            </div>
+          </ModalForm>
+        </Modal>
       )}
 
       {/* Signature du demandeur (lu et approuvé) */}

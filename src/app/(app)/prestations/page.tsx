@@ -26,12 +26,14 @@ async function chargerModales(supabase: Awaited<ReturnType<typeof createClient>>
     <Modal trigger="+ Créer un devis" title="Créer un devis">
       <p className="mb-4 text-sm text-muted">Nouveau devis dans un nouvel événement — vierge, ou copié d&apos;un devis existant.</p>
       <PrestationForm action={createPrestation} clients={clients} cancelHref="/prestations" inModal type="devis" devisModeles={modeles} />
+      <ImportPdf clients={clients} prestations={prestations} defaultType="devis" />
     </Modal>
   );
   const creerFacture = (
     <Modal trigger="+ Créer une facture" title="Créer une facture">
       <p className="mb-4 text-sm text-muted">Nouvelle facture — vierge, ou à partir d&apos;un devis existant. (Depuis un devis déjà ouvert, tu peux aussi utiliser « Transformer en facture ».)</p>
       <PrestationForm action={createPrestation} clients={clients} cancelHref="/prestations" inModal type="facture" devisModeles={modeles} />
+      <ImportPdf clients={clients} prestations={prestations} defaultType="facture" />
     </Modal>
   );
   return { creerDevis, creerFacture, clients, prestations };
@@ -151,12 +153,7 @@ export default async function PrestationsPage({
       ? allDocs.filter((d) => d.prestation && (d.type === "facture" || aEmissionFacture.has(d.id))).map((d) => toRow(d, true))
       : allDocs.filter((d) => d.prestation && d.type === "devis").map((d) => toRow(d, false));
 
-  const action = (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      {tab === "factures" ? creerFacture : creerDevis}
-      <ImportPdf clients={clients} prestations={prestations} defaultType={tab === "factures" ? "facture" : "devis"} />
-    </div>
-  );
+  const action = tab === "factures" ? creerFacture : creerDevis;
 
   return (
     <div className="max-w-7xl">

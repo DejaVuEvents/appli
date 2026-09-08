@@ -7,7 +7,7 @@ import { InfoTip } from "@/components/info-tip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte } from "./actions";
 import { updateTresorerieReglages, updatePrixCarburant } from "../finance/actions";
-import { Modal, ModalForm } from "@/components/modal";
+import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { getMembreActuel, COMPETENCES, ROLE_LABELS, nomMembre, type RoleMembre } from "@/lib/membre";
 import { urlDocument } from "@/lib/storage";
 import { FinanceCategories, type FinanceCat } from "./finance-categories";
@@ -331,13 +331,22 @@ export default async function ParametresPage({
                 </div>
               ))}
             </Card>
-            <Card className="mt-3 p-4">
-              <form action={addTarifDegressifGlobal} className="grid gap-3 sm:grid-cols-3 sm:items-end">
-                <Field label="À partir du jour n°" name="jour_min" type="number" defaultValue={2} />
-                <Field label="Coefficient (ex. 0.5 = −50%)" name="coefficient" type="number" step="0.001" defaultValue={0.5} />
-                <SubmitButton>+ Ajouter un palier</SubmitButton>
-              </form>
-            </Card>
+            <div className="mt-3">
+              <Modal
+                trigger={<>+ Ajouter un palier</>}
+                title="Ajouter un palier dégressif"
+                triggerClassName="rounded-lg border border-dashed border-border px-4 py-2 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+              >
+                <ModalForm action={addTarifDegressifGlobal} className="space-y-3">
+                  <Field label="À partir du jour n°" name="jour_min" type="number" defaultValue={2} />
+                  <Field label="Coefficient (ex. 0.5 = −50%)" name="coefficient" type="number" step="0.001" defaultValue={0.5} />
+                  <div className="flex items-center gap-3 pt-1">
+                    <SubmitButton>+ Ajouter</SubmitButton>
+                    <ModalCancelButton />
+                  </div>
+                </ModalForm>
+              </Modal>
+            </div>
           </section>
 
           <section className="md:relative md:left-1/2 md:w-[calc(100vw-17rem)] md:max-w-6xl md:-translate-x-1/2">

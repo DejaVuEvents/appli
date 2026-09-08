@@ -323,6 +323,8 @@ export const TYPE_NDF_LABELS: Record<TypeNoteFrais, string> = {
 export interface NoteFrais {
   id: string;
   numero: string | null;
+  /** Date de la note (celle des dépenses), distincte de created_at. */
+  date: string | null;
   demandeur_id: string | null;
   titre: string | null;
   type_ndf: TypeNoteFrais;

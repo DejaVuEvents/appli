@@ -82,6 +82,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
               >
                 <ModalForm action={renommerNDF.bind(null, id)} className="space-y-3">
                   <Field label="Intitulé" name="titre" defaultValue={ndf.titre ?? ""} required />
+                  <Field label="Date de la note" name="date" type="date" defaultValue={ndf.date ?? ndf.created_at?.slice(0, 10)} />
                   <div className="flex items-center gap-3">
                     <SubmitButton>Enregistrer</SubmitButton>
                     <ModalCancelButton />
@@ -91,7 +92,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
             )}
           </>
         }
-        subtitle={`${ndf.numero ? `${ndf.numero} · ` : ""}${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.created_at)}`}
+        subtitle={`${ndf.numero ? `${ndf.numero} · ` : ""}${TYPE_NDF_LABELS[ndf.type_ndf]} · Demandeur : ${demandeur} · ${dateFr(ndf.date ?? ndf.created_at)}`}
         action={
           <div className="flex items-center gap-2">
             {!estPredepense && (

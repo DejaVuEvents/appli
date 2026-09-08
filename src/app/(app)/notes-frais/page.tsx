@@ -24,7 +24,7 @@ export default async function NotesFraisPage() {
   const supabase = await createClient();
   const membre = await getMembreActuel(supabase);
   const [{ data }, { data: membresData }] = await Promise.all([
-    supabase.from("note_frais").select("*, lignes:ligne_note_frais(montant_ttc)").order("created_at", { ascending: false }),
+    supabase.from("note_frais").select("*, lignes:ligne_note_frais(montant_ttc)").order("date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }),
     supabase.from("membre").select("id, nom, prenom, email").order("prenom"),
   ]);
   const notes = (data ?? []) as NdfRow[];
@@ -57,7 +57,7 @@ export default async function NotesFraisPage() {
       statut: n.statut,
       demandeur_id: n.demandeur_id,
       demandeur_nom: mMap.get(n.demandeur_id ?? "") ?? "—",
-      created_at: n.created_at,
+      created_at: (n as { date?: string | null }).date ?? n.created_at,
       total: total(n),
       paye: estPayee(n),
     }));

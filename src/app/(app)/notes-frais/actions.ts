@@ -51,7 +51,7 @@ export async function createNoteFrais(formData: FormData) {
   const type_ndf = raw === "km" || raw === "predepense" ? raw : "depense";
   const { data, error } = await supabase
     .from("note_frais")
-    .insert({ numero: await numeroNDF(supabase), titre: str(formData.get("titre")), type_ndf, demandeur_id: user?.id ?? null, statut: "brouillon" })
+    .insert({ numero: await numeroNDF(supabase), titre: str(formData.get("titre")), date: new Date().toISOString().slice(0, 10), type_ndf, demandeur_id: user?.id ?? null, statut: "brouillon" })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
@@ -98,7 +98,7 @@ export async function importerNoteFrais(formData: FormData) {
     .from("note_frais")
     .insert({
       numero: await numeroNDF(supabase),
-      titre, demandeur_id: demandeurId, type_ndf: "depense",
+      titre, date, demandeur_id: demandeurId, type_ndf: "depense",
       statut: "validee", valide_par: membre?.id ?? null, valide_le: new Date().toISOString(),
       demandeur_signe_le: new Date().toISOString(),
     })
@@ -147,7 +147,11 @@ export async function importerNoteFrais(formData: FormData) {
 export async function renommerNDF(noteId: string, formData: FormData) {
   const supabase = await createSupabase();
   const titre = str(formData.get("titre"));
-  const { error } = await supabase.from("note_frais").update({ titre }).eq("id", noteId);
+  const date = str(formData.get("date"));
+  const { error } = await supabase
+    .from("note_frais")
+    .update(date ? { titre, date } : { titre })
+    .eq("id", noteId);
   if (error) throw new Error(error.message);
   revalidatePath(`/notes-frais/${noteId}`);
   revalidatePath("/notes-frais");

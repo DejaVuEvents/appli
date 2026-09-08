@@ -3,7 +3,21 @@
 import { useRef, useState } from "react";
 
 /** Zone de glisser-déposer autour d'un <input type="file"> (utilisable dans un <form action=…>). */
-export function FileDropzone({ name, accept, maxMo = 4 }: { name: string; accept?: string; maxMo?: number }) {
+export function FileDropzone({
+  name,
+  accept,
+  maxMo = 4,
+  libelle,
+  onFile,
+}: {
+  name: string;
+  accept?: string;
+  maxMo?: number;
+  /** Texte affiché tant qu'aucun fichier n'est choisi. */
+  libelle?: string;
+  /** Prévient le parent du fichier retenu (null si retiré), pour dévoiler la suite du formulaire. */
+  onFile?: (f: File | null) => void;
+}) {
   const ref = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -20,11 +34,13 @@ export function FileDropzone({ name, accept, maxMo = 4 }: { name: string; accept
       setErreur(`« ${f.name} » fait ${(f.size / 1024 / 1024).toFixed(1)} Mo — maximum ${maxMo} Mo. Compresse le fichier ou photographie le justificatif.`);
       setFileName(null);
       ref.current.value = "";
+      onFile?.(null);
       return;
     }
     ref.current.files = files; // les fichiers déposés deviennent ceux de l'input → soumis avec le form
     setFileName(f.name);
     setErreur(null);
+    onFile?.(f);
   }
 
   return (
@@ -48,7 +64,7 @@ export function FileDropzone({ name, accept, maxMo = 4 }: { name: string; accept
       {fileName ? (
         <span className="font-medium">{fileName}</span>
       ) : (
-        <span className="text-muted">Glisser un justificatif ici, ou cliquer pour choisir (photo / PDF)</span>
+        <span className="text-muted">{libelle ?? "Glisser un justificatif ici, ou cliquer pour choisir (photo / PDF)"}</span>
       )}
       {erreur && <p className="mt-1.5 text-xs font-medium text-red-600">{erreur}</p>}
     </div>

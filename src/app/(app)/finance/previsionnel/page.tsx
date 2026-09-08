@@ -9,7 +9,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
   const annee = Number((await searchParams)?.annee) || new Date().getFullYear();
   const supabase = await createClient();
 
-  const [{ data: recData }, { data: prevData }, { data: entData }, { data: toutesEcritures }, nomenclature] = await Promise.all([
+  const [{ data: recData }, { data: prevData }, { data: entData }, { data: toutesEcritures }, { data: ndfData }, nomenclature, { data: suggData }] = await Promise.all([
     supabase.from("depense_recurrente").select("*").order("actif", { ascending: false }).order("nom"),
     supabase
       .from("ecriture_financiere")
@@ -18,8 +18,15 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       .is("depense_recurrente_id", null)
       .order("date"),
     supabase.from("parametres_entreprise").select("solde_initial, solde_initial_date, seuil_alerte").limit(1).maybeSingle(),
-    supabase.from("ecriture_financiere").select("date, montant_ttc, sens, statut, depense_recurrente_id"),
+    supabase.from("ecriture_financiere").select("date, montant_ttc, sens, statut, depense_recurrente_id, note_frais_id"),
+    // Notes de frais validées dont le remboursement n'est pas encore décaissé.
+    supabase
+      .from("note_frais")
+      .select("id, numero, titre, date, ecriture_id, lignes:ligne_note_frais(montant_ttc)")
+      .in("statut", ["soumise", "validee"])
+      .order("date", { ascending: false }),
     chargerNomenclature(supabase),
+    supabase.rpc("suggestions_rapprochement_ndf"),
   ]);
 
   // Point de départ du solde projeté : le réel encaissé à ce jour.
@@ -33,6 +40,34 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
 
   // Net mensuel des prévisions RÉCURRENTES : absentes de la liste affichée, mais elles
   // pèsent sur le solde — les ignorer donnerait une projection fausse.
+  // Une note déjà liée à une prévision ou à un décaissement réel ne doit plus être proposée.
+  const dejaLiees = new Set(
+    ((toutesEcritures ?? []) as { note_frais_id?: string | null }[]).map((e) => e.note_frais_id).filter(Boolean) as string[],
+  );
+  const ndfAPrevoir = ((ndfData ?? []) as unknown as {
+    id: string; numero: string | null; titre: string | null; date: string | null;
+    ecriture_id: string | null; lignes: { montant_ttc: number }[];
+  }[])
+    .filter((n) => !n.ecriture_id && !dejaLiees.has(n.id))
+    .map((n) => ({
+      id: n.id,
+      libelle: `${n.numero ?? "NDF"} — ${n.titre ?? "Note de frais"}`,
+      montant: Math.round((n.lignes ?? []).reduce((s2, l) => s2 + Number(l.montant_ttc ?? 0), 0) * 100) / 100,
+      date: n.date,
+    }))
+    .filter((n) => n.montant > 0);
+
+  // Décaissements réels qui pourraient solder une prévision de note de frais.
+  const suggestions = ((suggData ?? []) as {
+    prevision_id: string; note_numero: string | null; note_titre: string | null;
+    ecriture_id: string; ecriture_date: string; ecriture_libelle: string | null;
+  }[]).map((x) => ({
+    previsionId: x.prevision_id,
+    ecritureId: x.ecriture_id,
+    libelle: x.ecriture_libelle ?? "Décaissement",
+    date: x.ecriture_date,
+  }));
+
   const recurrentesParMois: Record<string, number> = {};
   for (const e of lignes) {
     if (e.statut !== "previsionnel" || !e.depense_recurrente_id) continue;
@@ -65,6 +100,8 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
         soldeReel={soldeReel}
         seuil={Number(ent?.seuil_alerte ?? 0)}
         recurrentesParMois={recurrentesParMois}
+        ndfAPrevoir={ndfAPrevoir}
+        suggestions={suggestions}
       />
     </div>
   );

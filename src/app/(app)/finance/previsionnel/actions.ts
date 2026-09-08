@@ -113,7 +113,10 @@ export async function creerPrevisionPonctuelle(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   const montant = num(formData.get("montant_ttc"));
   if (!montant) throw new Error("Renseigne un montant.");
-  const { error } = await supabase.from("ecriture_financiere").insert({
+  // Note de frais associée : la prévision suit son remboursement.
+  const noteFraisId = str(formData.get("note_frais_id"));
+  const { data: cree, error } = await supabase.from("ecriture_financiere").insert({
+    note_frais_id: noteFraisId,
     date: str(formData.get("date")) ?? ymd(new Date()),
     denomination: String(formData.get("denomination") ?? "").trim() || "Prévision",
     type: str(formData.get("type")),
@@ -123,8 +126,38 @@ export async function creerPrevisionPonctuelle(formData: FormData) {
     montant_ttc: montant,
     valide: false,
     created_by: user?.id ?? null,
-  });
+  }).select("id").single();
   if (error) throw new Error(error.message);
+  // Lien réciproque : la fiche de la note montre alors sa ligne de trésorerie.
+  if (noteFraisId && cree) {
+    await supabase.from("note_frais").update({ ecriture_id: cree.id }).eq("id", noteFraisId);
+    revalidatePath(`/notes-frais/${noteFraisId}`);
+  }
   revalider();
   revalidatePath("/finance/journal");
+}
+
+/**
+ * Rapproche une prévision de note de frais du décaissement réel constaté.
+ *
+ * La prévision disparaît (le mouvement est désormais réel) et la note pointe sur
+ * l'écriture bancaire : elle bascule alors en « Remboursée ». Déclenché à la main —
+ * un virement du bon montant peut concerner autre chose.
+ */
+export async function rapprocherPrevisionNdf(previsionId: string, ecritureReelleId: string) {
+  const supabase = await createSupabase();
+  const { data: prev } = await supabase
+    .from("ecriture_financiere")
+    .select("note_frais_id")
+    .eq("id", previsionId)
+    .maybeSingle();
+  if (!prev?.note_frais_id) return;
+
+  await supabase.from("note_frais").update({ ecriture_id: ecritureReelleId }).eq("id", prev.note_frais_id);
+  await supabase.from("ecriture_financiere").update({ note_frais_id: prev.note_frais_id }).eq("id", ecritureReelleId);
+  await supabase.from("ecriture_financiere").delete().eq("id", previsionId);
+
+  revalider();
+  revalidatePath("/finance/journal");
+  revalidatePath(`/notes-frais/${prev.note_frais_id}`);
 }

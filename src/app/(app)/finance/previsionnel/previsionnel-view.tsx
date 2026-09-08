@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DateInput } from "@/components/date-input";
 import Link from "next/link";
-import { creerRecurrent, supprimerRecurrent, toggleRecurrent, creerPrevisionPonctuelle } from "./actions";
+import { creerRecurrent, supprimerRecurrent, toggleRecurrent, creerPrevisionPonctuelle, rapprocherPrevisionNdf } from "./actions";
 import { deleteEcriture } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
 import { Modal, ModalForm } from "@/components/modal";
@@ -13,6 +13,9 @@ import { typeLabel } from "@/lib/finance";
 import { CategorieIcon } from "@/components/categorie-icon";
 
 export type PrevRow = { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; type: string | null; specification: string | null; prestation_id?: string | null; prestationNom?: string | null };
+export type DocAPrevoir = { id: string; libelle: string; montant: number; date: string | null };
+export type Suggestion = { previsionId: string; ecritureId: string; libelle: string; date: string };
+
 export type Recurrent = { id: string; nom: string; sens: string; montant_ttc: number; frequence: string; jour: number; mois: number | null; type: string | null; specification: string | null; actif: boolean };
 type Nomenclature = Record<string, Record<string, string[]>>;
 
@@ -25,6 +28,8 @@ export function PrevisionnelView({
   soldeReel,
   seuil,
   recurrentesParMois,
+  ndfAPrevoir = [],
+  suggestions = [],
 }: {
   ponctuelles: PrevRow[];
   recurrents: Recurrent[];
@@ -32,6 +37,8 @@ export function PrevisionnelView({
   soldeReel: number;
   seuil: number;
   recurrentesParMois: Record<string, number>;
+  ndfAPrevoir?: DocAPrevoir[];
+  suggestions?: Suggestion[];
 }) {
   const [vue, setVue] = useState<"ponctuelles" | "recurrents">("ponctuelles");
 
@@ -51,7 +58,7 @@ export function PrevisionnelView({
       {vue === "recurrents" ? (
         <RecurrentsView recurrents={recurrents} nomenclature={nomenclature} mensuelEquivalent={mensuelEquivalent} />
       ) : (
-        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} />
+        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} ndfAPrevoir={ndfAPrevoir} suggestions={suggestions} />
       )}
     </div>
   );
@@ -187,15 +194,23 @@ function PonctuellesView({
   soldeReel,
   seuil,
   recurrentesParMois,
+  ndfAPrevoir,
+  suggestions,
 }: {
   rows: PrevRow[];
   nomenclature: Nomenclature;
   soldeReel: number;
   seuil: number;
   recurrentesParMois: Record<string, number>;
+  ndfAPrevoir: DocAPrevoir[];
+  suggestions: Suggestion[];
 }) {
   const [sens, setSens] = useState<"sortie" | "entree">("sortie");
   const [type, setType] = useState("");
+  // Document associé : sélectionner une note de frais remplit libellé, montant et date,
+  // et fait suivre son remboursement à la prévision.
+  const [docId, setDocId] = useState("");
+  const doc = ndfAPrevoir.find((d) => d.id === docId) ?? null;
   const map = nomenclature[sens] ?? {};
   const types = Object.keys(map);
   const specs = map[type] ?? [];
@@ -224,15 +239,34 @@ function PonctuellesView({
   const formulaire = (
     <Modal trigger={<>+ Nouvelle prévision</>} title="Nouvelle prévision ponctuelle">
       <ModalForm action={creerPrevisionPonctuelle} className="space-y-3">
+      {ndfAPrevoir.length > 0 && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">Note de frais associée (facultatif)</span>
+          <select
+            name="note_frais_id"
+            value={docId}
+            onChange={(e) => { setDocId(e.target.value); if (e.target.value) setSens("sortie"); }}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">— Aucune —</option>
+            {ndfAPrevoir.map((d) => (
+              <option key={d.id} value={d.id}>{d.libelle} — {euros(d.montant)}</option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-muted">
+            Le montant se remplit tout seul, et la prévision se retire dès que le remboursement est constaté.
+          </span>
+        </label>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block"><span className="mb-1 block text-xs font-medium">Libellé</span>
-          <input name="denomination" required placeholder="Achat lyres, subvention…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input name="denomination" required key={`lib-${docId}`} defaultValue={doc ? doc.libelle : ""} placeholder="Achat lyres, subvention…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Sens</span>
           <select name="sens" value={sens} onChange={(e) => { setSens(e.target.value as "sortie" | "entree"); setType(""); }} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="sortie">Dépense</option><option value="entree">Entrée</option>
           </select></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Montant (€)</span>
-          <input name="montant_ttc" type="number" step="0.01" min="0" required className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <input name="montant_ttc" type="number" step="0.01" min="0" required key={`mt-${docId}`} defaultValue={doc ? doc.montant : ""} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Date prévue</span>
           <DateInput name="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium">Catégorie</span>
@@ -318,6 +352,20 @@ function PonctuellesView({
                     <span className="flex shrink-0 items-center gap-3">
                       <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
                       <Link href={`/finance/${r.id}?retour=previsionnel`} className={`text-xs hover:text-primary ${echue ? "font-medium text-amber-700 dark:text-amber-500" : "text-muted"}`}>Modifier</Link>
+                      {(() => {
+                        const sugg = suggestions.find((x) => x.previsionId === r.id);
+                        if (!sugg) return null;
+                        return (
+                          <form action={rapprocherPrevisionNdf.bind(null, r.id, sugg.ecritureId)}>
+                            <SubmitButton
+                              className="!px-2 !py-1 !text-xs"
+                              confirm={`Rapprocher cette prévision du décaissement « ${sugg.libelle} » du ${dateFr(sugg.date)} ? La prévision disparaît et la note passe en « Remboursée ».`}
+                            >
+                              Rapprocher
+                            </SubmitButton>
+                          </form>
+                        );
+                      })()}
                       <form action={deleteEcriture.bind(null, r.id)}>
                         <ConfirmButton
                           confirm={`Supprimer la prévision « ${r.denomination ?? "sans libellé"} » (${euros(r.montant_ttc)}) ?`}

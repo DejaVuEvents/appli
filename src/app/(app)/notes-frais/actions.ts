@@ -68,6 +68,74 @@ export async function setPredepenseInfos(noteId: string, formData: FormData) {
   revalidatePath(`/notes-frais/${noteId}`);
 }
 
+/**
+ * Importe une note de frais existante (PDF ou photo) : reprise d'historique, ou note
+ * établie hors de l'outil.
+ *
+ * Aucune écriture prévisionnelle n'est créée. Une note ancienne a déjà été remboursée et
+ * son virement est au journal via la synchro bancaire : en ajouter une deuxième gonflerait
+ * la trésorerie d'un montant fantôme. On cherche donc un décaissement réel du même montant,
+ * non encore rattaché, et on s'y relie — la note apparaît alors « Remboursée ».
+ */
+export async function importerNoteFrais(formData: FormData) {
+  const supabase = await createSupabase();
+  const membre = await getMembreActuel(supabase);
+
+  const titre = str(formData.get("titre"));
+  const date = str(formData.get("date"));
+  const montant = num(formData.get("montant_ttc"));
+  const demandeurId = str(formData.get("demandeur_id")) ?? membre?.id ?? null;
+  const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
+  if (!montant) throw new Error("Renseigne le montant de la note.");
+
+  const { data: note, error } = await supabase
+    .from("note_frais")
+    .insert({
+      titre, demandeur_id: demandeurId, type_ndf: "depense",
+      statut: "validee", valide_par: membre?.id ?? null, valide_le: new Date().toISOString(),
+      demandeur_signe_le: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await supabase.from("ligne_note_frais").insert({
+    note_frais_id: note.id,
+    libelle: titre ?? "Dépense",
+    date,
+    montant_ttc: montant,
+    justificatif_url: justificatif?.path ?? null,
+    justificatif_nom: justificatif?.nom ?? null,
+  });
+
+  // Rattachement au décaissement déjà présent au journal, s'il existe.
+  const ref = date ?? new Date().toISOString().slice(0, 10);
+  const jour = 86400000;
+  const [{ data: candidats }, { data: dejaLiees }] = await Promise.all([
+    supabase
+      .from("ecriture_financiere")
+      .select("id, date")
+      .eq("statut", "reel")
+      .eq("sens", "sortie")
+      .eq("montant_ttc", montant)
+      .gte("date", new Date(new Date(ref).getTime() - 15 * jour).toISOString().slice(0, 10))
+      .lte("date", new Date(new Date(ref).getTime() + 150 * jour).toISOString().slice(0, 10)),
+    // Le lien est porté par note_frais.ecriture_id : on écarte les écritures déjà prises.
+    supabase.from("note_frais").select("ecriture_id").not("ecriture_id", "is", null),
+  ]);
+
+  const prises = new Set(((dejaLiees ?? []) as { ecriture_id: string }[]).map((n) => n.ecriture_id));
+  const liste = ((candidats ?? []) as { id: string; date: string }[]).filter((e) => !prises.has(e.id));
+  if (liste.length > 0) {
+    const ecart = (d: string) => Math.abs(new Date(d).getTime() - new Date(ref).getTime());
+    const meilleure = liste.reduce((a, b) => (ecart(b.date) < ecart(a.date) ? b : a));
+    await supabase.from("note_frais").update({ ecriture_id: meilleure.id }).eq("id", note.id);
+  }
+
+  revalidatePath("/notes-frais");
+  redirect(`/notes-frais/${note.id}`);
+}
+
 export async function addLigneNDF(noteId: string, formData: FormData) {
   const supabase = await createSupabase();
   const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);

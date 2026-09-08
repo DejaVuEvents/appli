@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
-import { Field } from "@/components/form";
+import { Field, Select } from "@/components/form";
+import { FileDropzone } from "@/components/file-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { Modal, ModalForm } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre } from "@/lib/membre";
-import { createNoteFrais } from "./actions";
+import { createNoteFrais, importerNoteFrais } from "./actions";
 import { NotesFraisListe, type NoteLite } from "./notes-liste";
 import { STATUT_NDF_LABELS, TYPE_NDF_LABELS, type NoteFrais } from "@/lib/types";
 
@@ -97,9 +98,46 @@ export default async function NotesFraisPage() {
     </Modal>
   );
 
+  const importerNote = (
+    <Modal
+      trigger={<>Importer une note</>}
+      title="Importer une note de frais"
+      triggerClassName="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-background"
+    >
+      <ModalForm action={importerNoteFrais} className="space-y-3">
+        <p className="text-sm text-muted">
+          Reprise d&apos;une note établie hors de l&apos;outil. Elle est enregistrée comme validée et
+          signée, avec son justificatif.
+        </p>
+        <Field label="Intitulé" name="titre" required placeholder="NDF Théo — janvier" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Date" name="date" type="date" />
+          <Field label="Montant TTC (€)" name="montant_ttc" type="number" step="0.01" required />
+        </div>
+        <Select
+          label="Demandeur"
+          name="demandeur_id"
+          options={[{ value: "", label: "— Moi —" }, ...membresListe.map((m) => ({ value: m.id, label: m.nom }))]}
+        />
+        <div>
+          <span className="mb-1 block text-sm font-medium">Justificatif (photo / PDF)</span>
+          <FileDropzone name="justificatif" accept="image/*,application/pdf" />
+        </div>
+        <p className="text-xs text-muted">
+          Aucune écriture n&apos;est créée : si un décaissement du même montant existe déjà au journal,
+          la note s&apos;y rattache et apparaît « Remboursée ».
+        </p>
+        <SubmitButton>Importer</SubmitButton>
+      </ModalForm>
+    </Modal>
+  );
+
   return (
     <div className="max-w-6xl">
-      <PageHeader title="Notes de frais" action={nouvelleNote} />
+      <PageHeader
+        title="Notes de frais"
+        action={<span className="flex items-center gap-2">{importerNote}{nouvelleNote}</span>}
+      />
 
       {/* À valider (co-présidents) */}
       {isCoPres && (

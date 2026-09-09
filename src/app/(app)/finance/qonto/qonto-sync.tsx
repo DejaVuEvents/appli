@@ -60,6 +60,7 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDoublons, setShowDoublons] = useState(false);
+  const [menuSync, setMenuSync] = useState(false);
 
   const handlePreview = () => {
     setResult(null);
@@ -197,31 +198,50 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
         )
       )}
 
-      {/* Boutons sync */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={handleSyncGlobal}
-          disabled={pending}
-          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-          title="Importe les nouvelles transactions propres (hors doublons/en attente) + récupère les justificatifs manquants, en un clic"
-        >
-          {pending ? "Synchronisation…" : "⟳ Tout synchroniser"}
-        </button>
-        <button
-          onClick={handlePreview}
-          disabled={pending}
-          className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background disabled:opacity-50"
-        >
-          {pending ? "Chargement…" : "Vérifier / choisir les transactions"}
-        </button>
-        <button
-          onClick={handleJustificatifs}
-          disabled={pending}
-          className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background disabled:opacity-50"
-          title="Télécharge depuis Qonto les pièces jointes des écritures qui n'en ont pas encore"
-        >
-          Récupérer les justificatifs manquants
-        </button>
+      {/* Un seul bouton : l'action courante au clic, les deux variantes dans le menu. */}
+      <div className="relative inline-block" onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuSync(false);
+      }}>
+        <div className="flex">
+          <button
+            onClick={handleSyncGlobal}
+            disabled={pending}
+            className="rounded-l-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            title="Importe les nouvelles transactions propres (hors doublons/en attente) + récupère les justificatifs manquants"
+          >
+            {pending ? "Synchronisation…" : "⟳ Synchroniser"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuSync((v) => !v)}
+            disabled={pending}
+            aria-label="Autres options de synchronisation"
+            aria-expanded={menuSync}
+            className="rounded-r-lg border-l border-primary-foreground/25 bg-primary px-2.5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            ▾
+          </button>
+        </div>
+        {menuSync && (
+          <div className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+            <button
+              type="button"
+              onClick={() => { setMenuSync(false); handlePreview(); }}
+              className="block w-full px-3 py-2.5 text-left text-sm hover:bg-background"
+            >
+              Vérifier / choisir les transactions
+              <span className="block text-xs text-muted">Passer les mouvements en revue avant de les importer.</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMenuSync(false); handleJustificatifs(); }}
+              className="block w-full border-t border-border px-3 py-2.5 text-left text-sm hover:bg-background"
+            >
+              Récupérer les justificatifs manquants
+              <span className="block text-xs text-muted">Télécharge depuis Qonto les pièces jointes absentes.</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (

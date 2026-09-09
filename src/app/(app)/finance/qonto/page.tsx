@@ -4,7 +4,6 @@ import { FinanceTabs } from "../finance-tabs";
 import { fetchQontoOrg } from "@/lib/qonto";
 import { chargerNomenclature, syntheseMensuelle } from "@/lib/finance";
 import { QontoSync } from "./qonto-sync";
-import { QontoRapport } from "./qonto-rapport";
 import { EmailFactures } from "./email-factures";
 import type { ParametresEntreprise, EcritureFinanciere } from "@/lib/types";
 
@@ -64,12 +63,10 @@ export default async function QontoPage({
         <>
           <QontoSync
             derniereSync={ent?.qonto_derniere_sync ?? null}
-            compteNom={ent?.qonto_account_slug ?? ""}
             balanceQonto={balanceQonto}
             soldeOutil={soldeOutil}
             nomenclature={await chargerNomenclature(supabase)}
           />
-          <QontoRapport />
         </>
       )}
 

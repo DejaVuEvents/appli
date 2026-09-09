@@ -2,23 +2,21 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { rapprochementQonto, importQontoTransactions, ajusterSoldeInitial, type RapportRapprochement } from "./actions";
+import { importQontoTransactions, ajusterSoldeInitial, type RapportRapprochement } from "./actions";
 import { euros, dateFr } from "@/lib/format";
 
-export function QontoRapport() {
+export function QontoRapport({
+  rap,
+  onRefresh,
+}: {
+  rap: Extract<RapportRapprochement, { ok: true }> | null;
+  /** Relance l'analyse après une correction, pour que les chiffres suivent. */
+  onRefresh: () => void;
+}) {
   const [pending, startTransition] = useTransition();
-  const [rap, setRap] = useState<Extract<RapportRapprochement, { ok: true }> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-
-  const generer = () => {
-    setError(null); setMsg(null);
-    startTransition(async () => {
-      const r = await rapprochementQonto();
-      if (!r.ok) { setError(r.error); setRap(null); return; }
-      setRap(r);
-    });
-  };
+  const generer = onRefresh;
 
   const importerManquantes = () => {
     if (!rap?.manquantes.length) return;
@@ -44,14 +42,7 @@ export function QontoRapport() {
   const valide = rap && Math.abs(rap.ecart) < 0.01;
 
   return (
-    <div className="mt-6 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Rapport de rapprochement</h2>
-        <button onClick={generer} disabled={pending} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface disabled:opacity-50">
-          {pending ? "Analyse…" : rap ? "Rafraîchir" : "Analyser l'écart"}
-        </button>
-      </div>
-
+    <div className="space-y-4">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {msg && <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{msg}</div>}
 

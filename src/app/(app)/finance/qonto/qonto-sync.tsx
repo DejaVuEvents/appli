@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { previewQonto, importQontoTransactions, recupererJustificatifsQonto, syncGlobal } from "./actions";
-import type { QontoPreviewItem } from "./actions";
+import { previewQonto, importQontoTransactions, recupererJustificatifsQonto, syncGlobal, rapprochementQonto } from "./actions";
+import type { QontoPreviewItem, RapportRapprochement } from "./actions";
+import { QontoRapport } from "./qonto-rapport";
 import { euros, dateFr } from "@/lib/format";
 import { NOMENCLATURE } from "@/lib/finance";
 import type { SensFinancier } from "@/lib/types";
@@ -46,13 +47,12 @@ function SpecSelect({ sens, type, spec, onChange, nomenclature }: {
 
 interface Props {
   derniereSync: string | null;
-  compteNom: string;
   balanceQonto: number | null;
   soldeOutil?: number;
   nomenclature?: Nomenclature;
 }
 
-export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, nomenclature = NOMENCLATURE }: Props) {
+export function QontoSync({ derniereSync, balanceQonto, soldeOutil, nomenclature = NOMENCLATURE }: Props) {
   const [pending, startTransition] = useTransition();
   const [items, setItems] = useState<QontoPreviewItem[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -61,6 +61,19 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
   const [error, setError] = useState<string | null>(null);
   const [showDoublons, setShowDoublons] = useState(false);
   const [menuSync, setMenuSync] = useState(false);
+  // Le rapport de rapprochement est piloté d'ici : son bouton vit dans le même
+  // encadré d'actions que la synchronisation.
+  const [rap, setRap] = useState<Extract<RapportRapprochement, { ok: true }> | null>(null);
+  const [rapPending, setRapPending] = useState(false);
+
+  const analyser = async () => {
+    setRapPending(true);
+    setError(null);
+    const r = await rapprochementQonto();
+    setRapPending(false);
+    if (!r.ok) { setError(r.error); setRap(null); return; }
+    setRap(r);
+  };
 
   const handlePreview = () => {
     setResult(null);
@@ -154,94 +167,110 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
 
   return (
     <div className="space-y-4">
-      {/* Info compte */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4">
-        <div>
-          <div className="text-sm font-semibold">Compte Qonto connecté</div>
-          <div className="text-xs text-muted">{compteNom}</div>
-          {derniereSync && (
-            <div className="mt-0.5 text-xs text-muted">Dernière sync : {dateFr(derniereSync.slice(0, 10))}</div>
-          )}
-        </div>
-        <div className="text-right">
-          {balanceQonto !== null && (
-            <div className={`text-lg font-bold ${balanceQonto < 0 ? "text-red-600" : "text-green-700"}`}>
-              {euros(balanceQonto)}
-            </div>
-          )}
-          <div className="text-xs text-muted">Solde Qonto actuel</div>
-        </div>
-      </div>
-
-      {/* Rapprochement Qonto ↔ outil */}
-      {ecart !== null && (
-        valide ? (
-          <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700 dark:border-green-500/40 dark:bg-green-950/20 dark:text-green-300">
-            ✓ Trésorerie à jour
+      {/* Colonne de gauche : état du compte. Colonne de droite : toutes les actions. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start">
+        <div className="space-y-4">
+        {/* Info compte */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4">
+          <div>
+            <div className="text-sm font-semibold">Compte Qonto connecté</div>
+            {derniereSync && (
+              <div className="mt-0.5 text-xs text-muted">Dernière sync : {dateFr(derniereSync.slice(0, 10))}</div>
+            )}
           </div>
-        ) : (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm font-semibold">⚠️ Écart entre Qonto et l&apos;outil</div>
-              <div className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                Écart : {ecart > 0 ? "+" : ""}{euros(ecart)}
+          <div className="text-right">
+            {balanceQonto !== null && (
+              <div className={`text-lg font-bold ${balanceQonto < 0 ? "text-red-600" : "text-green-700"}`}>
+                {euros(balanceQonto)}
               </div>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:max-w-md">
-              <div className="flex justify-between gap-2"><span className="text-muted">Solde banque (Qonto)</span><span className="font-semibold tabular-nums">{euros(balanceQonto)}</span></div>
-              <div className="flex justify-between gap-2"><span className="text-muted">Solde outil (réel)</span><span className="font-semibold tabular-nums">{euros(soldeOutil!)}</span></div>
-            </div>
-            <p className="mt-2 text-xs text-muted">
-              Récupère puis importe les transactions manquantes ci-dessous pour aligner l&apos;outil sur la banque.
-            </p>
+            )}
+            <div className="text-xs text-muted">Solde Qonto actuel</div>
           </div>
-        )
-      )}
-
-      {/* Un seul bouton : l'action courante au clic, les deux variantes dans le menu. */}
-      <div className="relative inline-block" onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuSync(false);
-      }}>
-        <div className="flex">
-          <button
-            onClick={handleSyncGlobal}
-            disabled={pending}
-            className="rounded-l-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            title="Importe les nouvelles transactions propres (hors doublons/en attente) + récupère les justificatifs manquants"
-          >
-            {pending ? "Synchronisation…" : "⟳ Synchroniser"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenuSync((v) => !v)}
-            disabled={pending}
-            aria-label="Autres options de synchronisation"
-            aria-expanded={menuSync}
-            className="rounded-r-lg border-l border-primary-foreground/25 bg-primary px-2.5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-          >
-            ▾
-          </button>
         </div>
-        {menuSync && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+
+        {/* Rapprochement Qonto ↔ outil */}
+        {ecart !== null && (
+          valide ? (
+            <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700 dark:border-green-500/40 dark:bg-green-950/20 dark:text-green-300">
+              ✓ Trésorerie à jour
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-semibold">⚠️ Écart entre Qonto et l&apos;outil</div>
+                <div className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                  Écart : {ecart > 0 ? "+" : ""}{euros(ecart)}
+                </div>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:max-w-md">
+                <div className="flex justify-between gap-2"><span className="text-muted">Solde banque (Qonto)</span><span className="font-semibold tabular-nums">{euros(balanceQonto)}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-muted">Solde outil (réel)</span><span className="font-semibold tabular-nums">{euros(soldeOutil!)}</span></div>
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                Récupère puis importe les transactions manquantes ci-dessous pour aligner l&apos;outil sur la banque.
+              </p>
+            </div>
+          )
+        )}
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="mb-3 text-sm font-semibold">Actions</div>
+          <div className="space-y-2">
+          {/* Un seul bouton : l'action courante au clic, les deux variantes dans le menu. */}
+          <div className="relative block" onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuSync(false);
+          }}>
+            <div className="flex w-full">
+              <button
+                onClick={handleSyncGlobal}
+                disabled={pending}
+                className="flex-1 rounded-l-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                title="Importe les nouvelles transactions propres (hors doublons/en attente) + récupère les justificatifs manquants"
+              >
+                {pending ? "Synchronisation…" : "⟳ Synchroniser"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMenuSync((v) => !v)}
+                disabled={pending}
+                aria-label="Autres options de synchronisation"
+                aria-expanded={menuSync}
+                className="rounded-r-lg border-l border-primary-foreground/25 bg-primary px-2.5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                ▾
+              </button>
+            </div>
+            {menuSync && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { setMenuSync(false); handlePreview(); }}
+                  className="block w-full px-3 py-2.5 text-left text-sm hover:bg-background"
+                >
+                  Vérifier / choisir les transactions
+                  <span className="block text-xs text-muted">Passer les mouvements en revue avant de les importer.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMenuSync(false); handleJustificatifs(); }}
+                  className="block w-full border-t border-border px-3 py-2.5 text-left text-sm hover:bg-background"
+                >
+                  Récupérer les justificatifs manquants
+                  <span className="block text-xs text-muted">Télécharge depuis Qonto les pièces jointes absentes.</span>
+                </button>
+              </div>
+            )}
+          </div>
             <button
-              type="button"
-              onClick={() => { setMenuSync(false); handlePreview(); }}
-              className="block w-full px-3 py-2.5 text-left text-sm hover:bg-background"
+              onClick={analyser}
+              disabled={pending || rapPending}
+              className="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background disabled:opacity-50"
             >
-              Vérifier / choisir les transactions
-              <span className="block text-xs text-muted">Passer les mouvements en revue avant de les importer.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMenuSync(false); handleJustificatifs(); }}
-              className="block w-full border-t border-border px-3 py-2.5 text-left text-sm hover:bg-background"
-            >
-              Récupérer les justificatifs manquants
-              <span className="block text-xs text-muted">Télécharge depuis Qonto les pièces jointes absentes.</span>
+              {rapPending ? "Analyse…" : rap ? "Rafraîchir l'analyse" : "Analyser l'écart"}
             </button>
           </div>
-        )}
+        </div>
       </div>
 
       {error && (
@@ -249,6 +278,13 @@ export function QontoSync({ derniereSync, compteNom, balanceQonto, soldeOutil, n
       )}
       {result && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{result}</div>
+      )}
+
+      {rap && (
+        <div>
+          <h2 className="mb-3 text-base font-semibold">Rapport de rapprochement</h2>
+          <QontoRapport rap={rap} onRefresh={analyser} />
+        </div>
       )}
 
       {/* Tableau de prévisualisation */}

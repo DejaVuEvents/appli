@@ -1,15 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/login/actions";
 
 export function ProfileMenu({ avatarUrl, nom, email }: { avatarUrl: string | null; nom: string; email: string | null }) {
   const [open, setOpen] = useState(false);
+  const conteneur = useRef<HTMLDivElement>(null);
   const initiale = (nom?.trim()?.[0] ?? "?").toUpperCase();
 
+  // Fermeture au clic extérieur — écouteur sur le document, PAS un calque `fixed`.
+  // Le header porte `backdrop-blur` : un élément avec `backdrop-filter` devient le
+  // bloc conteneur de ses descendants `position: fixed`, donc un `fixed inset-0`
+  // s'y trouvait rogné à la hauteur du header et ne couvrait pas la page.
+  useEffect(() => {
+    if (!open) return;
+    const dehors = (e: PointerEvent) => {
+      if (!conteneur.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const echap = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", dehors);
+    document.addEventListener("keydown", echap);
+    return () => {
+      document.removeEventListener("pointerdown", dehors);
+      document.removeEventListener("keydown", echap);
+    };
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div ref={conteneur} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -26,8 +45,6 @@ export function ProfileMenu({ avatarUrl, nom, email }: { avatarUrl: string | nul
 
       {open && (
         <>
-          {/* Fond pour fermer au clic extérieur */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="animate-popin absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
             <div className="border-b border-border px-4 py-3">
               <div className="truncate text-sm font-semibold">{nom}</div>

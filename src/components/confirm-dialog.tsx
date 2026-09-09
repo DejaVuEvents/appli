@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ponctuationFr } from "@/lib/format";
 
 /** Modale de confirmation intégrée au design (remplace window.confirm). */
 export function ConfirmDialog({
@@ -34,7 +35,7 @@ export function ConfirmDialog({
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${danger ? "bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400" : "bg-primary/10 text-primary"}`}>
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </span>
-          <p className="pt-1 text-sm text-foreground">{message}</p>
+          <p className="pt-1 text-sm text-foreground">{ponctuationFr(message)}</p>
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-background">Annuler</button>

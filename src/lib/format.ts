@@ -31,3 +31,18 @@ export function dateFr(iso: string | null | undefined, format: DateFormat = "fr"
   }
   return `${d}/${m}/${y}`;
 }
+
+/**
+ * Rend insécable l'espace qui précède la ponctuation double française (? ! ; :) et
+ * qui suit un guillemet ouvrant. Sans ça, « Soumettre cette note pour validation ? »
+ * peut renvoyer le « ? » seul à la ligne suivante.
+ *
+ * Espace fine insécable (U+202F) devant ? ! ; et », espace insécable (U+00A0) devant
+ * les deux-points, conformément à l'usage typographique.
+ */
+export function ponctuationFr(texte: string): string {
+  return texte
+    .replace(/\s+([?!;»])/g, "\u202f$1")
+    .replace(/\s+(:)/g, "\u00a0$1")
+    .replace(/(«)\s+/g, "«\u202f");
+}

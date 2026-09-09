@@ -412,8 +412,10 @@ function PonctuellesView({
                     <div className="rounded-lg border-l-2 border-primary/50 bg-surface/40 py-1 pl-3 pr-1">
                       <div className="flex items-center justify-between gap-3 pb-1 text-xs">
                         <span className="truncate font-semibold text-muted">{g.nom}</span>
-                        <span className={`shrink-0 font-semibold ${netGroupe >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>
-                          net {netGroupe >= 0 ? "+" : ""}{euros(netGroupe)}
+                        {/* Neutre volontairement : le vert et le rouge sont réservés aux
+                            montants des lignes, sinon le récapitulatif les concurrence. */}
+                        <span className="shrink-0 font-semibold text-foreground">
+                          <span className="font-normal text-muted">net </span>{netGroupe >= 0 ? "+" : ""}{euros(netGroupe)}
                         </span>
                       </div>
                       <div className="divide-y divide-border/60">

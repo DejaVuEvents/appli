@@ -70,3 +70,23 @@ export async function getMembreActuel(supabase?: SupabaseClient): Promise<Membre
 export function nomMembre(m: { prenom?: string | null; nom: string | null; email: string | null } | null): string {
   return m?.prenom?.trim() || m?.nom?.trim() || m?.email?.split("@")[0] || "—";
 }
+
+/**
+ * Champs d'identité indispensables pour qu'une note de frais soit remboursable :
+ * ce sont exactement ceux que le PDF imprime (identité, adresse, contact, IBAN).
+ * Sans eux, la note part en validation sans dire à qui ni où rembourser.
+ */
+export function champsDemandeurManquants(m: {
+  nom?: string | null; prenom?: string | null; adresse?: string | null;
+  telephone?: string | null; iban?: string | null;
+} | null): string[] {
+  if (!m) return ["ton profil"];
+  const requis: [string, string | null | undefined][] = [
+    ["prénom", m.prenom],
+    ["nom", m.nom],
+    ["adresse", m.adresse],
+    ["téléphone", m.telephone],
+    ["IBAN", m.iban],
+  ];
+  return requis.filter(([, v]) => !v || !String(v).trim()).map(([k]) => k);
+}

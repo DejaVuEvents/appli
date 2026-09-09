@@ -11,7 +11,7 @@ import { FileDropzone } from "@/components/file-dropzone";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
-import { getMembreActuel, nomMembre } from "@/lib/membre";
+import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
 import {
   addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF } from "../actions";
 import { orsConfigured } from "@/lib/ors";
@@ -346,12 +346,16 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           // Les mêmes règles que soumettreNDF, évaluées ici pour expliquer le blocage
           // AVANT le clic : l'action lève une exception, dont Next.js masque le message
           // en production — l'utilisateur ne voyait qu'une page d'erreur.
-          const bloque = !estPredepense && (!ndf.demandeur_signe_le || lignes.length === 0);
+          const manquants = champsDemandeurManquants(membre);
+          const bloque = !estPredepense
+            && (!ndf.demandeur_signe_le || lignes.length === 0 || manquants.length > 0);
           // La carte « Signature » juste au-dessus s'affiche dans exactement les mêmes
           // conditions et donne déjà la marche à suivre : on ne la répète pas ici.
-          const blocage = bloque && ndf.demandeur_signe_le && lignes.length === 0
-            ? "Ajoute au moins une dépense avant de soumettre."
-            : null;
+          const blocage = !bloque || !ndf.demandeur_signe_le
+            ? null
+            : manquants.length > 0
+              ? `Complète ton profil avant de soumettre : ${manquants.join(", ")}.`
+              : "Ajoute au moins une dépense avant de soumettre.";
 
           if (bloque) {
             return (
@@ -363,7 +367,17 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 >
                   Soumettre pour validation
                 </button>
-                {blocage && <span className="text-sm text-amber-700">{blocage}</span>}
+                {blocage && (
+                  <span className="text-sm text-amber-700">
+                    {blocage}
+                    {manquants.length > 0 && (
+                      <>
+                        {" "}
+                        <Link href="/parametres?tab=moncompte" className="underline">Mon compte</Link>
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
             );
           }

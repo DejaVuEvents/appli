@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
-import { getMembreActuel, nomMembre } from "@/lib/membre";
+import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
@@ -263,6 +263,13 @@ export async function soumettreNDF(noteId: string) {
   const nn = n as unknown as { type_ndf: string | null; demandeur_signe_le: string | null; lignes: { id: string }[] } | null;
   if (!nn) throw new Error("Note de frais introuvable.");
   if (!nn.demandeur_signe_le) throw new Error("Signe ta note de frais avant de la soumettre.");
+  // Une note sans identité complète n'est pas remboursable : on bloque à la source,
+  // pas seulement dans l'interface.
+  const moi = await getMembreActuel(supabase);
+  const manquants = champsDemandeurManquants(moi);
+  if (manquants.length) {
+    throw new Error(`Complète ton profil avant de soumettre : ${manquants.join(", ")}.`);
+  }
   if (nn.type_ndf !== "predepense" && (nn.lignes ?? []).length === 0) {
     throw new Error("Ajoute au moins une dépense avant de soumettre.");
   }

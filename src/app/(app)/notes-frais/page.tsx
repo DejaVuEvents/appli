@@ -122,7 +122,7 @@ export default async function NotesFraisPage() {
                 <Link key={n.id} href={`/notes-frais/${n.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
                   <div className="min-w-0">
                     <div className="truncate font-medium">{n.titre || "Note de frais"}</div>
-                    <div className="text-xs text-muted">{TYPE_NDF_LABELS[n.type_ndf]} · {mMap.get(n.demandeur_id ?? "") ?? "—"} · {dateFr(n.created_at)}</div>
+                    <div className="text-xs text-muted">{TYPE_NDF_LABELS[n.type_ndf]} · {mMap.get(n.demandeur_id ?? "") ?? "—"} · {dateFr((n as { date?: string | null }).date ?? n.created_at)}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="font-semibold">{euros(total(n))}</span>

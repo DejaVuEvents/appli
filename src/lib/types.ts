@@ -375,6 +375,8 @@ export interface EcritureFinanciere {
   prestation_id: string | null;
   devis_facture_id: string | null;
   facture_fournisseur_id: string | null;
+  /** Note de frais dont cette écriture porte le remboursement (justificatifs sur la note). */
+  note_frais_id: string | null;
   qonto_transaction_id: string | null;
   valide: boolean;
 }

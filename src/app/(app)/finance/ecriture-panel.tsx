@@ -38,7 +38,10 @@ export function EcriturePanel({
   const [delOpen, setDelOpen] = useState(false);
   const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
   const factureRef = !factureUrl && e.facture ? e.facture : null;
-  const missingDoc = !e.facture && !e.devis_facture_id && factures.length === 0 && !hasJustif;
+  // Les justificatifs d'une écriture issue d'une NOTE DE FRAIS vivent sur la note,
+  // pas sur l'écriture : sans ce cas, l'outil réclamait un document déjà fourni.
+  const viaNoteFrais = !!e.note_frais_id;
+  const missingDoc = !e.facture && !e.devis_facture_id && factures.length === 0 && !hasJustif && !viaNoteFrais;
   const apercu = factures.find((f) => f.previewUrl)?.previewUrl ?? null;
 
   // Verrouille le scroll de la page d'arrière-plan tant que le panneau est ouvert.
@@ -100,6 +103,18 @@ export function EcriturePanel({
           )}
 
           {/* Facture / document */}
+          {viaNoteFrais && !e.facture && (
+            <Link
+              href={`/notes-frais/${e.note_frais_id}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm hover:bg-background"
+            >
+              <span className="flex min-w-0 items-center gap-2 text-muted">
+                <IconPaperclip className="h-4 w-4 shrink-0" />
+                Justificatifs portés par la note de frais
+              </span>
+              <span className="shrink-0 text-primary">Ouvrir la note →</span>
+            </Link>
+          )}
           {missingDoc && (
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm text-orange-800 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300">
               <div className="mb-2 flex items-center gap-2"><span>⚠</span><span>Aucun document joint à cette écriture.</span></div>

@@ -261,7 +261,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                   <div className="mt-1 divide-y divide-border rounded-xl border border-border bg-background">
                     {entries.map((e) => {
                       const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
-                      const hasDoc = !!e.facture || !!e.devis_facture_id || (facturesLiees[e.id]?.length ?? 0) > 0 || justifSet.has(e.id);
+                      const hasDoc = !!e.facture || !!e.devis_facture_id || !!e.note_frais_id || (facturesLiees[e.id]?.length ?? 0) > 0 || justifSet.has(e.id);
                       const missingDoc = e.statut === "reel" && !hasDoc;
                       return (
                         <div

@@ -189,9 +189,11 @@ export async function createEcriture(formData: FormData) {
   const supabase = await createSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   const ecriture = await ecritureFromForm(supabase, formData);
+  // Saisie à la main : rien à relire, l'écriture naît validée. Le drapeau « à valider »
+  // est réservé aux écritures que l'app génère seule (sync devis/factures, récurrents).
   const { error } = await supabase
     .from("ecriture_financiere")
-    .insert({ ...ecriture, created_by: user?.id ?? null });
+    .insert({ ...ecriture, valide: true, created_by: user?.id ?? null });
   if (error) throw new Error(error.message);
 
   // Archivage Drive (best-effort) : facture reçue (fichier téléversé sur une sortie)

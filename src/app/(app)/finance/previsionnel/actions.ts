@@ -134,7 +134,8 @@ export async function creerPrevisionPonctuelle(formData: FormData) {
     sens: str(formData.get("sens")) === "entree" ? "entree" : "sortie",
     statut: "previsionnel",
     montant_ttc: montant,
-    valide: false,
+    // Prévision saisie à la main : validée d'office (cf. createEcriture).
+    valide: true,
     created_by: user?.id ?? null,
   }).select("id").single();
   if (error) throw new Error(error.message);

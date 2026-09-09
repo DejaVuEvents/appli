@@ -72,6 +72,13 @@ Points clés à NE PAS casser :
 - L'app doit rester simple d'usage : utilisateurs peu techniques, mobile important.
 - Penser mobile-first pour les écrans inventaire/préparation (scan QR, cases à cocher).
 - Prévoir une sauvegarde/export régulier de la base (données critiques).
+- **Un état doit toujours dire la suite.** Tout écran qui affiche un statut (brouillon,
+  soumise, en attente, bloqué…) indique aussi *ce qui manque* et *quelle est la prochaine
+  action*. Un bouton désactivé sans raison affichée, ou un statut qui ne bouge pas sans
+  explication, est un bug — pas un détail d'ergonomie.
+- **Une validation serveur a toujours son pendant visible.** Toute règle qui fait échouer
+  une Server Action (`throw`) doit être évaluée aussi à l'affichage : Next.js masque le
+  message des Server Actions en production, l'utilisateur ne verrait qu'une page d'erreur.
 
 ## État actuel
 

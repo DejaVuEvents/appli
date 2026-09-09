@@ -66,6 +66,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
     : { data: null };
   const estRemboursee = ecrLiee?.statut === "reel";
 
+  // Conditions de soumission, évaluées une seule fois : le bandeau d'état et le
+  // bouton doivent dire la même chose.
+  const manquants = champsDemandeurManquants(membre);
+  const bloqueSoumission = !estPredepense
+    && (!ndf.demandeur_signe_le || lignes.length === 0 || manquants.length > 0);
+
   return (
     <div className="max-w-2xl space-y-6">
       <Link href="/notes-frais" className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← Notes de frais</Link>
@@ -110,6 +116,31 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         }
       />
 
+      {ndf.statut === "brouillon" && estDemandeur && (
+        <Card className="border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/20 dark:text-amber-200">
+          <strong>Brouillon</strong> — personne d&apos;autre ne la voit pour l&apos;instant.
+          {bloqueSoumission ? (
+            <div className="mt-1">
+              Il manque :{" "}
+              {[
+                manquants.length > 0 ? `ton ${manquants.join(", ")} (Mon compte)` : null,
+                !ndf.demandeur_signe_le ? "ta signature sur la note" : null,
+                lignes.length === 0 ? "au moins une dépense" : null,
+              ].filter(Boolean).join(" · ")}.
+            </div>
+          ) : (
+            <div className="mt-1">
+              Tout est prêt : clique sur <strong>Soumettre pour validation</strong> en bas de page.
+              Tant que tu ne l&apos;as pas fait, elle reste en brouillon.
+            </div>
+          )}
+        </Card>
+      )}
+      {ndf.statut === "soumise" && (
+        <Card className="border-primary/30 bg-primary/5 p-4 text-sm">
+          <strong>Soumise</strong> — en attente de validation par un co-président autre que le demandeur.
+        </Card>
+      )}
       {ndf.statut === "refusee" && (
         <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <strong>Refusée</strong> par {mMap.get(ndf.valide_par ?? "") ?? "—"} le {dateFr(ndf.valide_le)}.
@@ -346,18 +377,15 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           // Les mêmes règles que soumettreNDF, évaluées ici pour expliquer le blocage
           // AVANT le clic : l'action lève une exception, dont Next.js masque le message
           // en production — l'utilisateur ne voyait qu'une page d'erreur.
-          const manquants = champsDemandeurManquants(membre);
-          const bloque = !estPredepense
-            && (!ndf.demandeur_signe_le || lignes.length === 0 || manquants.length > 0);
           // La carte « Signature » juste au-dessus s'affiche dans exactement les mêmes
           // conditions et donne déjà la marche à suivre : on ne la répète pas ici.
-          const blocage = !bloque || !ndf.demandeur_signe_le
+          const blocage = !bloqueSoumission || !ndf.demandeur_signe_le
             ? null
             : manquants.length > 0
               ? `Complète ton profil avant de soumettre : ${manquants.join(", ")}.`
               : "Ajoute au moins une dépense avant de soumettre.";
 
-          if (bloque) {
+          if (bloqueSoumission) {
             return (
               <div className="flex flex-wrap items-center gap-3">
                 <button

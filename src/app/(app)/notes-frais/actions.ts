@@ -62,6 +62,7 @@ export async function createNoteFrais(formData: FormData) {
 /** Renseigne les informations d'une pré-dépense (demande d'engagement > 500 €). */
 export async function setPredepenseInfos(noteId: string, formData: FormData) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   const { error } = await supabase
     .from("note_frais")
     .update({
@@ -144,8 +145,34 @@ export async function importerNoteFrais(formData: FormData) {
 }
 
 /** Renomme une note de frais (l'intitulé n'était modifiable nulle part après création). */
+/**
+ * Une note n'est modifiable qu'en BROUILLON, et par son demandeur.
+ *
+ * L'interface masquait déjà les commandes d'édition dès la soumission, mais aucune
+ * action serveur ne le vérifiait : une requête rejouée pouvait encore modifier —
+ * voire supprimer — une note soumise, validée ou déjà remboursée. Sur des pièces
+ * comptables, c'est la garantie d'intégrité qui manquait.
+ */
+async function assertModifiable(supabase: Supa, noteId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non connecté.");
+  const { data: n } = await supabase
+    .from("note_frais")
+    .select("statut, demandeur_id")
+    .eq("id", noteId)
+    .maybeSingle();
+  if (!n) throw new Error("Note de frais introuvable.");
+  if (n.demandeur_id !== user.id) throw new Error("Seul le demandeur peut modifier sa note de frais.");
+  if (n.statut !== "brouillon") {
+    throw new Error(
+      "Cette note n'est plus modifiable : elle a été soumise. Repasse-la en brouillon pour la corriger.",
+    );
+  }
+}
+
 export async function renommerNDF(noteId: string, formData: FormData) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   const titre = str(formData.get("titre"));
   const date = str(formData.get("date"));
   const { error } = await supabase
@@ -159,6 +186,7 @@ export async function renommerNDF(noteId: string, formData: FormData) {
 
 export async function addLigneNDF(noteId: string, formData: FormData) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
   const { error } = await supabase.from("ligne_note_frais").insert({
     note_frais_id: noteId,
@@ -174,6 +202,7 @@ export async function addLigneNDF(noteId: string, formData: FormData) {
 
 export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   const depart = str(formData.get("depart"));
   const arrivee = str(formData.get("arrivee"));
   if (!depart || !arrivee) throw new Error("Renseigne le départ et l'arrivée.");
@@ -207,6 +236,7 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
  */
 export async function updateLigneNDF(noteId: string, ligneId: string, formData: FormData) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
   const patch: Record<string, unknown> = {
     libelle: str(formData.get("libelle")),
@@ -225,6 +255,7 @@ export async function updateLigneNDF(noteId: string, ligneId: string, formData: 
 /** Retire le justificatif d'une ligne sans toucher au reste (croix ✕ à côté du nom). */
 export async function retirerJustificatifNDF(noteId: string, ligneId: string) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   const { error } = await supabase
     .from("ligne_note_frais")
     .update({ justificatif_url: null, justificatif_nom: null })
@@ -235,6 +266,7 @@ export async function retirerJustificatifNDF(noteId: string, ligneId: string) {
 
 export async function deleteLigneNDF(noteId: string, ligneId: string) {
   const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
   await supabase.from("ligne_note_frais").delete().eq("id", ligneId);
   revalidatePath(`/notes-frais/${noteId}`);
 }
@@ -404,6 +436,17 @@ export async function deleteNoteFrais(noteId: string) {
   // L'écriture de remboursement liée doit disparaître avec la note (la FK est en
   // SET NULL dans l'autre sens : sans ça elle resterait orpheline et invisible).
   const { data: n } = await supabase.from("note_frais").select("ecriture_id").eq("id", noteId).maybeSingle();
+  // Une note déjà remboursée porte un décaissement RÉEL, rapproché de la banque.
+  // La supprimer effacerait ce mouvement et déséquilibrerait le solde face à Qonto.
+  if (n?.ecriture_id) {
+    const { data: ecr } = await supabase
+      .from("ecriture_financiere").select("statut").eq("id", n.ecriture_id).maybeSingle();
+    if (ecr?.statut === "reel") {
+      throw new Error(
+        "Cette note a déjà été remboursée : sa suppression effacerait un mouvement bancaire réel. Annule d'abord le remboursement.",
+      );
+    }
+  }
   await supabase.from("note_frais").delete().eq("id", noteId);
   if (n?.ecriture_id) await supabase.from("ecriture_financiere").delete().eq("id", n.ecriture_id);
   revalidatePath("/notes-frais");

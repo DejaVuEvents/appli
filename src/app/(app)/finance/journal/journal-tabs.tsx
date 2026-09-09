@@ -10,6 +10,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { typeLabel, categorieManquante, NOMENCLATURE, type Nomenclature } from "@/lib/finance";
 import { CategorieIcon } from "@/components/categorie-icon";
+import { Modal } from "@/components/modal";
+import { DateInput } from "@/components/date-input";
 import { euros, dateFr } from "@/lib/format";
 import type { EcritureFinanciere } from "@/lib/types";
 
@@ -44,9 +46,12 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
   const [tab, setTab] = useState<Tab>("entrees");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
-  const [filtreOuvert, setFiltreOuvert] = useState(false);
   const [aValiderOnly, setAValiderOnly] = useState(false);
   const [catManquanteOnly, setCatManquanteOnly] = useState(false);
+  const [dateMin, setDateMin] = useState("");
+  const [dateMax, setDateMax] = useState("");
+  const [prixMin, setPrixMin] = useState("");
+  const [prixMax, setPrixMax] = useState("");
   const [selected, setSelected] = useState<EcritureFinanciere | null>(null);
 
   const catFlag = useMemo(
@@ -64,10 +69,16 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
     }
     if (aValiderOnly) list = list.filter((e) => !e.valide);
     if (catManquanteOnly) list = list.filter(catFlag);
+    if (dateMin) list = list.filter((e) => e.date >= dateMin);
+    if (dateMax) list = list.filter((e) => e.date <= dateMax);
+    // Les bornes portent sur le montant absolu : l'utilisateur raisonne en euros,
+    // pas en signe (le sens est déjà donné par l'onglet).
+    if (prixMin) list = list.filter((e) => Number(e.montant_ttc) >= parseFloat(prixMin));
+    if (prixMax) list = list.filter((e) => Number(e.montant_ttc) <= parseFloat(prixMax));
     if (tab === "entrees") return list.filter((e) => e.statut === "reel" && e.sens === "entree").sort((a, b) => b.date.localeCompare(a.date));
     if (tab === "sorties") return list.filter((e) => e.statut === "reel" && e.sens === "sortie").sort((a, b) => b.date.localeCompare(a.date));
     return list.filter((e) => e.statut === "previsionnel").sort((a, b) => a.date.localeCompare(b.date));
-  }, [all, tab, q, aValiderOnly, catManquanteOnly, catFlag]);
+  }, [all, tab, q, aValiderOnly, catManquanteOnly, catFlag, dateMin, dateMax, prixMin, prixMax]);
 
   const nbAValider = useMemo(() => all.filter((e) => !e.valide).length, [all]);
   const nbCatManquante = useMemo(() => all.filter(catFlag).length, [all, catFlag]);
@@ -97,67 +108,84 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
 
   const prestMap = new Map(prestations.map((p) => [p.id, p]));
 
-  const activeCount = (q.trim() ? 1 : 0) + (aValiderOnly ? 1 : 0) + (catManquanteOnly ? 1 : 0);
+  // La recherche a sa propre barre : elle ne compte plus dans le badge « Filtrer ».
+  const activeCount = [aValiderOnly, catManquanteOnly, dateMin, dateMax, prixMin, prixMax].filter(Boolean).length;
+  const resetFiltres = () => {
+    setAValiderOnly(false); setCatManquanteOnly(false);
+    setDateMin(""); setDateMax(""); setPrixMin(""); setPrixMax("");
+  };
 
   return (
     <div>
-      {/* Barre d'outils à droite : Filtrer (déroulant inline) + Nouvelle écriture + Exporter */}
-      <div className="mb-4 flex items-center">
+      {/* Barre d'outils : recherche à gauche, Filtrer + actions à droite. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-56 flex-1">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rechercher une dénomination, une catégorie, une personne…"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm pr-8"
+          />
+          {q && (
+            <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground" aria-label="Effacer la recherche">✕</button>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => setFiltreOuvert((o) => !o)}
-            className="relative inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-background"
+          <Modal
+            title="Filtrer le journal"
+            panelClassName="max-w-md"
+            triggerClassName="relative inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-background"
+            trigger={
+              <>
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 5h18M6 12h12M10 19h4" strokeLinecap="round" />
+                </svg>
+                Filtrer
+                {activeCount > 0 && (
+                  <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{activeCount}</span>
+                )}
+              </>
+            }
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 5h18M6 12h12M10 19h4" strokeLinecap="round" />
-            </svg>
-            Filtrer
-            {activeCount > 0 && (
-              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{activeCount}</span>
-            )}
-            <svg className={`h-3.5 w-3.5 transition-transform ${filtreOuvert ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+            <div className="space-y-4">
+              <div>
+                <span className="mb-1.5 block text-sm font-medium">Montant (€)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="number" step="0.01" min="0" value={prixMin} onChange={(e) => setPrixMin(e.target.value)} placeholder="Minimum" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                  <input type="number" step="0.01" min="0" value={prixMax} onChange={(e) => setPrixMax(e.target.value)} placeholder="Maximum" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <span className="mb-1.5 block text-sm font-medium">Date</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <DateInput value={dateMin} onChange={setDateMin} />
+                  <DateInput value={dateMax} onChange={setDateMax} />
+                </div>
+              </div>
+              <div className="space-y-2 border-t border-border pt-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={aValiderOnly} onChange={(e) => setAValiderOnly(e.target.checked)} className="h-4 w-4 rounded border-border" />
+                  À valider uniquement {nbAValider > 0 && <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">{nbAValider}</span>}
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={catManquanteOnly} onChange={(e) => setCatManquanteOnly(e.target.checked)} className="h-4 w-4 rounded border-border" />
+                  Catégorie à corriger {nbCatManquante > 0 && <span className="rounded-full bg-red-100 px-1.5 text-[10px] font-bold text-red-700 dark:bg-red-500/15 dark:text-red-300">{nbCatManquante}</span>}
+                </label>
+              </div>
+              <div className="flex items-center justify-between border-t border-border pt-3">
+                <button onClick={resetFiltres} className="text-sm text-muted hover:underline" disabled={activeCount === 0}>
+                  Tout effacer
+                </button>
+                <div className="flex gap-2">
+                  <button onClick={expandAll} className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-background">Tout déplier</button>
+                  <button onClick={collapseAll} className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-background">Tout replier</button>
+                </div>
+              </div>
+            </div>
+          </Modal>
           {sidebar}
         </div>
       </div>
-
-      {/* Panneau de filtres — déroulé juste en dessous (pas de popup) */}
-      {filtreOuvert && (
-        <div className="mb-4 flex">
-          <div className="ml-auto w-full max-w-sm space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">Recherche</span>
-              <div className="relative">
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Dénomination, catégorie, personne…"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-8 text-sm"
-                  autoFocus
-                />
-                {q && (
-                  <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground" aria-label="Effacer">✕</button>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-muted">S&apos;applique à l&apos;onglet affiché (entrées / sorties / prévisionnel).</p>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={aValiderOnly} onChange={(e) => setAValiderOnly(e.target.checked)} className="h-4 w-4 rounded border-border" />
-              À valider uniquement {nbAValider > 0 && <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">{nbAValider}</span>}
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={catManquanteOnly} onChange={(e) => setCatManquanteOnly(e.target.checked)} className="h-4 w-4 rounded border-border" />
-              Catégorie à corriger {nbCatManquante > 0 && <span className="rounded-full bg-red-100 px-1.5 text-[10px] font-bold text-red-700 dark:bg-red-500/15 dark:text-red-300">{nbCatManquante}</span>}
-            </label>
-            <div className="flex gap-2">
-              <button onClick={expandAll} className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-background">Tout déplier</button>
-              <button onClick={collapseAll} className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-background">Tout replier</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Onglets */}
       <div className="mb-4 flex gap-1 rounded-xl border border-border bg-surface p-1">

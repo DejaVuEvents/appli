@@ -60,7 +60,7 @@ export function ExportModal({ annee }: { annee: number }) {
           <IconDownload className="h-4 w-4" /> {format === "pdf" ? "PDF" : "CSV"}
         </a>
         <p className="text-xs text-muted">
-          Le {format === "pdf" ? "PDF" : "fichier CSV"} inclut le solde cumulé projeté. Le CSV s&apos;ouvre dans Excel / Google Sheets.
+          {`Le ${format === "pdf" ? "PDF" : "fichier CSV"} inclut le solde cumulé projeté. Le CSV s'ouvre dans Excel / Google Sheets.`}
         </p>
       </div>
     </Modal>

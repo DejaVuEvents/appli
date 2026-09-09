@@ -342,15 +342,45 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
 
       {/* Actions de workflow */}
       <Card className="p-4 space-y-3">
-        {editable && (
-          <div className="flex flex-wrap items-center gap-3">
-            <form action={soumettreNDF.bind(null, id)}>
-              <SubmitButton confirm={estPredepense ? "Soumettre cette pré-dépense pour autorisation ?" : (lignes.length === 0 ? "Aucune ligne — soumettre quand même ?" : "Soumettre cette note de frais pour validation ?")}>
-                {estPredepense ? "Soumettre pour autorisation" : "Soumettre pour validation"}
-              </SubmitButton>
-            </form>
-          </div>
-        )}
+        {editable && (() => {
+          // Les mêmes règles que soumettreNDF, évaluées ici pour expliquer le blocage
+          // AVANT le clic : l'action lève une exception, dont Next.js masque le message
+          // en production — l'utilisateur ne voyait qu'une page d'erreur.
+          const blocage = estPredepense
+            ? null
+            : !ndf.demandeur_signe_le
+              ? (membre?.signature_url
+                  ? "Signe cette note (« lu et approuvé ») avant de la soumettre."
+                  : "Ajoute ta signature dans Paramètres → Mon compte, puis signe cette note.")
+              : lignes.length === 0
+                ? "Ajoute au moins une dépense avant de soumettre."
+                : null;
+
+          if (blocage) {
+            return (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled
+                  className="cursor-not-allowed rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground opacity-50"
+                >
+                  Soumettre pour validation
+                </button>
+                <span className="text-sm text-amber-700">{blocage}</span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex flex-wrap items-center gap-3">
+              <form action={soumettreNDF.bind(null, id)}>
+                <SubmitButton confirm={estPredepense ? "Soumettre cette pré-dépense pour autorisation ?" : "Soumettre cette note de frais pour validation ?"}>
+                  {estPredepense ? "Soumettre pour autorisation" : "Soumettre pour validation"}
+                </SubmitButton>
+              </form>
+            </div>
+          );
+        })()}
 
         {ndf.statut === "soumise" && estDemandeur && (
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted">

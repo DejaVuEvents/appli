@@ -346,17 +346,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           // Les mêmes règles que soumettreNDF, évaluées ici pour expliquer le blocage
           // AVANT le clic : l'action lève une exception, dont Next.js masque le message
           // en production — l'utilisateur ne voyait qu'une page d'erreur.
-          const blocage = estPredepense
-            ? null
-            : !ndf.demandeur_signe_le
-              ? (membre?.signature_url
-                  ? "Signe cette note (« lu et approuvé ») avant de la soumettre."
-                  : "Ajoute ta signature dans Paramètres → Mon compte, puis signe cette note.")
-              : lignes.length === 0
-                ? "Ajoute au moins une dépense avant de soumettre."
-                : null;
+          const bloque = !estPredepense && (!ndf.demandeur_signe_le || lignes.length === 0);
+          // La carte « Signature » juste au-dessus s'affiche dans exactement les mêmes
+          // conditions et donne déjà la marche à suivre : on ne la répète pas ici.
+          const blocage = bloque && ndf.demandeur_signe_le && lignes.length === 0
+            ? "Ajoute au moins une dépense avant de soumettre."
+            : null;
 
-          if (blocage) {
+          if (bloque) {
             return (
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -366,7 +363,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                 >
                   Soumettre pour validation
                 </button>
-                <span className="text-sm text-amber-700">{blocage}</span>
+                {blocage && <span className="text-sm text-amber-700">{blocage}</span>}
               </div>
             );
           }

@@ -5,7 +5,8 @@ import { Field, TextArea, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { InfoTip } from "@/components/info-tip";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte } from "./actions";
+import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte, supprimerImageProfil } from "./actions";
+import { FileDropzone } from "@/components/file-dropzone";
 import { updateTresorerieReglages, updatePrixCarburant } from "../finance/actions";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { getMembreActuel, COMPETENCES, ROLE_LABELS, nomMembre, type RoleMembre } from "@/lib/membre";
@@ -125,12 +126,15 @@ export default async function ParametresPage({
                     <img src={moiPhoto} alt="Photo" className="h-16 w-16 rounded-full border border-border object-cover" />
                   )}
                   <div className="flex-1">
-                    <input type="file" name="photo" accept="image/*"
-                      className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                    <FileDropzone name="photo" accept="image/*" libelle="Glisse une image ou clique pour choisir" />
                     {moi.photo_url && (
-                      <label className="mt-2 flex items-center gap-2 text-xs text-muted">
-                        <input type="checkbox" name="supprimer_photo" className="h-4 w-4 rounded border-border" /> Supprimer la photo
-                      </label>
+                      <button
+                        type="submit"
+                        formAction={supprimerImageProfil.bind(null, "photo_url")}
+                        className="mt-2 text-xs text-red-600 underline"
+                      >
+                        Supprimer la photo
+                      </button>
                     )}
                   </div>
                 </div>
@@ -146,12 +150,15 @@ export default async function ParametresPage({
                     <img src={moiSignature} alt="Signature" className="h-14 w-32 rounded border border-border object-contain bg-white" />
                   )}
                   <div className="flex-1">
-                    <input type="file" name="signature" accept="image/*"
-                      className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground" />
+                    <FileDropzone name="signature" accept="image/*" libelle="Glisse ta signature ou clique pour choisir" />
                     {moi.signature_url && (
-                      <label className="mt-2 flex items-center gap-2 text-xs text-muted">
-                        <input type="checkbox" name="supprimer_signature" className="h-4 w-4 rounded border-border" /> Supprimer la signature
-                      </label>
+                      <button
+                        type="submit"
+                        formAction={supprimerImageProfil.bind(null, "signature_url")}
+                        className="mt-2 text-xs text-red-600 underline"
+                      >
+                        Supprimer la signature
+                      </button>
                     )}
                   </div>
                 </div>

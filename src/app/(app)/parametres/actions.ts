@@ -94,10 +94,21 @@ export async function updateMonCompte(formData: FormData) {
   };
   if (photo) patch.photo_url = photo;
   if (signature) patch.signature_url = signature;
-  if (formData.get("supprimer_signature") === "on") patch.signature_url = null;
-  if (formData.get("supprimer_photo") === "on") patch.photo_url = null;
 
   const { error } = await supabase.from("membre").update(patch).eq("id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/parametres");
+}
+
+/**
+ * Retire la photo ou la signature du profil. Action dédiée plutôt qu'une case à
+ * cocher à valider ensuite : le bouton fait ce qu'il annonce, tout de suite.
+ */
+export async function supprimerImageProfil(champ: "photo_url" | "signature_url") {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non connecté.");
+  const { error } = await supabase.from("membre").update({ [champ]: null }).eq("id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/parametres");
 }

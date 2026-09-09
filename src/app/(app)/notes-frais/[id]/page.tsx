@@ -116,26 +116,6 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         }
       />
 
-      {ndf.statut === "brouillon" && estDemandeur && (
-        <Card className="border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/20 dark:text-amber-200">
-          <strong>Brouillon</strong> — personne d&apos;autre ne la voit pour l&apos;instant.
-          {bloqueSoumission ? (
-            <div className="mt-1">
-              Il manque :{" "}
-              {[
-                manquants.length > 0 ? `ton ${manquants.join(", ")} (Mon compte)` : null,
-                !ndf.demandeur_signe_le ? "ta signature sur la note" : null,
-                lignes.length === 0 ? "au moins une dépense" : null,
-              ].filter(Boolean).join(" · ")}.
-            </div>
-          ) : (
-            <div className="mt-1">
-              Tout est prêt : clique sur <strong>Soumettre pour validation</strong> en bas de page.
-              Tant que tu ne l&apos;as pas fait, elle reste en brouillon.
-            </div>
-          )}
-        </Card>
-      )}
       {ndf.statut === "soumise" && (
         <Card className="border-primary/30 bg-primary/5 p-4 text-sm">
           <strong>Soumise</strong> — en attente de validation par un co-président autre que le demandeur.

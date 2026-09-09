@@ -13,7 +13,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
     supabase.from("depense_recurrente").select("*").order("actif", { ascending: false }).order("nom"),
     supabase
       .from("ecriture_financiere")
-      .select("id, date, denomination, montant_ttc, sens, type, specification, prestation_id, prestation:prestation_id(nom, client(nom))")
+      .select("*, prestation:prestation_id(id, nom, client(nom))")
       .eq("statut", "previsionnel")
       .is("depense_recurrente_id", null)
       .order("date"),
@@ -125,7 +125,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       <PrevisionnelView
         ponctuelles={ponctuelles}
         recurrents={recurrents}
-        nomenclature={nomenclature as Record<string, Record<string, string[]>>}
+        nomenclature={nomenclature}
         soldeReel={soldeReel}
         seuil={Number(ent?.seuil_alerte ?? 0)}
         recurrentesParMois={recurrentesParMois}

@@ -7,6 +7,23 @@ import {
 type Ico = (p: { className?: string }) => React.ReactElement;
 
 /**
+ * Clé de recherche insensible à la casse, aux accents, aux tirets bas et aux
+ * espaces. Les catégories cohabitent en base sous plusieurs graphies héritées
+ * des imports (« Frais Fixes » / « Frais_Fixes », « Materiel » / « Matériel »,
+ * « Subventions/Dons » / « Subventions_Dons ») : sans normalisation, la moitié
+ * des lignes retombait sur l'icône euro générique.
+ */
+const cle = (v: string): string =>
+  v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function chercher(table: Record<string, Ico>, valeur?: string | null): Ico | null {
+  if (!valeur) return null;
+  const k = cle(valeur);
+  for (const [nom, ico] of Object.entries(table)) if (cle(nom) === k) return ico;
+  return null;
+}
+
+/**
  * Icône illustrant une catégorie financière. La spécification prime sur le type
  * (« Transport » est plus parlant que « Frais techniques »).
  */
@@ -32,10 +49,15 @@ const PAR_SPECIFICATION: Record<string, Ico> = {
   "Don": IconGift,
   "Subvention": IconGift,
   "Remboursement": IconRefresh,
+  "Billetterie": IconTicket,
 };
 
 const PAR_TYPE: Record<string, Ico> = {
   "Matériel": IconBox,
+  "Prestation": IconBox,
+  "Évènement": IconTicket,
+  "Subventions/Dons": IconGift,
+  "Vente Materiel": IconTag,
   "Frais_Fixes": IconBuilding,
   "Frais_Techniques": IconUser,
   "Frais_Artistiques": IconMusic,
@@ -55,6 +77,6 @@ export function CategorieIcon({
   specification?: string | null;
   className?: string;
 }) {
-  const Ico = (specification && PAR_SPECIFICATION[specification]) || (type && PAR_TYPE[type]) || IconEuro;
+  const Ico = chercher(PAR_SPECIFICATION, specification) ?? chercher(PAR_TYPE, type) ?? IconEuro;
   return <Ico className={className} />;
 }

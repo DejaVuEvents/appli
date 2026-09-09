@@ -9,15 +9,20 @@ import { SubmitButton } from "@/components/submit-button";
 import { Modal, ModalForm } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { euros, dateFr } from "@/lib/format";
-import { typeLabel } from "@/lib/finance";
+import { EcriturePanel, type PrestationLiee } from "../ecriture-panel";
+import type { EcritureFinanciere } from "@/lib/types";
+import { typeLabel, categorieManquante, type Nomenclature } from "@/lib/finance";
 import { CategorieIcon } from "@/components/categorie-icon";
 
-export type PrevRow = { id: string; date: string; denomination: string | null; montant_ttc: number; sens: string; type: string | null; specification: string | null; prestation_id?: string | null; prestationNom?: string | null };
+export type PrevRow = EcritureFinanciere & {
+  /** Nom (et client) de la prestation rattachée, pré-calculé côté serveur. */
+  prestationNom?: string | null;
+  prestation?: PrestationLiee | null;
+};
 export type DocAPrevoir = { id: string; kind: "ndf" | "devis"; libelle: string; montant: number; date: string | null };
 export type Suggestion = { previsionId: string; ecritureId: string; libelle: string; date: string };
 
 export type Recurrent = { id: string; nom: string; sens: string; montant_ttc: number; frequence: string; jour: number; mois: number | null; type: string | null; specification: string | null; actif: boolean };
-type Nomenclature = Record<string, Record<string, string[]>>;
 
 const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
@@ -209,6 +214,7 @@ function PonctuellesView({
   const [type, setType] = useState("");
   // Document associé : sélectionner une note de frais remplit libellé, montant et date,
   // et fait suivre son remboursement à la prévision.
+  const [selected, setSelected] = useState<PrevRow | null>(null);
   const [docId, setDocId] = useState("");
   const doc = docsAPrevoir.find((d) => d.id === docId) ?? null;
   const notes = docsAPrevoir.filter((d) => d.kind === "ndf");
@@ -352,7 +358,11 @@ function PonctuellesView({
                 const ligne = (r: PrevRow, indente: boolean) => {
                   const echue = r.date < aujourdhui;
                   return (
-                  <div key={r.id} className={`flex items-center justify-between gap-3 py-2 text-sm ${indente ? "pl-4" : ""} ${echue ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
+                  <div
+                    key={r.id}
+                    onClick={() => setSelected(r)}
+                    className={`flex cursor-pointer items-center justify-between gap-3 py-2 text-sm hover:bg-surface/50 ${indente ? "pl-4" : ""} ${echue ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}
+                  >
                     <div className="flex min-w-0 items-center gap-2.5">
                       <CategorieIcon type={r.type} specification={r.specification} className={`h-4 w-4 shrink-0 ${echue ? "text-amber-600 dark:text-amber-500" : "text-muted"}`} />
                       <div className="min-w-0">
@@ -365,12 +375,11 @@ function PonctuellesView({
                     </div>
                     <span className="flex shrink-0 items-center gap-3">
                       <span className={`font-medium ${r.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{r.sens === "entree" ? "+" : "−"} {euros(r.montant_ttc)}</span>
-                      <Link href={`/finance/${r.id}?retour=previsionnel`} className={`text-xs hover:text-primary ${echue ? "font-medium text-amber-700 dark:text-amber-500" : "text-muted"}`}>Modifier</Link>
                       {(() => {
                         const sugg = suggestions.find((x) => x.previsionId === r.id);
                         if (!sugg) return null;
                         return (
-                          <form action={rapprocherPrevisionNdf.bind(null, r.id, sugg.ecritureId)}>
+                          <form action={rapprocherPrevisionNdf.bind(null, r.id, sugg.ecritureId)} onClick={(ev) => ev.stopPropagation()}>
                             <SubmitButton
                               className="!px-2 !py-1 !text-xs"
                               confirm={`Rapprocher cette prévision du décaissement « ${sugg.libelle} » du ${dateFr(sugg.date)} ? La prévision disparaît et la note passe en « Remboursée ».`}
@@ -380,7 +389,7 @@ function PonctuellesView({
                           </form>
                         );
                       })()}
-                      <form action={deleteEcriture.bind(null, r.id)}>
+                      <form action={deleteEcriture.bind(null, r.id)} onClick={(ev) => ev.stopPropagation()}>
                         <ConfirmButton
                           confirm={`Supprimer la prévision « ${r.denomination ?? "sans libellé"} » (${euros(r.montant_ttc)}) ?`}
                           className="text-muted hover:text-red-600"
@@ -418,6 +427,17 @@ function PonctuellesView({
           </div>
         );
       })}
+
+      {/* Même panneau de détail que le journal : un seul endroit pour consulter,
+          catégoriser, valider ou supprimer une écriture. */}
+      {selected && (
+        <EcriturePanel
+          ecriture={selected}
+          prestation={selected.prestation ?? null}
+          catManquante={categorieManquante(nomenclature, selected.sens, selected.type)}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

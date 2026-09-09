@@ -5,10 +5,11 @@
 //   1. APIs & Services → activer « Google Drive API », « Google Calendar API »
 //      ET « Gmail API » (pour lire les factures reçues + emails Qonto).
 //   2. OAuth consent screen (= « Data Access » dans la nouvelle UI) → ajouter les scopes
-//      drive.file, calendar.events et gmail.readonly ; Audience = External → « Publish app ».
+//      drive.file, calendar.events, gmail.readonly et gmail.send ;
+//      Audience = External → « Publish app ».
 //   3. Credentials → Create OAuth client ID → type « Desktop app ».
 //
-// ⚠️ Après ajout de gmail.readonly : RE-LANCER ce script pour régénérer le refresh token
+// ⚠️ Après ajout d'un scope (gmail.readonly, gmail.send…) : RE-LANCER ce script pour régénérer le refresh token
 //    (l'ancien n'a pas le scope Gmail), puis mettre à jour GOOGLE_OAUTH_REFRESH_TOKEN
 //    en local ET sur Vercel (Environment Variables), et redéployer.
 //
@@ -59,6 +60,7 @@ const url = oauth2.generateAuthUrl({
     "https://www.googleapis.com/auth/drive.readonly",    // lecture de TOUT le Drive (import NDF existantes, etc.)
     "https://www.googleapis.com/auth/calendar.events",   // réunions Google Agenda + Meet
     "https://www.googleapis.com/auth/gmail.readonly",    // lecture factures reçues + prélèvements à venir
+    "https://www.googleapis.com/auth/gmail.send",        // notifications par mail (NDF à valider)
   ],
 });
 

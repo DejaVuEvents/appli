@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
+import { envoyerMail, baseUrl } from "@/lib/mail";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
@@ -306,8 +307,60 @@ export async function soumettreNDF(noteId: string) {
     throw new Error("Ajoute au moins une dépense avant de soumettre.");
   }
   await supabase.from("note_frais").update({ statut: "soumise", motif_refus: null }).eq("id", noteId).eq("statut", "brouillon");
+  await prevenirValideurs(supabase, noteId, moi);
   revalidatePath(`/notes-frais/${noteId}`);
   revalidatePath("/notes-frais");
+}
+
+/**
+ * Prévient par mail les co-présidents habilités à valider — c'est-à-dire tous sauf
+ * le demandeur, qui ne peut pas valider sa propre note. La cloche de l'app ne
+ * signale rien tant que personne ne l'ouvre : sans mail, une note peut dormir
+ * plusieurs jours.
+ */
+async function prevenirValideurs(
+  supabase: Supa,
+  noteId: string,
+  demandeur: { id: string; prenom?: string | null; nom?: string | null } | null,
+) {
+  const { data: note } = await supabase
+    .from("note_frais")
+    .select("numero, titre, lignes:ligne_note_frais(montant_ttc)")
+    .eq("id", noteId)
+    .maybeSingle();
+  if (!note) return;
+
+  const { data: membres } = await supabase
+    .from("membre")
+    .select("id, email")
+    .eq("role", "co_president")
+    .eq("actif", true);
+  const destinataires = (membres ?? [])
+    .filter((m) => m.id !== demandeur?.id && m.email)
+    .map((m) => m.email as string);
+  if (!destinataires.length) return;
+
+  const n = note as unknown as { numero: string | null; titre: string | null; lignes: { montant_ttc: number }[] };
+  const total = (n.lignes ?? []).reduce((s, l) => s + Number(l.montant_ttc ?? 0), 0);
+  const auteur = [demandeur?.prenom, demandeur?.nom].filter(Boolean).join(" ") || "Un membre";
+  const montant = total.toFixed(2).replace(".", ",");
+
+  await envoyerMail({
+    to: destinataires,
+    sujet: `Note de frais à valider — ${n.numero ?? ""} ${n.titre ?? ""}`.trim(),
+    corps: [
+      `${auteur} a soumis une note de frais pour validation.`,
+      "",
+      `Note    : ${n.numero ?? "—"} — ${n.titre ?? "Sans titre"}`,
+      `Montant : ${montant} €`,
+      "",
+      `À valider ici : ${baseUrl()}/notes-frais/${noteId}`,
+      "",
+      "Rappel : un co-président autre que le demandeur doit valider la note.",
+      "",
+      "— Déjà Vu",
+    ].join("\n"),
+  });
 }
 
 /** Renvoie au brouillon pour corriger. Supprime la ligne de trésorerie créée le cas échéant. */

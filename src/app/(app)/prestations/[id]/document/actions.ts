@@ -20,10 +20,17 @@ function revaliderFinance() {
 }
 
 /**
- * Auto-alimentation de la trésorerie depuis une facture émise :
- * crée/maj une écriture d'entrée liée (prévisionnelle par défaut, réelle si payée,
- * supprimée si la facture est annulée). Écriture identifiée par `devis_facture_id`
- * → jamais de doublon, n'affecte pas les écritures saisies à la main.
+ * Auto-alimentation du PRÉVISIONNEL depuis une facture émise.
+ *
+ * Le journal réel appartient à Qonto et à lui seul : changer le statut d'une facture
+ * ne crée jamais d'écriture réelle. Une facture émise et non réglée porte une
+ * PRÉVISION d'encaissement ; dès qu'elle est payée, cette prévision disparaît — le
+ * virement importé depuis la banque prend le relais. C'est le sens inverse qui fait
+ * foi : l'entrée d'argent rapproche la facture et la passe en « payée »
+ * (voir rapprocherFacturesEncaissees, côté Qonto).
+ *
+ * Sans cette règle, un encaissement était compté deux fois : une fois par la banque,
+ * une fois par le passage en « payée ».
  */
 async function synchroniserEcritureFacture(supabase: Supa, devisId: string) {
   const { data: fac } = await supabase
@@ -65,15 +72,30 @@ async function synchroniserEcritureFacture(supabase: Supa, devisId: string) {
     clientNom = (p as unknown as { client: { nom: string } | null } | null)?.client?.nom ?? "";
   }
 
-  const paye = fac.statut_paiement === "paye";
+  // Facture réglée : la prévision ne disparaît QUE si le mouvement bancaire est bien
+  // arrivé. Coché à la main avant l'encaissement, on garde la prévision — sinon la
+  // recette sortirait de la projection alors que l'argent n'est pas là.
+  if (fac.statut_paiement === "paye") {
+    const { data: reelle } = await supabase
+      .from("ecriture_financiere")
+      .select("id")
+      .eq("devis_facture_id", fac.id)
+      .eq("statut", "reel")
+      .maybeSingle();
+    if (reelle) {
+      if (existante) await supabase.from("ecriture_financiere").delete().eq("id", existante.id);
+      return;
+    }
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const payload = {
-    date: paye ? today : (fac.date_echeance ?? fac.date_emission ?? today),
+    date: fac.date_echeance ?? fac.date_emission ?? today,
     denomination: `${dvNom?.nom ? `${dvNom.nom} — ` : ""}Facture N° ${fac.numero}${clientNom ? ` (${clientNom})` : ""}`,
     type,
     specification,
     sens: "entree",
-    statut: paye ? "reel" : "previsionnel",
+    statut: "previsionnel",
     montant_ttc: Number(fac.montant_ttc ?? 0),
     prestation_id: fac.prestation_id,
     devis_facture_id: fac.id,

@@ -309,6 +309,12 @@ export async function importQontoTransactions(
     }
     if (aSupprimer.length) await supabase.from("ecriture_financiere").delete().in("id", aSupprimer);
 
+    // Sens du rapprochement : c'est l'ARGENT REÇU qui solde la facture, jamais l'inverse.
+    // Chaque entrée importée cherche une facture émise, non réglée, de même montant à
+    // ±10 jours ; on la rattache, on la passe en « payée » et on retire sa prévision
+    // d'encaissement (le mouvement bancaire la remplace).
+    await rapprocherFacturesEncaissees(supabase, items);
+
     await supabase
       .from("parametres_entreprise")
       .update({ qonto_derniere_sync: new Date().toISOString() })
@@ -396,4 +402,65 @@ export async function syncGlobal(): Promise<
   const j = await recupererJustificatifsQonto();
   const justificatifs = j.ok ? j.ajoutes : 0;
   return { ok: true, importees, justificatifs, ignoresDoublons };
+}
+
+
+type SupaClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Rapproche les encaissements fraîchement importés des factures émises en attente.
+ * Une facture n'est jamais soldée par une saisie manuelle de statut : il faut que
+ * l'argent soit arrivé sur le compte.
+ */
+async function rapprocherFacturesEncaissees(supabase: SupaClient, items: QontoPreviewItem[]) {
+  const entrees = items.filter((t) => t.sens === "entree");
+  if (!entrees.length) return;
+
+  const { data: facData } = await supabase
+    .from("devis_facture")
+    .select("id, numero, montant_ttc, date_emission, prestation_id")
+    .eq("type", "facture")
+    .not("numero", "is", null)
+    .or("statut_paiement.is.null,statut_paiement.eq.en_attente");
+  const factures = (facData ?? []) as {
+    id: string; numero: string | null; montant_ttc: number | null;
+    date_emission: string | null; prestation_id: string | null;
+  }[];
+  if (!factures.length) return;
+
+  const TOL = 10 * 86400000;
+  const prises = new Set<string>();
+
+  for (const t of entrees) {
+    const cents = Math.round(t.montant * 100);
+    const tMs = new Date(t.date).getTime();
+    // Une facture n'est encaissée qu'après son émission : on écarte les antérieures.
+    const candidates = factures.filter(
+      (f) => !prises.has(f.id) &&
+        Math.round(Number(f.montant_ttc ?? 0) * 100) === cents &&
+        f.date_emission != null &&
+        new Date(f.date_emission).getTime() <= tMs + 86400000 &&
+        tMs - new Date(f.date_emission).getTime() <= TOL,
+    );
+    if (!candidates.length) continue;
+    // La plus récemment émise avant l'encaissement.
+    const fac = candidates.reduce((a, b) =>
+      new Date(b.date_emission!).getTime() > new Date(a.date_emission!).getTime() ? b : a);
+    prises.add(fac.id);
+
+    const { data: ecr } = await supabase
+      .from("ecriture_financiere")
+      .select("id")
+      .eq("qonto_transaction_id", t.transaction_id)
+      .maybeSingle();
+    if (!ecr) continue;
+
+    await supabase.from("ecriture_financiere")
+      .update({ devis_facture_id: fac.id, prestation_id: fac.prestation_id })
+      .eq("id", ecr.id);
+    await supabase.from("devis_facture").update({ statut_paiement: "paye" }).eq("id", fac.id);
+    // La prévision d'encaissement de cette facture est désormais couverte par le réel.
+    await supabase.from("ecriture_financiere")
+      .delete().eq("devis_facture_id", fac.id).eq("statut", "previsionnel");
+  }
 }

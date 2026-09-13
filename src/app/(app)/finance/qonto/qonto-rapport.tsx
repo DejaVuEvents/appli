@@ -67,9 +67,32 @@ export function QontoRapport({
                 <ul className="space-y-1 text-muted">
                   <li>• <strong className="text-foreground">{rap.manquantes.length}</strong> transaction(s) Qonto absente(s) de l&apos;outil → net <strong className="text-foreground">{euros(rap.netManquantes)}</strong></li>
                   <li>• <strong className="text-foreground">{rap.enTrop.length}</strong> écriture(s) de l&apos;outil absente(s) de Qonto → net <strong className="text-foreground">{euros(rap.netEnTrop)}</strong></li>
+                  {rap.enAttente.length > 0 && (
+                    <li>• <strong className="text-foreground">{rap.enAttente.length}</strong> transaction(s) Qonto <strong className="text-foreground">en attente de règlement</strong> → net <strong className="text-foreground">{euros(rap.netEnAttente)}</strong> (comptées par la banque, pas encore importées)</li>
+                  )}
                   <li>• Reste <strong className="text-foreground">{euros(rap.ajustementBaseline)}</strong> imputable au <strong className="text-foreground">solde initial</strong> ({euros(rap.soldeInitial)}{rap.soldeInitialDate ? ` au ${dateFr(rap.soldeInitialDate)}` : ""})</li>
                 </ul>
               </div>
+
+              {rap.enAttente.length > 0 && (
+                <div className="rounded-xl border border-border p-4">
+                  <div className="mb-1 text-sm font-semibold">
+                    {rap.enAttente.length} transaction(s) en attente de règlement — rien à faire
+                  </div>
+                  <p className="mb-2 text-xs text-muted">
+                    Qonto les compte déjà dans le solde du compte, mais elles peuvent encore changer :
+                    la synchronisation ne les importe qu'une fois réglées. L'écart se résorbera tout seul.
+                  </p>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                    {rap.enAttente.map((t, i) => (
+                      <div key={`${t.date}-${i}`} className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs">
+                        <span className="min-w-0"><span className="text-muted">{dateFr(t.date)}</span> · {t.label}</span>
+                        <span className={`shrink-0 font-semibold ${t.sens === "entree" ? "text-green-600" : "text-red-600"}`}>{t.sens === "entree" ? "+" : "−"} {euros(t.montant)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Correction 1 : importer les manquantes */}
               {rap.manquantes.length > 0 && (

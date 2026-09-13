@@ -53,17 +53,21 @@ export async function previewQonto(): Promise<
       .select("date, montant_ttc, sens, statut")
       .is("qonto_transaction_id", null);
 
-    // Index : "montantCents|sens" -> liste des dates (ms)
-    const manualIdx = new Map<string, number[]>();
+    // Deux index distincts : face à une écriture RÉELLE saisie à la main, la transaction
+    // Qonto ferait bel et bien doublon. Face à une PRÉVISION, non : c'est le règlement
+    // attendu, il doit s'importer et consommer la prévision. Les confondre bloquait
+    // l'import automatique de mouvements parfaitement légitimes.
+    const idxReel = new Map<string, number[]>();
     for (const e of manualEntries ?? []) {
+      if (e.statut !== "reel") continue;
       const k = `${Math.round(Number(e.montant_ttc) * 100)}|${e.sens}`;
-      if (!manualIdx.has(k)) manualIdx.set(k, []);
-      manualIdx.get(k)!.push(new Date(e.date).getTime());
+      if (!idxReel.has(k)) idxReel.set(k, []);
+      idxReel.get(k)!.push(new Date(e.date).getTime());
     }
     // Une prévision peut être datée d'une échéance éloignée du règlement réel → tolérance large.
     const TOLERANCE_MS = 20 * 24 * 60 * 60 * 1000;
     const estDoublon = (date: string, amount: number, sens: string): boolean => {
-      const dates = manualIdx.get(`${Math.round(amount * 100)}|${sens}`);
+      const dates = idxReel.get(`${Math.round(amount * 100)}|${sens}`);
       if (!dates) return false;
       const t = new Date(date).getTime();
       return dates.some((d) => Math.abs(d - t) <= TOLERANCE_MS);
@@ -126,6 +130,9 @@ export type RapportRapprochement =
       enTrop: { id: string; date: string; denomination: string; montant: number; sens: string }[]; // dans l'outil mais absentes de Qonto
       netManquantes: number;
       netEnTrop: number;
+      /** Transactions Qonto pas encore réglées : comptées dans le solde bancaire, jamais importées. */
+      enAttente: { date: string; label: string; montant: number; sens: string }[];
+      netEnAttente: number;
       ajustementBaseline: number; // part de l'écart expliquée par le solde initial
       soldeInitial: number;
       soldeInitialDate: string | null;
@@ -158,9 +165,25 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
     const compte = org.bank_accounts.find((a) => a.slug === ent.qonto_account_slug);
     const balanceQonto = compte?.balance ?? org.bank_accounts[0]?.balance ?? 0;
 
-    // Transactions Qonto depuis la date du solde initial
-    const txs = (await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, `${baseline}T00:00:00.000Z`))
-      .filter((t) => (t.settled_at ?? "").slice(0, 10) >= baseline);
+    // Transactions Qonto depuis la date du solde initial. On inclut les EN ATTENTE :
+    // le solde renvoyé par Qonto les compte déjà, alors que la synchro ne les importe
+    // pas (une transaction non réglée peut encore changer). Sans les isoler ici,
+    // l'écart qui en découle était imputé à tort au solde initial.
+    const toutes = await fetchQontoTransactions(
+      ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, `${baseline}T00:00:00.000Z`, true,
+    );
+    const reglee = (t: { status: string }) => t.status === "completed";
+    const txs = toutes.filter((t) => reglee(t) && (t.settled_at ?? "").slice(0, 10) >= baseline);
+
+    const enAttente = toutes
+      .filter((t) => !reglee(t))
+      .map((t) => ({
+        date: (t.settled_at ?? t.emitted_at ?? "").slice(0, 10),
+        label: t.label,
+        montant: t.amount,
+        sens: t.side === "credit" ? "entree" : "sortie",
+      }));
+    const netEnAttente = r2(enAttente.reduce((s, t) => s + (t.sens === "entree" ? t.montant : -t.montant), 0));
 
     // Écritures « réelles » de l'outil depuis la date du solde initial
     const { data: toolData } = await supabase
@@ -203,12 +226,14 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
 
     const netManquantes = r2(manquantes.reduce((s, m) => s + (m.sens === "entree" ? m.montant : -m.montant), 0));
     const netEnTrop = r2(enTrop.reduce((s, m) => s + (m.sens === "entree" ? m.montant : -m.montant), 0));
-    // Après import des manquantes et retrait des « en trop », l'écart résiduel = solde initial mal calé.
-    const ajustementBaseline = r2(ecart - (netManquantes - netEnTrop));
+    // Résiduel imputable au solde initial : une fois retirés les mouvements à importer,
+    // les écritures en trop ET les transactions encore en attente.
+    const ajustementBaseline = r2(ecart - (netManquantes - netEnTrop) - netEnAttente);
 
     return {
       ok: true, balanceQonto, soldeOutil, ecart, manquantes, enTrop,
-      netManquantes, netEnTrop, ajustementBaseline, soldeInitial, soldeInitialDate: ent.solde_initial_date ?? null,
+      netManquantes, netEnTrop, enAttente, netEnAttente,
+      ajustementBaseline, soldeInitial, soldeInitialDate: ent.solde_initial_date ?? null,
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -288,23 +313,34 @@ export async function importQontoTransactions(
     const { error } = await supabase.from("ecriture_financiere").insert(rows);
     if (error) return { ok: false, error: error.message };
 
-    // Consommation des prévisionnelles RÉCURRENTES correspondantes : quand la vraie
-    // transaction arrive (même montant/sens à ±7 jours), la prévision du mois est
-    // supprimée pour éviter le double comptage dans le solde projeté.
-    const { data: prevRec } = await supabase
+    // Consommation des prévisions correspondantes : quand la vraie transaction arrive,
+    // la prévision qu'elle réalise disparaît, sinon le solde projeté la compte deux fois.
+    //
+    // On ne touche PAS aux prévisions rattachées à un document (note de frais, facture
+    // client, facture fournisseur) : leur cycle de vie est géré ailleurs — une NDF passe
+    // par « marquer remboursée », qui convertit l'écriture au lieu de la supprimer, et
+    // la supprimer ici casserait le lien note ↔ trésorerie.
+    const { data: prevs } = await supabase
       .from("ecriture_financiere")
-      .select("id, date, montant_ttc, sens")
+      .select("id, date, montant_ttc, sens, depense_recurrente_id")
       .eq("statut", "previsionnel")
-      .not("depense_recurrente_id", "is", null);
+      .is("note_frais_id", null)
+      .is("devis_facture_id", null)
+      .is("devis_id", null)
+      .is("facture_fournisseur_id", null);
     const aSupprimer: string[] = [];
     for (const t of items) {
       const tMs = new Date(t.date).getTime();
       const cents = Math.round(t.montant * 100);
-      const match = (prevRec ?? []).find(
-        (p) => !aSupprimer.includes(p.id) && p.sens === t.sens &&
-          Math.round(Number(p.montant_ttc) * 100) === cents &&
-          Math.abs(new Date(p.date).getTime() - tMs) <= 7 * 86400000,
-      );
+      const match = (prevs ?? []).find((p) => {
+        if (aSupprimer.includes(p.id) || p.sens !== t.sens) return false;
+        if (Math.round(Number(p.montant_ttc) * 100) !== cents) return false;
+        // Fenêtre serrée pour les récurrents : à ±20 jours on risquerait d'effacer
+        // l'échéance du mois voisin. Plus large pour une prévision saisie à la main,
+        // dont la date n'est qu'une estimation.
+        const tolerance = (p.depense_recurrente_id ? 7 : 20) * 86400000;
+        return Math.abs(new Date(p.date).getTime() - tMs) <= tolerance;
+      });
       if (match) aSupprimer.push(match.id);
     }
     if (aSupprimer.length) await supabase.from("ecriture_financiere").delete().in("id", aSupprimer);

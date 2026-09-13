@@ -96,13 +96,24 @@ export async function importerNoteFrais(formData: FormData) {
   const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
   if (!montant) throw new Error("Renseigne le montant de la note.");
 
+  // Deux usages très différents derrière le même formulaire :
+  //   « archive »   → note déjà traitée hors de l'outil, on ne fait que la consigner ;
+  //   « a_valider » → note établie sur papier mais qui doit encore passer en validation.
+  // Par défaut on NE court-circuite PAS le contrôle : importer ne doit jamais valider
+  // à la place d'un co-président, ni priver les autres de la notification.
+  const archive = str(formData.get("traitement")) === "archive";
+  const maintenant = new Date().toISOString();
+
   const { data: note, error } = await supabase
     .from("note_frais")
     .insert({
       numero: await numeroNDF(supabase),
       titre, date, demandeur_id: demandeurId, type_ndf: "depense",
-      statut: "validee", valide_par: membre?.id ?? null, valide_le: new Date().toISOString(),
-      demandeur_signe_le: new Date().toISOString(),
+      // La note existe sur papier, signée : on reprend la signature dans les deux cas.
+      demandeur_signe_le: maintenant,
+      ...(archive
+        ? { statut: "validee", valide_par: membre?.id ?? null, valide_le: maintenant }
+        : { statut: "soumise" }),
     })
     .select("id")
     .single();
@@ -139,6 +150,15 @@ export async function importerNoteFrais(formData: FormData) {
     const ecart = (d: string) => Math.abs(new Date(d).getTime() - new Date(ref).getTime());
     const meilleure = liste.reduce((a, b) => (ecart(b.date) < ecart(a.date) ? b : a));
     await supabase.from("note_frais").update({ ecriture_id: meilleure.id }).eq("id", note.id);
+  }
+
+  if (!archive) {
+    // Le demandeur peut être quelqu'un d'autre que l'importateur : c'est LUI qu'il
+    // faut exclure des destinataires, pas la personne qui a déposé le document.
+    const { data: dem } = demandeurId
+      ? await supabase.from("membre").select("id, prenom, nom").eq("id", demandeurId).maybeSingle()
+      : { data: null };
+    await prevenirValideurs(supabase, note.id, dem ?? membre);
   }
 
   revalidatePath("/notes-frais");

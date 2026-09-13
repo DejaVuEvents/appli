@@ -30,9 +30,17 @@ export function ImportNdf({ membres }: { membres: { id: string; nom: string }[] 
 
         {fichier && (
           <div className="space-y-3">
+            <Select
+              label="Que faire de cette note ?"
+              name="traitement"
+              options={[
+                { value: "a_valider", label: "La faire valider (notifie les co-présidents)" },
+                { value: "archive", label: "Déjà traitée — simple archive" },
+              ]}
+            />
             <p className="text-sm text-muted">
-              La note sera enregistrée comme validée et signée. Aucune écriture n&apos;est créée : si un
-              décaissement du même montant existe déjà au journal, elle s&apos;y rattache et apparaît
+              La signature du demandeur est reprise dans les deux cas. Aucune écriture n&apos;est créée : si un
+              décaissement du même montant existe déjà au journal, la note s&apos;y rattache et apparaît
               « Remboursée ».
             </p>
             <Field label="Intitulé" name="titre" required defaultValue={fichier.name.replace(/\.[^.]+$/, "")} />

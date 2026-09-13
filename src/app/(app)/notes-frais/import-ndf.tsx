@@ -14,6 +14,12 @@ import { importerNoteFrais } from "./actions";
  * qu'une fois le fichier choisi. Sans lui, la zone reste une simple invite — inutile de
  * montrer un formulaire complet à qui vient seulement créer une note vierge.
  */
+/** Beaucoup de justificatifs sont nommés « 2026-08-19 NDF … » : autant s'en servir. */
+function dateDuNom(nom: string): string {
+  const m = /(\d{4})[-_. ](\d{2})[-_. ](\d{2})/.exec(nom);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
+
 export function ImportNdf({ membres }: { membres: { id: string; nom: string }[] }) {
   const [fichier, setFichier] = useState<File | null>(null);
 
@@ -45,7 +51,15 @@ export function ImportNdf({ membres }: { membres: { id: string; nom: string }[] 
             </p>
             <Field label="Intitulé" name="titre" required defaultValue={fichier.name.replace(/\.[^.]+$/, "")} />
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Date" name="date" type="date" />
+              {/* Obligatoire : laissé vide, l'import datait la note du jour de son dépôt
+                  au lieu du jour de la dépense. */}
+              <Field
+                label="Date de la dépense"
+                name="date"
+                type="date"
+                required
+                defaultValue={dateDuNom(fichier.name)}
+              />
               <Field label="Montant TTC (€)" name="montant_ttc" type="number" step="0.01" required />
             </div>
             <Select

@@ -95,6 +95,8 @@ export async function importerNoteFrais(formData: FormData) {
   const demandeurId = str(formData.get("demandeur_id")) ?? membre?.id ?? null;
   const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
   if (!montant) throw new Error("Renseigne le montant de la note.");
+  // Sans date, la note se retrouvait datée du jour de l'import et non de la dépense.
+  if (!date) throw new Error("Renseigne la date de la dépense.");
 
   // Deux usages très différents derrière le même formulaire :
   //   « archive »   → note déjà traitée hors de l'outil, on ne fait que la consigner ;

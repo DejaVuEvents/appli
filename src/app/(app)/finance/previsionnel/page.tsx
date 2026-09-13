@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { dansUnMois } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import { FinanceTabs } from "../finance-tabs";
 import { InfoHint } from "@/components/info-hint";
@@ -62,7 +63,8 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       id: n.id,
       libelle: `${n.numero ?? "NDF"} — ${n.titre ?? "Note de frais"}`,
       montant: Math.round((n.lignes ?? []).reduce((s2, l) => s2 + Number(l.montant_ttc ?? 0), 0) * 100) / 100,
-      date: n.date,
+      // Même échéance que la validation : remboursement ~1 mois après la note.
+      date: n.date ? dansUnMois(n.date) : null,
     }))
     .filter((n) => n.montant > 0)
     .map((n) => ({ ...n, kind: "ndf" as const }));

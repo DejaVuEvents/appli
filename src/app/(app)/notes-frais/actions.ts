@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
 import { envoyerMail, baseUrl } from "@/lib/mail";
+import { dansUnMois } from "@/lib/format";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
@@ -406,7 +407,7 @@ export async function validerNDF(noteId: string) {
 
   const { data: ndf } = await supabase
     .from("note_frais")
-    .select("id, statut, titre, type_ndf, demandeur_id, ecriture_id, created_at")
+    .select("id, statut, titre, type_ndf, demandeur_id, ecriture_id, created_at, date")
     .eq("id", noteId)
     .single();
   if (!ndf || ndf.statut !== "soumise") throw new Error("Note de frais introuvable ou non soumise.");
@@ -428,29 +429,49 @@ export async function validerNDF(noteId: string) {
     .select("montant_ttc, date, libelle, justificatif_url")
     .eq("note_frais_id", noteId);
   const total = (lignes ?? []).reduce((s, l) => s + Number(l.montant_ttc ?? 0), 0);
-  const dates = (lignes ?? []).map((l) => l.date).filter(Boolean).sort() as string[];
 
   // Nom du demandeur pour le libellé de l'écriture
   const { data: dem } = await supabase.from("membre").select("nom, email").eq("id", ndf.demandeur_id ?? "").maybeSingle();
   const demandeur = nomMembre(dem);
 
-  // Ligne de trésorerie prévisionnelle (sortie : remboursement de frais)
-  const { data: ecr, error: ecrErr } = await supabase
+  // Une prévision peut déjà exister pour cette note : créée à la main depuis le
+  // prévisionnel (« document associé »), elle porte note_frais_id. La valider en
+  // créait une seconde — le remboursement était compté deux fois.
+  const { data: dejaPrevue } = await supabase
     .from("ecriture_financiere")
-    .insert({
-      date: dates[dates.length - 1] ?? new Date().toISOString().slice(0, 10),
-      denomination: `Remboursement NDF — ${demandeur}${ndf.titre ? ` — ${ndf.titre}` : ""}`,
-      type: "Frais_Fixes",
-      specification: "Remboursement frais",
-      sens: "sortie",
-      statut: "previsionnel",
-      montant_ttc: Math.round(total * 100) / 100,
-      effectue_par: demandeur,
-      created_by: membre.id,
-    })
     .select("id")
-    .single();
-  if (ecrErr) throw new Error(ecrErr.message);
+    .eq("note_frais_id", noteId)
+    .eq("statut", "previsionnel")
+    .maybeSingle();
+
+  // Ligne de trésorerie prévisionnelle (sortie : remboursement de frais)
+  const payloadPrev = {
+    // Échéance de remboursement : un mois après l'établissement de la note, et non
+    // la date de la dernière dépense — qui est souvent déjà passée, ce qui faisait
+    // apparaître la prévision comme échue dès sa création.
+    date: dansUnMois((ndf.date as string | null) ?? String(ndf.created_at).slice(0, 10)),
+    denomination: `Remboursement NDF — ${demandeur}${ndf.titre ? ` — ${ndf.titre}` : ""}`,
+    type: "Frais_Fixes",
+    specification: "Remboursement frais",
+    sens: "sortie",
+    statut: "previsionnel",
+    montant_ttc: Math.round(total * 100) / 100,
+    effectue_par: demandeur,
+  };
+
+  let ecr: { id: string };
+  if (dejaPrevue) {
+    await supabase.from("ecriture_financiere").update(payloadPrev).eq("id", dejaPrevue.id);
+    ecr = { id: dejaPrevue.id as string };
+  } else {
+    const { data: cree, error: ecrErr } = await supabase
+      .from("ecriture_financiere")
+      .insert({ ...payloadPrev, note_frais_id: noteId, created_by: membre.id })
+      .select("id")
+      .single();
+    if (ecrErr) throw new Error(ecrErr.message);
+    ecr = cree;
+  }
 
   const { data: maj } = await supabase
     .from("note_frais")
@@ -465,7 +486,8 @@ export async function validerNDF(noteId: string) {
 
   // Archivage Google Drive (best-effort) sous « Notes de frais / {année} »
   if (driveConfigured()) {
-    const annee = (dates[dates.length - 1] ?? new Date().toISOString()).slice(0, 4);
+    // Classement par année de la note, pas de son remboursement.
+    const annee = ((ndf.date as string | null) ?? String(ndf.created_at)).slice(0, 4);
     const baseNom = nomFichierSafe(`NDF ${demandeur} ${ndf.titre ?? ""}`.trim());
     // 1) Les justificatifs téléversés
     for (const [i, l] of (lignes ?? []).entries()) {

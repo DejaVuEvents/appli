@@ -46,3 +46,18 @@ export function ponctuationFr(texte: string): string {
     .replace(/\s+(:)/g, "\u00a0$1")
     .replace(/(«)\s+/g, "«\u202f");
 }
+
+/**
+ * Même quantième le mois suivant, en reculant au dernier jour quand il n'existe pas
+ * (31/01 → 28/02). Sert à l'échéance de remboursement d'une note de frais : elle est
+ * réglée environ un mois après avoir été établie.
+ */
+export function dansUnMois(iso: string): string {
+  // Midi UTC : évite qu'un décalage de fuseau ne fasse changer de jour.
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const quantieme = d.getUTCDate();
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  if (d.getUTCDate() !== quantieme) d.setUTCDate(0);
+  return d.toISOString().slice(0, 10);
+}

@@ -30,6 +30,7 @@ export function EcriturePanel({
   catManquante = false,
   hasJustif = false,
   facturesOuvertes = [],
+  retour,
   onClose,
 }: {
   ecriture: EcritureFinanciere;
@@ -39,6 +40,8 @@ export function EcriturePanel({
   hasJustif?: boolean;
   /** Factures émises impayées, pour rattacher un encaissement déjà au journal. */
   facturesOuvertes?: FactureOuverte[];
+  /** Page d'où le panneau est ouvert, pour y revenir après édition (défaut : journal). */
+  retour?: "previsionnel" | "journal" | "dashboard" | "qonto" | "calendrier";
   onClose: () => void;
 }) {
   const [delOpen, setDelOpen] = useState(false);
@@ -223,7 +226,7 @@ export function EcriturePanel({
           {/* Actions */}
           <div className="flex gap-2 pt-2">
             <Link
-              href={`/finance/${e.id}`}
+              href={`/finance/${e.id}${retour ? `?retour=${retour}` : ""}`}
               className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground"
             >
               Modifier

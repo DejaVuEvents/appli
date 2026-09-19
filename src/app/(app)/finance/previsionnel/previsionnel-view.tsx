@@ -189,10 +189,17 @@ function grouperParPrestation(list: PrevRow[]): { cle: string; nom: string | nul
     g.lignes.push(r);
     parPresta.set(r.prestation_id, g);
   }
-  const groupes = [...parPresta.values()]
+  const blocs = [...parPresta.values()]
     // Une prestation avec une seule écriture n'a pas besoin d'encadré.
     .map((g) => (g.lignes.length > 1 ? g : { ...g, nom: null }));
-  return seules.length ? [...groupes, { cle: "__autres", nom: null, lignes: seules }] : groupes;
+  // Chaque écriture sans prestation forme son propre bloc : regroupées en fin de liste,
+  // elles échappaient au tri et une date modifiée ne déplaçait plus rien.
+  for (const r of seules) blocs.push({ cle: r.id, nom: null, lignes: [r] });
+
+  // Ordre chronologique : un groupe se place à la date de sa ligne la plus ancienne.
+  const debut = (g: { lignes: PrevRow[] }) => g.lignes.reduce((min, r) => (r.date < min ? r.date : min), g.lignes[0].date);
+  for (const g of blocs) g.lignes.sort((a, b) => a.date.localeCompare(b.date));
+  return blocs.sort((a, b) => debut(a).localeCompare(debut(b)) || a.cle.localeCompare(b.cle));
 }
 
 function PonctuellesView({
@@ -442,6 +449,7 @@ function PonctuellesView({
           prestation={selected.prestation ?? null}
           catManquante={categorieManquante(nomenclature, selected.sens, selected.type)}
           facturesOuvertes={facturesOuvertes}
+          retour="previsionnel"
           onClose={() => setSelected(null)}
         />
       )}

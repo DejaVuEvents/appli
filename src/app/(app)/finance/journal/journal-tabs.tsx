@@ -345,6 +345,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
           catManquante={catFlag(selected)}
           hasJustif={justifSet.has(selected.id)}
           facturesOuvertes={facturesOuvertes}
+          retour="journal"
           onClose={() => setSelected(null)}
         />
       )}

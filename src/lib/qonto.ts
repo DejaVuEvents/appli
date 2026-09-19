@@ -140,3 +140,20 @@ export function mapQontoCategorie(
 
   return { type: "Matériel", specification: "Achat de matériel" };
 }
+
+/**
+ * Date calendaire À PARIS d'un horodatage Qonto.
+ *
+ * Les horodatages de l'API sont en UTC : `settled_at.slice(0, 10)` prend donc la date
+ * UTC, et une opération passée entre minuit et 2 h du matin heure française tombe la
+ * veille. D'où des dates décalées d'un jour par rapport à ce qu'affiche Qonto.
+ */
+export function dateParis(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  // « fr-CA » formate en AAAA-MM-JJ, directement exploitable en base.
+  return new Intl.DateTimeFormat("fr-CA", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(d);
+}

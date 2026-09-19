@@ -137,6 +137,7 @@ export function QontoSync({ derniereSync, balanceQonto, soldeOutil, nomenclature
         `${r.justificatifs} justificatif${r.justificatifs > 1 ? "s" : ""} récupéré${r.justificatifs > 1 ? "s" : ""}`,
       ];
       if (r.ignoresDoublons > 0) bits.push(`${r.ignoresDoublons} doublon${r.ignoresDoublons > 1 ? "s" : ""} ignoré${r.ignoresDoublons > 1 ? "s" : ""}`);
+      if (r.datesCorrigees > 0) bits.push(`${r.datesCorrigees} date${r.datesCorrigees > 1 ? "s" : ""} recalée${r.datesCorrigees > 1 ? "s" : ""}`);
       setResult(`Synchro terminée : ${bits.join(" · ")}.`);
     });
   };

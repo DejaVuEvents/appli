@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { fetchQontoTransactions, fetchQontoAttachment, fetchQontoOrg, mapQontoCategorie } from "@/lib/qonto";
+import { fetchQontoTransactions, fetchQontoAttachment, fetchQontoOrg, mapQontoCategorie, dateParis } from "@/lib/qonto";
 import type { QontoTransaction } from "@/lib/qonto";
 import { BUCKET_PRIVE } from "@/lib/storage";
 
@@ -92,7 +92,7 @@ export async function previewQonto(): Promise<
           t.label,
         );
         // Les transactions en attente n'ont pas de settled_at → on prend la date d'émission.
-        const date = (t.settled_at ?? t.emitted_at ?? "").slice(0, 10);
+        const date = dateParis(t.settled_at ?? t.emitted_at);
         const sens = (t.side === "credit" ? "entree" : "sortie") as "entree" | "sortie";
         return {
           transaction_id: t.transaction_id,
@@ -173,12 +173,12 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
       ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, `${baseline}T00:00:00.000Z`, true,
     );
     const reglee = (t: { status: string }) => t.status === "completed";
-    const txs = toutes.filter((t) => reglee(t) && (t.settled_at ?? "").slice(0, 10) >= baseline);
+    const txs = toutes.filter((t) => reglee(t) && dateParis(t.settled_at) >= baseline);
 
     const enAttente = toutes
       .filter((t) => !reglee(t))
       .map((t) => ({
-        date: (t.settled_at ?? t.emitted_at ?? "").slice(0, 10),
+        date: dateParis(t.settled_at ?? t.emitted_at),
         label: t.label,
         montant: t.amount,
         sens: t.side === "credit" ? "entree" : "sortie",
@@ -207,7 +207,7 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
     for (const tx of txs) {
       if (linkedIds.has(tx.transaction_id)) continue; // déjà importée
       const sens = (tx.side === "credit" ? "entree" : "sortie") as "entree" | "sortie";
-      const date = (tx.settled_at ?? tx.emitted_at ?? "").slice(0, 10);
+      const date = dateParis(tx.settled_at ?? tx.emitted_at);
       const cents = Math.round(tx.amount * 100);
       const t = new Date(date).getTime();
       const jumeau = manuels.find((m) => !m.used && m.sens === sens && m.cents === cents && Math.abs(m.t - t) <= TOL);
@@ -422,8 +422,41 @@ export async function recupererJustificatifsQonto(): Promise<
  * (hors doublons et hors "en attente") + récupère les justificatifs manquants,
  * en un seul clic. Ne remplace jamais un justificatif déjà présent.
  */
+/**
+ * Recale la date des écritures DÉJÀ importées sur la date parisienne de leur
+ * transaction. Les imports antérieurs découpaient l'horodatage UTC : toute opération
+ * passée après 22 h UTC portait la veille. La synchro saute les transactions connues,
+ * ces dates ne se seraient donc jamais corrigées d'elles-mêmes.
+ */
+async function corrigerDatesQonto(): Promise<number> {
+  const supabase = await createClient();
+  const { data: ent } = await supabase
+    .from("parametres_entreprise")
+    .select("qonto_login, qonto_token, qonto_account_slug")
+    .limit(1)
+    .maybeSingle();
+  if (!ent?.qonto_login || !ent?.qonto_token || !ent?.qonto_account_slug) return 0;
+
+  const txs = await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, undefined, true);
+  const bonneDate = new Map(txs.map((t) => [t.transaction_id, dateParis(t.settled_at ?? t.emitted_at)]));
+
+  const { data: rows } = await supabase
+    .from("ecriture_financiere")
+    .select("id, date, qonto_transaction_id")
+    .not("qonto_transaction_id", "is", null);
+
+  let corrigees = 0;
+  for (const e of (rows ?? []) as { id: string; date: string; qonto_transaction_id: string }[]) {
+    const attendue = bonneDate.get(e.qonto_transaction_id);
+    if (!attendue || attendue === e.date) continue;
+    await supabase.from("ecriture_financiere").update({ date: attendue }).eq("id", e.id);
+    corrigees++;
+  }
+  return corrigees;
+}
+
 export async function syncGlobal(): Promise<
-  { ok: true; importees: number; justificatifs: number; ignoresDoublons: number } | { ok: false; error: string }
+  { ok: true; importees: number; justificatifs: number; ignoresDoublons: number; datesCorrigees: number } | { ok: false; error: string }
 > {
   const prev = await previewQonto();
   if (!prev.ok) return { ok: false, error: prev.error };
@@ -437,7 +470,8 @@ export async function syncGlobal(): Promise<
   }
   const j = await recupererJustificatifsQonto();
   const justificatifs = j.ok ? j.ajoutes : 0;
-  return { ok: true, importees, justificatifs, ignoresDoublons };
+  const datesCorrigees = await corrigerDatesQonto();
+  return { ok: true, importees, justificatifs, ignoresDoublons, datesCorrigees };
 }
 
 

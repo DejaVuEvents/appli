@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { typeLabel, categorieManquante, NOMENCLATURE, type Nomenclature } from "@/lib/finance";
 import { CategorieIcon } from "@/components/categorie-icon";
-import { EcriturePanel, type FactureLiee, type PrestationLiee } from "../ecriture-panel";
+import { EcriturePanel, type FactureLiee, type PrestationLiee, type FactureOuverte } from "../ecriture-panel";
 import { Modal } from "@/components/modal";
 import { DateInput } from "@/components/date-input";
 import { euros, dateFr } from "@/lib/format";
@@ -42,7 +42,7 @@ function groupByMonth(list: EcritureFinanciere[]): [string, EcritureFinanciere[]
 
 
 
-export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], facturesLiees = {}, nomenclature = NOMENCLATURE }: { all: EcritureFinanciere[]; prestations?: Prestation[]; sidebar?: React.ReactNode; avecJustif?: string[]; facturesLiees?: Record<string, FactureLiee[]>; nomenclature?: Nomenclature }) {
+export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], facturesLiees = {}, facturesOuvertes = [], nomenclature = NOMENCLATURE }: { all: EcritureFinanciere[]; prestations?: Prestation[]; sidebar?: React.ReactNode; avecJustif?: string[]; facturesLiees?: Record<string, FactureLiee[]>; facturesOuvertes?: FactureOuverte[]; nomenclature?: Nomenclature }) {
   const justifSet = useMemo(() => new Set(avecJustif), [avecJustif]);
   const [tab, setTab] = useState<Tab>("entrees");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -344,6 +344,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
           factures={facturesLiees[selected.id] ?? []}
           catManquante={catFlag(selected)}
           hasJustif={justifSet.has(selected.id)}
+          facturesOuvertes={facturesOuvertes}
           onClose={() => setSelected(null)}
         />
       )}

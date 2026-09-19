@@ -9,7 +9,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Modal, ModalForm } from "@/components/modal";
 import { ConfirmButton } from "@/components/confirm-button";
 import { euros, dateFr } from "@/lib/format";
-import { EcriturePanel, type PrestationLiee } from "../ecriture-panel";
+import { EcriturePanel, type PrestationLiee, type FactureOuverte } from "../ecriture-panel";
 import type { EcritureFinanciere } from "@/lib/types";
 import { typeLabel, categorieManquante, type Nomenclature } from "@/lib/finance";
 import { CategorieIcon } from "@/components/categorie-icon";
@@ -34,6 +34,7 @@ export function PrevisionnelView({
   seuil,
   recurrentesParMois,
   docsAPrevoir = [],
+  facturesOuvertes = [],
   suggestions = [],
 }: {
   ponctuelles: PrevRow[];
@@ -43,6 +44,7 @@ export function PrevisionnelView({
   seuil: number;
   recurrentesParMois: Record<string, number>;
   docsAPrevoir?: DocAPrevoir[];
+  facturesOuvertes?: FactureOuverte[];
   suggestions?: Suggestion[];
 }) {
   const [vue, setVue] = useState<"ponctuelles" | "recurrents">("ponctuelles");
@@ -63,7 +65,7 @@ export function PrevisionnelView({
       {vue === "recurrents" ? (
         <RecurrentsView recurrents={recurrents} nomenclature={nomenclature} mensuelEquivalent={mensuelEquivalent} />
       ) : (
-        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} docsAPrevoir={docsAPrevoir} suggestions={suggestions} />
+        <PonctuellesView rows={ponctuelles} nomenclature={nomenclature} soldeReel={soldeReel} seuil={seuil} recurrentesParMois={recurrentesParMois} docsAPrevoir={docsAPrevoir} facturesOuvertes={facturesOuvertes} suggestions={suggestions} />
       )}
     </div>
   );
@@ -200,6 +202,7 @@ function PonctuellesView({
   seuil,
   recurrentesParMois,
   docsAPrevoir,
+  facturesOuvertes,
   suggestions,
 }: {
   rows: PrevRow[];
@@ -208,6 +211,7 @@ function PonctuellesView({
   seuil: number;
   recurrentesParMois: Record<string, number>;
   docsAPrevoir: DocAPrevoir[];
+  facturesOuvertes: FactureOuverte[];
   suggestions: Suggestion[];
 }) {
   const [sens, setSens] = useState<"sortie" | "entree">("sortie");
@@ -437,6 +441,7 @@ function PonctuellesView({
           ecriture={selected}
           prestation={selected.prestation ?? null}
           catManquante={categorieManquante(nomenclature, selected.sens, selected.type)}
+          facturesOuvertes={facturesOuvertes}
           onClose={() => setSelected(null)}
         />
       )}

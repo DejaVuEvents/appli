@@ -68,12 +68,33 @@ export default async function JournalPage({
       <ExportModal key="export" annee={annee} />
     </div>
   );
+  // Factures émises encore impayées : proposées au rattachement d'un encaissement
+  // déjà présent au journal (acompte encaissé avant d'être facturé).
+  const { data: facOuv } = await supabase
+    .from("devis_facture")
+    .select("id, numero, montant_ttc, prestation:prestation_id(nom), devis:devis_id(nom)")
+    .not("numero", "is", null)
+    .or("statut_paiement.is.null,statut_paiement.eq.en_attente")
+    .order("date_emission", { ascending: false });
+  const facturesOuvertes = ((facOuv ?? []) as unknown as {
+    id: string; numero: string | null; montant_ttc: number | null;
+    prestation: { nom: string } | null; devis: { nom: string } | null;
+  }[])
+    .filter((f) => Number(f.montant_ttc ?? 0) > 0)
+    .map((f) => ({
+      id: f.id,
+      numero: f.numero,
+      libelle: f.prestation?.nom ?? f.devis?.nom ?? "Document",
+      montant: Number(f.montant_ttc),
+    }));
+
 
   return (
     <div className="max-w-7xl">
       <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
-      <JournalTabs all={ecritures} prestations={prestations} sidebar={sidebar} avecJustif={[...avecJustif]} facturesLiees={facturesLiees} nomenclature={nomenclature} />
+      <JournalTabs
+        facturesOuvertes={facturesOuvertes} all={ecritures} prestations={prestations} sidebar={sidebar} avecJustif={[...avecJustif]} facturesLiees={facturesLiees} nomenclature={nomenclature} />
     </div>
   );
 }

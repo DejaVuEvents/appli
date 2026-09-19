@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { deleteEcriture, setValideEcriture, ajouterJustificatifs } from "./actions";
+import { deleteEcriture, setValideEcriture, ajouterJustificatifs, rattacherEcritureAFacture } from "./actions";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -14,6 +14,9 @@ import type { EcritureFinanciere } from "@/lib/types";
 
 /** Prestation réduite à ce que le panneau affiche. */
 export type PrestationLiee = { id: string; nom: string; client: { nom: string } | null };
+/** Facture émise encore impayée, proposable au rattachement d'un encaissement. */
+export type FactureOuverte = { id: string; numero: string | null; libelle: string; montant: number };
+
 /** Document (devis/facture) rattaché à une écriture. */
 export type FactureLiee = {
   numero: string | null; type: string; prestationId: string | null;
@@ -26,6 +29,7 @@ export function EcriturePanel({
   factures = [],
   catManquante = false,
   hasJustif = false,
+  facturesOuvertes = [],
   onClose,
 }: {
   ecriture: EcritureFinanciere;
@@ -33,6 +37,8 @@ export function EcriturePanel({
   factures?: FactureLiee[];
   catManquante?: boolean;
   hasJustif?: boolean;
+  /** Factures émises impayées, pour rattacher un encaissement déjà au journal. */
+  facturesOuvertes?: FactureOuverte[];
   onClose: () => void;
 }) {
   const [delOpen, setDelOpen] = useState(false);
@@ -100,6 +106,25 @@ export function EcriturePanel({
           {e.effectue_par && <Row label="Effectué par" value={e.effectue_par} />}
           {e.notes && e.notes !== "Import BP 2026" && e.notes !== "Import historique" && (
             <Row label="Notes" value={e.notes} />
+          )}
+
+          {e.statut === "reel" && e.sens === "entree" && !e.devis_facture_id && facturesOuvertes.length > 0 && (
+            <form action={rattacherEcritureAFacture.bind(null, e.id)} className="space-y-2 rounded-lg border border-border px-3 py-2.5">
+              <span className="block text-sm font-medium">Rattacher à une facture</span>
+              <p className="text-xs text-muted">
+                Solde la facture et retire sa prévision d&apos;encaissement — utile pour un acompte
+                encaissé avant d&apos;avoir été facturé.
+              </p>
+              <select name="devis_facture_id" required className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <option value="">— Choisir —</option>
+                {facturesOuvertes.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.numero ? `${f.numero} — ` : ""}{f.libelle} · {euros(f.montant)}
+                  </option>
+                ))}
+              </select>
+              <SubmitButton pendingLabel="Rattachement…" className="!py-1.5 !text-xs">Rattacher et solder</SubmitButton>
+            </form>
           )}
 
           {/* Facture / document */}

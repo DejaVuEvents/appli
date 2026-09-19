@@ -314,3 +314,42 @@ export async function updatePrixCarburant(id: string, formData: FormData) {
   revalidatePath("/parametres");
   revalidatePath("/planification");
 }
+
+/**
+ * Rattache un encaissement DÉJÀ au journal à une facture émise, et solde celle-ci.
+ *
+ * Le rapprochement automatique ne s'applique qu'aux transactions fraîchement importées :
+ * un virement arrivé avant l'émission de la facture — le cas d'un acompte encaissé puis
+ * facturé après coup — restait orphelin, et sa prévision continuait de gonfler le
+ * prévisionnel. C'est le même geste que la synchro, déclenché à la main.
+ */
+export async function rattacherEcritureAFacture(ecritureId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const factureId = String(formData.get("devis_facture_id") ?? "").trim();
+  if (!factureId) throw new Error("Choisis une facture.");
+
+  const { data: fac } = await supabase
+    .from("devis_facture")
+    .select("id, numero, prestation_id, montant_ttc")
+    .eq("id", factureId)
+    .maybeSingle();
+  if (!fac) throw new Error("Facture introuvable.");
+
+  const { error } = await supabase
+    .from("ecriture_financiere")
+    .update({ devis_facture_id: fac.id, prestation_id: fac.prestation_id })
+    .eq("id", ecritureId);
+  if (error) throw new Error(error.message);
+
+  // L'argent est arrivé : la facture est réglée, et sa prévision d'encaissement
+  // n'a plus lieu d'être — c'est le mouvement réel qui la remplace.
+  await supabase.from("devis_facture").update({ statut_paiement: "paye" }).eq("id", fac.id);
+  await supabase
+    .from("ecriture_financiere")
+    .delete()
+    .eq("devis_facture_id", fac.id)
+    .eq("statut", "previsionnel");
+
+  revaliderFinance();
+  revalidatePath("/finance/previsionnel");
+}

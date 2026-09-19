@@ -115,6 +115,25 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
       ? `${r.prestation.nom}${r.prestation.client?.nom ? ` · ${r.prestation.client.nom}` : ""}`
       : null,
   })) as PrevRow[];
+  // Mêmes factures ouvertes que le journal : le panneau partagé permet d'y rattacher
+  // un encaissement déjà enregistré.
+  const { data: facOuv } = await supabase
+    .from("devis_facture")
+    .select("id, numero, montant_ttc, prestation:prestation_id(nom), devis:devis_id(nom)")
+    .not("numero", "is", null)
+    .or("statut_paiement.is.null,statut_paiement.eq.en_attente")
+    .order("date_emission", { ascending: false });
+  const facturesOuvertes = ((facOuv ?? []) as unknown as {
+    id: string; numero: string | null; montant_ttc: number | null;
+    prestation: { nom: string } | null; devis: { nom: string } | null;
+  }[])
+    .filter((f) => Number(f.montant_ttc ?? 0) > 0)
+    .map((f) => ({
+      id: f.id, numero: f.numero,
+      libelle: f.prestation?.nom ?? f.devis?.nom ?? "Document",
+      montant: Number(f.montant_ttc),
+    }));
+
 
   return (
     <div className="max-w-6xl">
@@ -132,6 +151,7 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
         seuil={Number(ent?.seuil_alerte ?? 0)}
         recurrentesParMois={recurrentesParMois}
         docsAPrevoir={docsAPrevoir}
+        facturesOuvertes={facturesOuvertes}
         suggestions={suggestions}
       />
     </div>

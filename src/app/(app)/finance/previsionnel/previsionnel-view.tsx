@@ -393,7 +393,7 @@ function PonctuellesView({
                           <form action={rapprocherPrevisionNdf.bind(null, r.id, sugg.ecritureId)} onClick={(ev) => ev.stopPropagation()}>
                             <SubmitButton
                               className="!px-2 !py-1 !text-xs"
-                              confirm={`Rapprocher cette prévision du décaissement « ${sugg.libelle} » du ${dateFr(sugg.date)} ? La prévision disparaît et la note passe en « Remboursée ».`}
+                              confirm={`Rattacher cette prévision à l'opération :\n« ${sugg.libelle} » — ${dateFr(sugg.date)} — ${euros(r.montant_ttc)}\n\nLa prévision disparaît et la note passe en « Remboursée ».`}
                             >
                               Rapprocher
                             </SubmitButton>

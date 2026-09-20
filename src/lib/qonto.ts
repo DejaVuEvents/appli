@@ -40,11 +40,31 @@ export async function fetchQontoAttachment(
   return data.attachment;
 }
 
+export type QontoBankAccount = {
+  slug: string; iban: string; name: string; status: string;
+  /** Solde des seules opérations réglées. */
+  balance: number;
+  /** Solde disponible : réglé MOINS les opérations autorisées non encore réglées.
+   *  C'est ce que Qonto affiche comme solde du compte, et donc ce que voit l'utilisateur. */
+  authorized_balance?: number;
+};
+
 export type QontoOrg = {
   name: string;
   slug: string;
-  bank_accounts: { slug: string; iban: string; balance: number; name: string; status: string }[];
+  bank_accounts: QontoBankAccount[];
 };
+
+/**
+ * Solde de référence, à comparer au solde de l'outil.
+ *
+ * L'outil importe les opérations EN ATTENTE (Qonto les décompte déjà côté client) :
+ * la contrepartie est de se comparer au solde qui les décompte lui aussi, soit
+ * `authorized_balance`. Repli sur `balance` si l'API ne le renvoie pas.
+ */
+export function soldeDeReference(compte: QontoBankAccount | undefined): number {
+  return compte?.authorized_balance ?? compte?.balance ?? 0;
+}
 
 export async function fetchQontoOrg(login: string, token: string): Promise<QontoOrg> {
   const resp = await fetch("https://thirdparty.qonto.com/v2/organization", {

@@ -82,9 +82,10 @@ export function QontoSync({ derniereSync, balanceQonto, soldeOutil, nomenclature
       const r = await previewQonto();
       if (!r.ok) { setError(r.error); return; }
       setItems(r.items);
-      // Pré-sélectionner tout SAUF les doublons et les transactions en attente de règlement
+      // Pré-sélectionner tout SAUF les doublons (les opérations en attente sont importées :
+      // Qonto les décompte déjà du solde du compte).
       // (montant susceptible de changer — l'utilisateur les coche manuellement s'il le souhaite).
-      setSelected(new Set(r.items.filter((i) => !i.doublon && !i.pending).map((i) => i.transaction_id)));
+      setSelected(new Set(r.items.filter((i) => !i.doublon).map((i) => i.transaction_id)));
       setEdited(new Map());
     });
   };
@@ -137,7 +138,7 @@ export function QontoSync({ derniereSync, balanceQonto, soldeOutil, nomenclature
         `${r.justificatifs} justificatif${r.justificatifs > 1 ? "s" : ""} récupéré${r.justificatifs > 1 ? "s" : ""}`,
       ];
       if (r.ignoresDoublons > 0) bits.push(`${r.ignoresDoublons} doublon${r.ignoresDoublons > 1 ? "s" : ""} ignoré${r.ignoresDoublons > 1 ? "s" : ""}`);
-      if (r.datesCorrigees > 0) bits.push(`${r.datesCorrigees} date${r.datesCorrigees > 1 ? "s" : ""} recalée${r.datesCorrigees > 1 ? "s" : ""}`);
+      if (r.datesCorrigees > 0) bits.push(`${r.datesCorrigees} écriture${r.datesCorrigees > 1 ? "s" : ""} recalée${r.datesCorrigees > 1 ? "s" : ""}`);
       setResult(`Synchro terminée : ${bits.join(" · ")}.`);
     });
   };
@@ -227,7 +228,7 @@ export function QontoSync({ derniereSync, balanceQonto, soldeOutil, nomenclature
                 onClick={handleSyncGlobal}
                 disabled={pending}
                 className="flex-1 rounded-l-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                title="Importe les nouvelles transactions propres (hors doublons/en attente) + récupère les justificatifs manquants"
+                title="Importe les nouvelles transactions (opérations en attente comprises, hors doublons), recale les dates et montants, puis récupère les justificatifs manquants"
               >
                 {pending ? "Synchronisation…" : "⟳ Synchroniser"}
               </button>

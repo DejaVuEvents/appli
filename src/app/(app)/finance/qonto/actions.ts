@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { fetchQontoTransactions, fetchQontoAttachment, fetchQontoOrg, mapQontoCategorie, dateParis } from "@/lib/qonto";
+import { fetchQontoTransactions, fetchQontoAttachment, fetchQontoOrg, mapQontoCategorie, dateParis, soldeDeReference } from "@/lib/qonto";
 import type { QontoTransaction } from "@/lib/qonto";
 import { BUCKET_PRIVE } from "@/lib/storage";
 
@@ -162,21 +162,24 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
 
     // Solde bancaire Qonto
     const org = await fetchQontoOrg(ent.qonto_login, ent.qonto_token);
-    const compte = org.bank_accounts.find((a) => a.slug === ent.qonto_account_slug);
-    const balanceQonto = compte?.balance ?? org.bank_accounts[0]?.balance ?? 0;
+    const compte = org.bank_accounts.find((a) => a.slug === ent.qonto_account_slug) ?? org.bank_accounts[0];
+    const balanceQonto = soldeDeReference(compte);
 
     // Transactions Qonto depuis la date du solde initial. On inclut les EN ATTENTE :
     // le solde renvoyé par Qonto les compte déjà, alors que la synchro ne les importe
     // pas (une transaction non réglée peut encore changer). Sans les isoler ici,
     // l'écart qui en découle était imputé à tort au solde initial.
+    // Sans filtre `settled_after` : il s'appuie sur settled_at, que les opérations en
+    // attente n'ont pas encore — elles disparaîtraient du rapprochement.
     const toutes = await fetchQontoTransactions(
-      ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, `${baseline}T00:00:00.000Z`, true,
+      ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, undefined, true,
     );
-    const reglee = (t: { status: string }) => t.status === "completed";
-    const txs = toutes.filter((t) => reglee(t) && dateParis(t.settled_at) >= baseline);
+    const txs = toutes.filter((t) => dateParis(t.settled_at ?? t.emitted_at) >= baseline);
 
+    // Purement informatif : ces opérations SONT importées, elles ne creusent donc plus
+    // d'écart. On les signale seulement parce que leur montant peut encore bouger.
     const enAttente = toutes
-      .filter((t) => !reglee(t))
+      .filter((t) => t.status !== "completed")
       .map((t) => ({
         date: dateParis(t.settled_at ?? t.emitted_at),
         label: t.label,
@@ -217,7 +220,7 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
         transaction_id: tx.transaction_id, date, label: tx.label, montant: tx.amount, sens,
         type: cat.type, specification: cat.specification, reference: tx.reference,
         cashflow_cat: tx.cashflow_category?.name ?? null, cashflow_sub: tx.cashflow_subcategory?.name ?? null,
-        doublon: false, pending: false, attachment_ids: tx.attachment_ids ?? [],
+        doublon: false, pending: tx.status !== "completed", attachment_ids: tx.attachment_ids ?? [],
       });
     }
     const enTrop = manuels
@@ -226,9 +229,10 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
 
     const netManquantes = r2(manquantes.reduce((s, m) => s + (m.sens === "entree" ? m.montant : -m.montant), 0));
     const netEnTrop = r2(enTrop.reduce((s, m) => s + (m.sens === "entree" ? m.montant : -m.montant), 0));
-    // Résiduel imputable au solde initial : une fois retirés les mouvements à importer,
-    // les écritures en trop ET les transactions encore en attente.
-    const ajustementBaseline = r2(ecart - (netManquantes - netEnTrop) - netEnAttente);
+    // Résiduel imputable au solde initial, une fois retirés les mouvements à importer
+    // et les écritures en trop. Les opérations en attente ne sont plus déduites : elles
+    // sont importées comme les autres et comptent déjà des deux côtés.
+    const ajustementBaseline = r2(ecart - (netManquantes - netEnTrop));
 
     return {
       ok: true, balanceQonto, soldeOutil, ecart, manquantes, enTrop,
@@ -423,12 +427,16 @@ export async function recupererJustificatifsQonto(): Promise<
  * en un seul clic. Ne remplace jamais un justificatif déjà présent.
  */
 /**
- * Recale la date des écritures DÉJÀ importées sur la date parisienne de leur
- * transaction. Les imports antérieurs découpaient l'horodatage UTC : toute opération
- * passée après 22 h UTC portait la veille. La synchro saute les transactions connues,
- * ces dates ne se seraient donc jamais corrigées d'elles-mêmes.
+ * Recale DATE et MONTANT des écritures déjà importées sur ce que dit Qonto.
+ *
+ * Deux raisons de repasser dessus, la synchro sautant les transactions connues :
+ *  — les imports antérieurs découpaient l'horodatage UTC, toute opération réglée
+ *    après 22 h UTC portait la veille ;
+ *  — une opération importée EN ATTENTE peut changer de montant à son règlement
+ *    (autorisation carte, pourboire, frais de change) et gagne alors sa date de
+ *    règlement, plus tardive que sa date d'émission.
  */
-async function corrigerDatesQonto(): Promise<number> {
+async function corrigerDonneesQonto(): Promise<number> {
   const supabase = await createClient();
   const { data: ent } = await supabase
     .from("parametres_entreprise")
@@ -438,18 +446,23 @@ async function corrigerDatesQonto(): Promise<number> {
   if (!ent?.qonto_login || !ent?.qonto_token || !ent?.qonto_account_slug) return 0;
 
   const txs = await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, undefined, true);
-  const bonneDate = new Map(txs.map((t) => [t.transaction_id, dateParis(t.settled_at ?? t.emitted_at)]));
+  const parId = new Map(txs.map((t) => [t.transaction_id, t]));
 
   const { data: rows } = await supabase
     .from("ecriture_financiere")
-    .select("id, date, qonto_transaction_id")
+    .select("id, date, montant_ttc, qonto_transaction_id")
     .not("qonto_transaction_id", "is", null);
 
   let corrigees = 0;
-  for (const e of (rows ?? []) as { id: string; date: string; qonto_transaction_id: string }[]) {
-    const attendue = bonneDate.get(e.qonto_transaction_id);
-    if (!attendue || attendue === e.date) continue;
-    await supabase.from("ecriture_financiere").update({ date: attendue }).eq("id", e.id);
+  for (const e of (rows ?? []) as { id: string; date: string; montant_ttc: number; qonto_transaction_id: string }[]) {
+    const tx = parId.get(e.qonto_transaction_id);
+    if (!tx) continue;
+    const patch: { date?: string; montant_ttc?: number } = {};
+    const date = dateParis(tx.settled_at ?? tx.emitted_at);
+    if (date && date !== e.date) patch.date = date;
+    if (Math.round(tx.amount * 100) !== Math.round(Number(e.montant_ttc) * 100)) patch.montant_ttc = tx.amount;
+    if (!Object.keys(patch).length) continue;
+    await supabase.from("ecriture_financiere").update(patch).eq("id", e.id);
     corrigees++;
   }
   return corrigees;
@@ -460,7 +473,10 @@ export async function syncGlobal(): Promise<
 > {
   const prev = await previewQonto();
   if (!prev.ok) return { ok: false, error: prev.error };
-  const propres = prev.items.filter((i) => !i.doublon && !i.pending);
+  // Les opérations EN ATTENTE sont importées elles aussi : Qonto les décompte déjà du
+  // solde du compte, les écarter creusait un trou permanent entre l'outil et la banque.
+  // Leur date et leur montant sont recalés au règlement par corrigerDonneesQonto.
+  const propres = prev.items.filter((i) => !i.doublon);
   const ignoresDoublons = prev.items.filter((i) => i.doublon).length;
   let importees = 0;
   if (propres.length) {
@@ -470,7 +486,7 @@ export async function syncGlobal(): Promise<
   }
   const j = await recupererJustificatifsQonto();
   const justificatifs = j.ok ? j.ajoutes : 0;
-  const datesCorrigees = await corrigerDatesQonto();
+  const datesCorrigees = await corrigerDonneesQonto();
   return { ok: true, importees, justificatifs, ignoresDoublons, datesCorrigees };
 }
 

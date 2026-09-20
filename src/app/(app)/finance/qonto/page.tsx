@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { FinanceTabs } from "../finance-tabs";
-import { fetchQontoOrg } from "@/lib/qonto";
+import { fetchQontoOrg, soldeDeReference } from "@/lib/qonto";
 import { chargerNomenclature, syntheseMensuelle } from "@/lib/finance";
 import { QontoSync } from "./qonto-sync";
 import { EmailFactures } from "./email-factures";
@@ -37,8 +37,8 @@ export default async function QontoPage({
   if (ent?.qonto_login && ent?.qonto_token) {
     try {
       const org = await fetchQontoOrg(ent.qonto_login, ent.qonto_token);
-      const compte = org.bank_accounts.find((a) => a.slug === ent.qonto_account_slug);
-      balanceQonto = compte?.balance ?? org.bank_accounts[0]?.balance ?? null;
+      const compte = org.bank_accounts.find((a) => a.slug === ent.qonto_account_slug) ?? org.bank_accounts[0];
+      balanceQonto = soldeDeReference(compte);
     } catch {
       // pas bloquant
     }

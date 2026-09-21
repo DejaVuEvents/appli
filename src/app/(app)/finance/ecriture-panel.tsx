@@ -6,6 +6,7 @@ import Link from "next/link";
 import { deleteEcriture, setValideEcriture, ajouterJustificatifs, rattacherEcritureAFacture } from "./actions";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import { SubmitButton } from "@/components/submit-button";
+import { FileDropzone } from "@/components/file-dropzone";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { typeLabel } from "@/lib/finance";
 import { euros, dateFr } from "@/lib/format";
@@ -45,6 +46,7 @@ export function EcriturePanel({
   onClose: () => void;
 }) {
   const [delOpen, setDelOpen] = useState(false);
+  const [fichierJustif, setFichierJustif] = useState<File | null>(null);
   const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
   const factureRef = !factureUrl && e.facture ? e.facture : null;
   // Les justificatifs d'une écriture issue d'une NOTE DE FRAIS vivent sur la note,
@@ -146,12 +148,20 @@ export function EcriturePanel({
           {missingDoc && (
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm text-orange-800 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300">
               <div className="mb-2 flex items-center gap-2"><span>⚠</span><span>Aucun document joint à cette écriture.</span></div>
+              {/* Une seule action : la zone sert à choisir OU déposer, le bouton n'apparaît
+                  qu'une fois un fichier retenu. Le « Choose Files » du navigateur, en
+                  anglais et redondant avec le bouton d'envoi, disparaît. */}
               <form action={ajouterJustificatifs.bind(null, e.id)} className="space-y-2">
-                <input
-                  type="file" name="justificatifs" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"
-                  className="block w-full text-xs text-orange-900/80 file:mr-2 file:rounded-lg file:border-0 file:bg-orange-600 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white dark:text-orange-200"
+                <FileDropzone
+                  name="justificatifs"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  multiple
+                  libelle="Glisser un justificatif ici, ou cliquer pour choisir"
+                  onFile={setFichierJustif}
                 />
-                <SubmitButton pendingLabel="Ajout…" className="!py-1.5 !text-xs">Associer un document</SubmitButton>
+                {fichierJustif && (
+                  <SubmitButton pendingLabel="Ajout…" className="!py-1.5 !text-xs">Associer</SubmitButton>
+                )}
               </form>
             </div>
           )}

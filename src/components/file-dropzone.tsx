@@ -8,11 +8,14 @@ export function FileDropzone({
   accept,
   maxMo = 4,
   libelle,
+  multiple = false,
   onFile,
 }: {
   name: string;
   accept?: string;
   maxMo?: number;
+  /** Autorise plusieurs fichiers d'un coup (plusieurs justificatifs pour une écriture). */
+  multiple?: boolean;
   /** Texte affiché tant qu'aucun fichier n'est choisi. */
   libelle?: string;
   /** Prévient le parent du fichier retenu (null si retiré), pour dévoiler la suite du formulaire. */
@@ -29,18 +32,19 @@ export function FileDropzone({
 
   function assign(files: FileList | null) {
     if (!ref.current || !files || !files.length) return;
-    const f = files[0];
-    if (tropLourd(f)) {
-      setErreur(`« ${f.name} » fait ${(f.size / 1024 / 1024).toFixed(1)} Mo — maximum ${maxMo} Mo. Compresse le fichier ou photographie le justificatif.`);
+    const liste = Array.from(files);
+    const lourd = liste.find(tropLourd);
+    if (lourd) {
+      setErreur(`« ${lourd.name} » fait ${(lourd.size / 1024 / 1024).toFixed(1)} Mo — maximum ${maxMo} Mo. Compresse le fichier ou photographie le justificatif.`);
       setFileName(null);
       ref.current.value = "";
       onFile?.(null);
       return;
     }
     ref.current.files = files; // les fichiers déposés deviennent ceux de l'input → soumis avec le form
-    setFileName(f.name);
+    setFileName(liste.length > 1 ? `${liste.length} fichiers` : liste[0].name);
     setErreur(null);
-    onFile?.(f);
+    onFile?.(liste[0]);
   }
 
   return (
@@ -58,6 +62,7 @@ export function FileDropzone({
         type="file"
         name={name}
         accept={accept}
+        multiple={multiple}
         className="hidden"
         onChange={(e) => assign(e.target.files)}
       />

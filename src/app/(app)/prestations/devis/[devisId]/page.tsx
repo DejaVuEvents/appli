@@ -607,7 +607,11 @@ export default async function DevisEditorPage({
         supabase={supabase}
       />
 
-      <DisponibiliteSection prestationId={prestationId} periode={periode} besoin={besoin} />
+      {/* Une VENTE ne se réserve pas : le matériel quitte le parc, il n'est pas
+          immobilisé sur des dates. La section n'a donc pas lieu d'être. */}
+      {devis.nature !== "vente" && (
+        <DisponibiliteSection prestationId={prestationId} periode={periode} besoin={besoin} />
+      )}
     </div>
   );
 }

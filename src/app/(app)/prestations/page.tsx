@@ -2,8 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { Modal } from "@/components/modal";
-import { PrestationForm } from "./prestation-form";
-import { createPrestation } from "./actions";
+import { NouveauDocumentForm } from "./nouveau-document-form";
+import { creerDocument } from "./actions";
 import { DocsSection, type DocRow } from "./docs-section";
 import { ImportPdf } from "./import-pdf";
 import { calculerTotaux, type RemiseType } from "@/lib/devis";
@@ -14,9 +14,12 @@ async function chargerModales(supabase: Awaited<ReturnType<typeof createClient>>
   const [{ data: clientsData }, { data: devisData }, { data: prestData }] = await Promise.all([
     supabase.from("client").select("id, nom").order("nom"),
     supabase.from("devis").select("id, nom, type, prestation:prestation_id(nom)").order("created_at", { ascending: false }),
-    supabase.from("prestation").select("id, nom").order("date_event_debut", { ascending: false }),
+    // Événements proposés au rattachement d'un document : pas les prestations
+    // support d'une location, qui ont leur propre écran.
+    supabase.from("prestation").select("id, nom, date_event_debut").eq("est_evenement", true)
+      .order("date_event_debut", { ascending: false }),
   ]);
-  const prestations = (prestData ?? []) as { id: string; nom: string }[];
+  const prestations = (prestData ?? []) as { id: string; nom: string; date_event_debut: string | null }[];
   const clients = (clientsData ?? []) as { id: string; nom: string }[];
   const modeles = ((devisData ?? []) as unknown as DevisModeleRow[]).map((d) => ({
     id: d.id,
@@ -24,15 +27,14 @@ async function chargerModales(supabase: Awaited<ReturnType<typeof createClient>>
   }));
   const creerDevis = (
     <Modal trigger="+ Créer un devis" title="Créer un devis">
-      <p className="mb-4 text-sm text-muted">Nouveau devis dans un nouvel événement — vierge, ou copié d&apos;un devis existant.</p>
-      <PrestationForm action={createPrestation} clients={clients} cancelHref="/prestations" inModal type="devis" devisModeles={modeles} />
+      <NouveauDocumentForm action={creerDocument} clients={clients} evenements={prestations} type="devis" />
       <ImportPdf clients={clients} prestations={prestations} defaultType="devis" />
     </Modal>
   );
   const creerFacture = (
     <Modal trigger="+ Créer une facture" title="Créer une facture">
-      <p className="mb-4 text-sm text-muted">Nouvelle facture — vierge, ou à partir d&apos;un devis existant. (Depuis un devis déjà ouvert, tu peux aussi utiliser « Transformer en facture ».)</p>
-      <PrestationForm action={createPrestation} clients={clients} cancelHref="/prestations" inModal type="facture" devisModeles={modeles} />
+      <p className="mb-4 text-sm text-muted">Depuis un devis déjà ouvert, tu peux aussi utiliser « Transformer en facture ».</p>
+      <NouveauDocumentForm action={creerDocument} clients={clients} evenements={prestations} devisModeles={modeles} type="facture" />
       <ImportPdf clients={clients} prestations={prestations} defaultType="facture" />
     </Modal>
   );

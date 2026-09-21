@@ -138,20 +138,24 @@ export function LigneForm({
             </div>
           )}
         </div>
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium">Catégorie</span>
-          <select
-            name="categorie_id"
-            value={categorieId}
-            onChange={(e) => setCategorieId(e.target.value)}
-            className={input}
-          >
-            <option value="">— Aucune —</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.nom}</option>
-            ))}
-          </select>
-        </label>
+        {/* Sans catégorie proposée (devis de vente), le champ n'offrait que
+            « — Aucune — » : on le masque au lieu d'afficher un choix vide. */}
+        {categories.length > 0 && (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Catégorie</span>
+            <select
+              name="categorie_id"
+              value={categorieId}
+              onChange={(e) => setCategorieId(e.target.value)}
+              className={input}
+            >
+              <option value="">— Aucune —</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       <label className="block">

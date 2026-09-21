@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getMembreActuel } from "@/lib/membre";
+import { createClient } from "@/lib/supabase/server";
 
 export type EventTab = "infos" | "devis" | "technique" | "planification" | "preparation";
 
@@ -24,7 +25,14 @@ function tabHref(eventId: string, tab: EventTab): string {
 export async function EventTabBar({ eventId, active }: { eventId: string; active: EventTab }) {
   // Le rôle technique n'a pas accès aux devis/factures → on masque l'onglet.
   const moi = await getMembreActuel();
-  const tabs = moi?.role === "co_president" ? TABS : TABS.filter((t) => t.key !== "devis");
+  let tabs = moi?.role === "co_president" ? TABS : TABS.filter((t) => t.key !== "devis");
+
+  // Une VENTE de matériel n'est pas un événement : rien à calculer techniquement,
+  // rien à planifier, rien à charger ni à rendre. On ne garde que Infos et Documents.
+  const supabase = await createClient();
+  const { data: docs } = await supabase.from("devis").select("nature").eq("prestation_id", eventId);
+  const vente = (docs ?? []).length > 0 && (docs ?? []).every((d) => d.nature === "vente");
+  if (vente) tabs = tabs.filter((t) => t.key === "infos" || t.key === "devis");
   return (
     <div className="print:hidden">
       <Link href="/planification" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← Événements</Link>

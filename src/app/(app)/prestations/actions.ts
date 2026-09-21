@@ -1093,3 +1093,62 @@ export async function recalculerSolde(devisId: string) {
   revalidatePath(`/prestations/devis/${devisId}`);
   redirect(`/prestations/devis/${devisId}?msg=${encodeURIComponent(`Solde mis à jour : ${ecart.soldeAttendu.toFixed(2)} €`)}`);
 }
+
+/**
+ * Création d'un devis ou d'une facture depuis la liste « Devis & Factures ».
+ *
+ * On nomme le DOCUMENT, pas l'événement. L'événement ne vient qu'ensuite, et
+ * seulement s'il a un sens : une vente de matériel n'en a pas, une prestation se
+ * rattache à un événement existant ou en crée un avec ses dates.
+ */
+export async function creerDocument(formData: FormData) {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const type = str(formData.get("devis_type")) === "facture" ? "facture" : "devis";
+  const nature = str(formData.get("devis_nature")) === "vente" ? "vente" : "location";
+  const nomDocument = String(formData.get("devis_nom") ?? "").trim()
+    || (type === "facture" ? "Facture" : "Devis");
+  const source = str(formData.get("source_devis_id"));
+
+  // Rattachement : événement choisi, sinon on en crée un. Une vente n'a pas
+  // d'événement — sa prestation ne sert que de conteneur et porte le nom du document.
+  let prestationId: string = str(formData.get("prestation_id")) ?? "";
+  if (!prestationId) {
+    const estVente = type === "devis" && nature === "vente";
+    const { data, error } = await supabase
+      .from("prestation")
+      .insert({
+        nom: estVente ? nomDocument : String(formData.get("nom") ?? "").trim() || nomDocument,
+        client_id: str(formData.get("client_id")),
+        lieu: estVente ? null : str(formData.get("lieu")),
+        date_event_debut: estVente ? null : str(formData.get("date_event_debut")),
+        date_event_fin: estVente ? null : str(formData.get("date_event_fin")),
+        statut: "brouillon",
+        est_evenement: true,
+        created_by: user?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    prestationId = data.id;
+  }
+
+  let devisId: string | null = null;
+  if (source) {
+    devisId = await copierDevisDans(supabase, source, prestationId, user?.id ?? null, type);
+    if (devisId) await supabase.from("devis").update({ nom: nomDocument }).eq("id", devisId);
+  }
+  if (!devisId) {
+    const { data: devis, error } = await supabase
+      .from("devis")
+      .insert({ prestation_id: prestationId, nom: nomDocument, type, nature, created_by: user?.id ?? null })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    devisId = devis?.id ?? null;
+  }
+
+  revalidatePath("/prestations");
+  redirect(devisId ? `/prestations/devis/${devisId}?edit=1` : `/prestations/${prestationId}`);
+}

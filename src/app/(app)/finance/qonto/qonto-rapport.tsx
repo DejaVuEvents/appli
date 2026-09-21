@@ -80,8 +80,8 @@ export function QontoRapport({
                     {rap.enAttente.length} transaction(s) en attente de règlement — rien à faire
                   </div>
                   <p className="mb-2 text-xs text-muted">
-                    Qonto les compte déjà dans le solde du compte, mais elles peuvent encore changer :
-                    la synchronisation ne les importe qu'une fois réglées. L'écart se résorbera tout seul.
+                    Elles sont importées comme les autres — Qonto les décompte déjà du solde — et
+                    leur date comme leur montant seront recalés à leur règlement. Rien à faire.
                   </p>
                   <div className="max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border">
                     {rap.enAttente.map((t, i) => (

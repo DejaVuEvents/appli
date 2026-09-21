@@ -86,6 +86,10 @@ export async function previewQonto(): Promise<
 
     const items: QontoPreviewItem[] = txs
       .filter((t) => !importedIds.has(t.transaction_id))
+      // Autorisations de carte à 0 € (« GOOGLE *CHROME TEMP », « FACEBK »…) : Qonto les
+      // affiche, mais elles ne se règlent jamais et ne déplacent aucun euro. Les importer
+      // n'ajoutait que du bruit dans le journal.
+      .filter((t) => Math.round(t.amount * 100) !== 0)
       .map((t) => {
         const cat = mapQontoCategorie(
           t.side,
@@ -176,12 +180,14 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
     const toutes = await fetchQontoTransactions(
       ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, undefined, true,
     );
-    const txs = toutes.filter((t) => dateParis(t.settled_at ?? t.emitted_at) >= baseline);
+    const txs = toutes.filter(
+      (t) => dateParis(t.settled_at ?? t.emitted_at) >= baseline && Math.round(t.amount * 100) !== 0,
+    );
 
     // Purement informatif : ces opérations SONT importées, elles ne creusent donc plus
     // d'écart. On les signale seulement parce que leur montant peut encore bouger.
     const enAttente = toutes
-      .filter((t) => t.status !== "completed")
+      .filter((t) => t.status !== "completed" && Math.round(t.amount * 100) !== 0)
       .map((t) => ({
         date: dateParis(t.settled_at ?? t.emitted_at),
         label: t.label,
@@ -482,7 +488,9 @@ async function corrigerDonneesQonto(): Promise<{ corrigees: number; disparues: n
   // Miroir : une transaction retirée de Qonto (autorisation temporaire, caution
   // relâchée, opération annulée) doit disparaître de l'outil, sinon le solde reste
   // grevé d'un mouvement qui n'a jamais eu lieu.
-  const connues = new Set(txs.map((t) => t.transaction_id));
+  const connues = new Set(
+    txs.filter((t) => Math.round(t.amount * 100) !== 0).map((t) => t.transaction_id),
+  );
   const orphelines = ((rows ?? []) as { id: string; qonto_transaction_id: string }[])
     .filter((e) => !connues.has(e.qonto_transaction_id));
 

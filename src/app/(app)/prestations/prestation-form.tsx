@@ -30,6 +30,16 @@ function Fields({
   return (
     <div className="space-y-4">
       {type && <input type="hidden" name="devis_type" value={type} />}
+      {type === "devis" && (
+        <Select
+          label="Nature du devis"
+          name="devis_nature"
+          options={[
+            { value: "location", label: "Location / prestation — facturée à la durée" },
+            { value: "vente", label: "Vente de matériel — prix unitaires, installation" },
+          ]}
+        />
+      )}
       <Field label="Nom de l'événement" name="nom" required defaultValue={prestation?.nom} placeholder="Festival X — scène principale" />
       <div className="grid gap-4 sm:grid-cols-2">
         <Select

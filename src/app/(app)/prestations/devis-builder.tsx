@@ -167,7 +167,10 @@ export async function DevisBuilder(props: {
   }
 
   // Coefficient multi-jours appliqué au TOTAL final (coef × total).
-  const coeff = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
+  // Une VENTE se facture au prix unitaire : la durée n'a aucun sens, le coefficient
+  // est neutralisé quoi qu'il y ait en base.
+  const estVente = devis.nature === "vente";
+  const coeff = estVente ? 1 : Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
 
   // Marge sous-location (coût fournisseur et revenu matos externe suivent la durée).
   const coutFournisseurTotal = coeff * lignes.reduce((s, l) => {
@@ -199,6 +202,12 @@ export async function DevisBuilder(props: {
     <div className="lg:flex lg:items-start lg:gap-6">
       {/* Colonne principale : catégories + transport + remise + marge */}
       <div className="min-w-0 flex-1 space-y-6">
+        {estVente && (
+          <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
+            Devis de <strong className="text-foreground">vente</strong> — prix unitaires, sans coefficient
+            de durée. Pense à sortir les unités vendues de l&apos;inventaire après livraison.
+          </p>
+        )}
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
         <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} />
 
@@ -216,6 +225,8 @@ export async function DevisBuilder(props: {
           </Card>
         </section>
 
+        {!estVente && (
+          <>
         {/* Durée / coefficient multi-jours */}
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Durée (tarif multi-jours)</h2>
@@ -241,6 +252,8 @@ export async function DevisBuilder(props: {
             </form>
           </Card>
         </section>
+          </>
+        )}
 
         {/* Marge sous-location */}
         {hasMargeFournisseur && (

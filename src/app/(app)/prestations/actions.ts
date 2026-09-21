@@ -307,6 +307,8 @@ export async function createPrestation(formData: FormData) {
   if (error) throw new Error(error.message);
 
   const type = str(formData.get("devis_type")) === "facture" ? "facture" : "devis";
+  // Vente de matériel : prix unitaires, ni durée ni dégressif (cf. devis.nature).
+  const nature = str(formData.get("devis_nature")) === "vente" ? "vente" : "location";
   const source = str(formData.get("source_devis_id"));
 
   let devisId: string | null = null;
@@ -317,7 +319,11 @@ export async function createPrestation(formData: FormData) {
   if (!devisId) {
     const { data: devis } = await supabase
       .from("devis")
-      .insert({ prestation_id: data.id, nom: type === "facture" ? "Facture" : "Devis", type, created_by: user?.id ?? null })
+      .insert({
+        prestation_id: data.id,
+        nom: type === "facture" ? "Facture" : nature === "vente" ? "Devis de vente" : "Devis",
+        type, nature, created_by: user?.id ?? null,
+      })
       .select("id")
       .single();
     devisId = devis?.id ?? null;

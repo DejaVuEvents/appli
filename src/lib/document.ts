@@ -38,7 +38,7 @@ export async function assemblerContenuDocument(
 ): Promise<DocContenu | null> {
   const { data: devisData } = await supabase
     .from("devis")
-    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur, coefficient_duree")
+    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur, coefficient_duree, nature")
     .eq("id", devisId)
     .single();
   if (!devisData) return null;
@@ -93,7 +93,12 @@ export async function assemblerContenuDocument(
   type CatRow = { id: string; nom: string; parent_id: string | null; ordre: number | null };
   const catById = new Map((cats ?? []).map((c) => [c.id, c as CatRow]));
   const transportTotal = (transports ?? []).reduce((s, t) => s + Number(t.cout_calcule ?? 0), 0);
-  const coefficientDuree = Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
+  // Une vente se facture au prix unitaire : pas de durée, donc pas de coefficient,
+  // et pas de ligne « Location sur plusieurs jours » sur le document.
+  const estVente = (devis as { nature?: string }).nature === "vente";
+  const coefficientDuree = estVente
+    ? 1
+    : Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
   const totaux = calculerTotaux({
     lignes,
     transportTotal,

@@ -165,6 +165,8 @@ export interface Devis {
   remise_globale_valeur: number;
   remise_globale_libelle: string | null;
   coefficient_duree: number | null;
+  /** « location » (défaut) ou « vente » : cession de matériel, prix unitaires, sans durée. */
+  nature?: "location" | "vente";
   source_devis_id: string | null;
   created_by: string | null;
   created_at: string;

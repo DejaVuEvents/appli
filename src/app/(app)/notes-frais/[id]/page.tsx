@@ -58,6 +58,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
   const estDemandeur = membre?.id === ndf.demandeur_id;
   const editable = ndf.statut === "brouillon" && estDemandeur;
   const peutValider = membre?.role === "co_president" && !estDemandeur && ndf.statut === "soumise";
+  // Le demandeur peut être quelqu'un d'autre : c'est SA signature qui doit exister,
+  // pas celle de la personne qui consulte.
+  const { data: fiche } = ndf.demandeur_id
+    ? await supabase.from("membre").select("signature_url").eq("id", ndf.demandeur_id).maybeSingle()
+    : { data: null };
+  const signatureReelle = !!ndf.demandeur_signe_le && !!fiche?.signature_url;
   const estPredepense = ndf.type_ndf === "predepense";
   const isCoPres = membre?.role === "co_president";
   // « Remboursée » = l'écriture de trésorerie liée est passée en réel.
@@ -116,6 +122,16 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         }
       />
 
+      {!estPredepense && (ndf.statut === "validee" || estRemboursee) && !signatureReelle && (
+        <Card className="border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-950/20 dark:text-red-300">
+          <strong>⚠ Note traitée sans signature</strong>
+          <div className="mt-1">
+            {estRemboursee ? "Elle a été remboursée" : "Elle a été validée"} alors que le document ne
+            porte aucune signature du demandeur. Fais-la signer a posteriori : la pièce comptable doit
+            l&apos;être.
+          </div>
+        </Card>
+      )}
       {ndf.statut === "soumise" && (
         <Card className="border-primary/30 bg-primary/5 p-4 text-sm">
           <strong>Soumise</strong> — en attente de validation par un co-président autre que le demandeur.
@@ -333,7 +349,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
       )}
 
       {/* Signature du demandeur (lu et approuvé) */}
-      {estDemandeur && !estPredepense && (
+      {estDemandeur && !estPredepense && (editable || !signatureReelle) && (
         <Card className="p-4">
           {ndf.demandeur_signe_le ? (
             <p className="text-sm text-green-700">✓ Tu as signé cette note le {dateFr(ndf.demandeur_signe_le)} (« lu et approuvé »).</p>
@@ -414,7 +430,15 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           <p className="text-sm text-muted">Tu es le demandeur : un <strong>autre</strong> co-président doit valider.</p>
         )}
 
-        {peutValider && (
+        {peutValider && !estPredepense && !signatureReelle && (
+          <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-950/20 dark:text-red-300">
+            <strong>Validation bloquée</strong> — cette note ne porte pas de signature.
+            {!ndf.demandeur_signe_le
+              ? " Son demandeur doit la signer avant que tu puisses la valider."
+              : ` ${demandeur} n'a aucune signature enregistrée : le document produit n'en porterait aucune.`}
+          </div>
+        )}
+        {peutValider && (estPredepense || signatureReelle) && (
           <div className="space-y-3">
             <form action={validerNDF.bind(null, id)}>
               {estPredepense ? (
@@ -428,6 +452,12 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
               <SubmitButton variant="danger" confirm="Refuser cette note de frais ?">Refuser</SubmitButton>
             </form>
           </div>
+        )}
+        {peutValider && !estPredepense && !signatureReelle && (
+          <form action={refuserNDF.bind(null, id)} className="flex flex-wrap items-end gap-2">
+            <Field label="Motif de refus" name="motif" className="flex-1 min-w-[12rem]" placeholder="Signature manquante…" />
+            <SubmitButton variant="danger" confirm="Refuser cette note de frais ?">Refuser</SubmitButton>
+          </form>
         )}
 
         {(ndf.statut === "validee" || ndf.statut === "refusee") && estDemandeur && (

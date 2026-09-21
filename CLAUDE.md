@@ -79,6 +79,10 @@ Points clés à NE PAS casser :
 - **Une validation serveur a toujours son pendant visible.** Toute règle qui fait échouer
   une Server Action (`throw`) doit être évaluée aussi à l'affichage : Next.js masque le
   message des Server Actions en production, l'utilisateur ne verrait qu'une page d'erreur.
+- **Un import ne contourne jamais un contrôle.** Reprendre un document créé ailleurs ne
+  doit pas poser à sa place un état que l'outil vérifie normalement (signature, validation,
+  paiement). Une NDF importée avec une signature supposée a été validée puis remboursée
+  sans qu'aucune signature n'existe.
 
 ## État actuel
 

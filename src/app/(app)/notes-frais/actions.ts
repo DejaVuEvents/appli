@@ -112,8 +112,10 @@ export async function importerNoteFrais(formData: FormData) {
     .insert({
       numero: await numeroNDF(supabase),
       titre, date, demandeur_id: demandeurId, type_ndf: "depense",
-      // La note existe sur papier, signée : on reprend la signature dans les deux cas.
-      demandeur_signe_le: maintenant,
+      // On NE pose PAS demandeur_signe_le : l'import n'a aucun moyen de savoir si la
+      // note est signée, et le champ signifie « signée dans l'outil avec la signature
+      // enregistrée ». Le poser revenait à affirmer une signature inexistante, et à
+      // contourner le contrôle que soumettreNDF applique par ailleurs.
       ...(archive
         ? { statut: "validee", valide_par: membre?.id ?? null, valide_le: maintenant }
         : { statut: "soumise" }),
@@ -400,6 +402,34 @@ export async function repasserBrouillonNDF(noteId: string) {
   revalidatePath("/finance");
 }
 
+/**
+ * Refuse d'aller plus loin si la note n'est pas RÉELLEMENT signée.
+ *
+ * Deux conditions, et pas une : l'horodatage de signature ET une signature
+ * enregistrée chez le demandeur. Sans la seconde, le document produit ne porte
+ * aucune signature — une note a été validée puis remboursée dans cet état.
+ */
+async function assertSignee(supabase: Supa, noteId: string, demandeurId: string | null) {
+  const { data: n } = await supabase
+    .from("note_frais")
+    .select("type_ndf, demandeur_signe_le")
+    .eq("id", noteId)
+    .maybeSingle();
+  if (n?.type_ndf === "predepense") return; // autorisation d'achat : pas de justificatif à signer
+  if (!n?.demandeur_signe_le) {
+    throw new Error("Cette note n'est pas signée par son demandeur : elle ne peut pas être validée.");
+  }
+  const { data: dem } = demandeurId
+    ? await supabase.from("membre").select("signature_url").eq("id", demandeurId).maybeSingle()
+    : { data: null };
+  if (!dem?.signature_url) {
+    throw new Error(
+      "Le demandeur n'a aucune signature enregistrée : le document ne porterait aucune signature. "
+      + "Qu'il l'ajoute dans Paramètres → Mon compte, puis signe la note.",
+    );
+  }
+}
+
 export async function validerNDF(noteId: string) {
   const supabase = await createSupabase();
   const membre = await getMembreActuel(supabase);
@@ -412,6 +442,7 @@ export async function validerNDF(noteId: string) {
     .single();
   if (!ndf || ndf.statut !== "soumise") throw new Error("Note de frais introuvable ou non soumise.");
   if (ndf.demandeur_id === membre.id) throw new Error("Le demandeur ne peut pas valider sa propre note de frais.");
+  await assertSignee(supabase, ndf.id, ndf.demandeur_id);
 
   // Pré-dépense : validation = autorisation d'achat AVANT dépense (pas d'écriture de trésorerie).
   if (ndf.type_ndf === "predepense") {
@@ -564,6 +595,8 @@ export async function marquerNDFRemboursee(noteId: string, formData?: FormData) 
   const { data: n } = await supabase.from("note_frais").select("ecriture_id, statut").eq("id", noteId).maybeSingle();
   if (!n?.ecriture_id) throw new Error("Aucune écriture de trésorerie liée à cette note.");
   if (n.statut !== "validee") throw new Error("La note doit être validée avant d'être remboursée.");
+  const { data: dm } = await supabase.from("note_frais").select("demandeur_id").eq("id", noteId).maybeSingle();
+  await assertSignee(supabase, noteId, dm?.demandeur_id ?? null);
   const dateVirement = str(formData?.get("date_virement") ?? null) ?? new Date().toISOString().slice(0, 10);
   await supabase
     .from("ecriture_financiere")

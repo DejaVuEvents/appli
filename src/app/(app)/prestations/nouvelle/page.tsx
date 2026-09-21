@@ -9,7 +9,7 @@ export default async function NouvellePrestationPage() {
 
   return (
     <div>
-      <PageHeader title="Nouvelle prestation" />
+      <PageHeader title="Nouvel événement" />
       <PrestationForm action={createPrestation} clients={data ?? []} cancelHref="/prestations" />
     </div>
   );

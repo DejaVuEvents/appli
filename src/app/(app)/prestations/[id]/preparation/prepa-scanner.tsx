@@ -20,7 +20,7 @@ function resultToFeedback(r: ResultatScan): Feedback {
         : `Cette unité n'est pas prévue et toutes les « ${r.refNom} » prévues sont déjà chargées.`,
       attendus: r.attendus,
     };
-    case "hors_presta": return { kind: "warn", title: `⚠ ${r.label} n'est pas prévu pour cette prestation` };
+    case "hors_presta": return { kind: "warn", title: `⚠ ${r.label} n'est pas prévu pour cet événement` };
     case "inconnu": return { kind: "warn", title: "⚠ Étiquette inconnue", detail: r.code };
   }
 }

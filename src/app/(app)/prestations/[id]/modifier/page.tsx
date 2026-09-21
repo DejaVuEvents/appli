@@ -20,7 +20,7 @@ export default async function ModifierPrestationPage({
 
   return (
     <div>
-      <PageHeader title="Modifier la prestation" />
+      <PageHeader title="Modifier l&apos;événement" />
       <PrestationForm
         action={updatePrestation.bind(null, id)}
         prestation={prest as Prestation}

@@ -88,6 +88,14 @@ Points clés à NE PAS casser :
   en disparaît (autorisation temporaire, caution relâchée) est retirée à la synchro
   suivante. Ne jamais refuser une transaction bancaire au motif qu'elle ressemble à une
   saisie : c'est la saisie sans origine bancaire qui est l'anomalie.
+- **Un seul mot par objet, partout.** L'entité s'appelle « événement » à l'écran (la table
+  s'appelle `prestation`, c'est un détail technique) ; un sélecteur qui mélange événements
+  et locations le dit. Les accords suivent le mot : passer des phrases complètes plutôt
+  qu'un mot à insérer, sinon on obtient « Aucune événement ».
+- **Un écran s'adapte à la nature de ce qu'il montre.** Un devis de vente n'a ni durée, ni
+  familles de matériel, ni disponibilité, ni préparation : ces blocs disparaissent au lieu
+  de s'afficher vides. Vérifier chaque nature (événement/location, devis/facture,
+  location/vente) avant de considérer un écran terminé.
 
 ## État actuel
 

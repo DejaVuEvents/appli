@@ -118,12 +118,12 @@ export function EcritureForm({
         </label>
         {prestations.length > 0 && (
           <label className="block">
-            <span className="mb-1 block text-sm font-medium">Prestation liée</span>
+            <span className="mb-1 block text-sm font-medium">Événement ou location</span>
             <SelecteurPrestation
               name="prestation_id"
               defaultValue={ecriture?.prestation_id ?? ""}
               options={prestations.map((p) => ({ id: p.id, nom: p.nom, date: p.date_event_debut, estEvenement: p.est_evenement }))}
-              placeholder="Aucun événement — cliquer pour chercher"
+              placeholder="Aucun — cliquer pour chercher"
             />
           </label>
         )}

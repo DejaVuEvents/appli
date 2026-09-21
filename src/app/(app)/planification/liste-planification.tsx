@@ -15,12 +15,14 @@ export type Entree = { cle: string; node: ReactNode };
 export function ListePlanification({
   aVenir,
   passees,
-  motVide,
+  libelles,
   descriptionVide,
 }: {
   aVenir: Entree[];
   passees: Entree[];
-  motVide: string;
+  /** Phrases complètes : « événement » est masculin, « location » féminine — un simple
+   *  mot à insérer produisait « Aucune événement ». */
+  libelles: { chercher: string; aucunAVenir: string; aucunPasse: string };
   descriptionVide: string;
 }) {
   const [q, setQ] = useState("");
@@ -43,7 +45,7 @@ export function ListePlanification({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={`Rechercher une ${motVide}… (nom, client, lieu, date)`}
+          placeholder={libelles.chercher}
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         {q && (
@@ -63,7 +65,7 @@ export function ListePlanification({
         </h2>
         {futures.length === 0 ? (
           <Card className="px-4 py-3 text-sm text-muted">
-            {recherche ? "Aucun résultat." : `Aucune ${motVide} à venir.`}
+            {recherche ? "Aucun résultat." : libelles.aucunAVenir}
           </Card>
         ) : (
           <Card className="divide-y divide-border overflow-hidden">{futures.map((e) => e.node)}</Card>
@@ -91,7 +93,7 @@ export function ListePlanification({
             recherche ? (
               <Card className="px-4 py-3 text-sm text-muted">Aucun résultat.</Card>
             ) : (
-              <EmptyState title={`Aucune ${motVide} passée`} description={descriptionVide} />
+              <EmptyState title={libelles.aucunPasse} description={descriptionVide} />
             )
           ) : (
             <Card className="divide-y divide-border overflow-hidden">{anciennes.map((e) => e.node)}</Card>

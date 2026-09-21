@@ -26,7 +26,7 @@ export async function DisponibiliteSection({
       <section>
         {titre}
         <Card className="px-4 py-4 text-sm text-muted">
-          Renseigne les dates de <strong>préparation</strong> et de <strong>retour</strong> de la prestation
+          Renseigne les dates de <strong>préparation</strong> et de <strong>retour</strong> de l&apos;événement
           pour vérifier la disponibilité et réserver des unités.
         </Card>
       </section>

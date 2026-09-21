@@ -188,7 +188,7 @@ export function EcriturePanel({
           {/* Prestation */}
           {prestation && (
             <div className="rounded-lg border border-border bg-surface p-3 text-sm">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Prestation liée</p>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Événement ou location</p>
               <p className="font-medium">{prestation.nom}</p>
               {prestation.client?.nom && (
                 <p className="text-xs text-muted">{prestation.client.nom}</p>

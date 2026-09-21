@@ -325,7 +325,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           <ModalForm action={ajouterTrajetNDF.bind(null, id)} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Départ (adresse / ville)" name="depart" placeholder="19 rue Achille Viadieu, Toulouse" />
-              <Field label="Arrivée (adresse / ville)" name="arrivee" placeholder="Lieu de la prestation" />
+              <Field label="Arrivée (adresse / ville)" name="arrivee" placeholder="Lieu de l&apos;événement" />
             </div>
             <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
               <Field label="Date" name="date" type="date" />

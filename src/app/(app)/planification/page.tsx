@@ -143,7 +143,18 @@ export default async function PlanificationPage({ searchParams }: { searchParams
     estLoc
       ? (av ? locAVenir : locPassees).map((l) => ({ cle: cleL(l), node: <LocRow key={l.id} l={l} /> }))
       : (av ? aVenir : passees).map((p) => ({ cle: cleP(p), node: <Row key={p.id} p={p} /> }));
-  const motVide = estLoc ? "location" : "prestation";
+  // L'onglet s'appelle « Événements » : le vocabulaire des messages doit suivre.
+  const libelles = estLoc
+    ? {
+        chercher: "Rechercher une location… (nom, client, lieu, date)",
+        aucunAVenir: "Aucune location à venir.",
+        aucunPasse: "Aucune location passée",
+      }
+    : {
+        chercher: "Rechercher un événement… (nom, client, lieu, date)",
+        aucunAVenir: "Aucun événement à venir.",
+        aucunPasse: "Aucun événement passé",
+      };
 
   return (
     <div className="max-w-6xl">
@@ -155,8 +166,8 @@ export default async function PlanificationPage({ searchParams }: { searchParams
       <ListePlanification
         aVenir={entrees(true)}
         passees={entrees(false)}
-        motVide={motVide}
-        descriptionVide={estLoc ? "Les locations terminées apparaîtront ici." : "Les prestations terminées apparaîtront ici."}
+        libelles={libelles}
+        descriptionVide={estLoc ? "Les locations terminées apparaîtront ici." : "Les événements terminés apparaîtront ici."}
       />
 
     </div>

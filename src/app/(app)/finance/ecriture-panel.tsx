@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { deleteEcriture, setValideEcriture, ajouterJustificatifs, rattacherEcritureAFacture } from "./actions";
@@ -46,7 +46,8 @@ export function EcriturePanel({
   onClose: () => void;
 }) {
   const [delOpen, setDelOpen] = useState(false);
-  const [fichierJustif, setFichierJustif] = useState<File | null>(null);
+  const formJustif = useRef<HTMLFormElement>(null);
+  const [envoiJustif, setEnvoiJustif] = useState(false);
   const factureUrl = e.facture?.startsWith("https://") ? e.facture : null;
   const factureRef = !factureUrl && e.facture ? e.facture : null;
   // Les justificatifs d'une écriture issue d'une NOTE DE FRAIS vivent sur la note,
@@ -148,20 +149,21 @@ export function EcriturePanel({
           {missingDoc && (
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm text-orange-800 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300">
               <div className="mb-2 flex items-center gap-2"><span>⚠</span><span>Aucun document joint à cette écriture.</span></div>
-              {/* Une seule action : la zone sert à choisir OU déposer, le bouton n'apparaît
-                  qu'une fois un fichier retenu. Le « Choose Files » du navigateur, en
-                  anglais et redondant avec le bouton d'envoi, disparaît. */}
-              <form action={ajouterJustificatifs.bind(null, e.id)} className="space-y-2">
+              {/* Aucun bouton : choisir ou déposer le fichier déclenche l'association.
+                  L'input natif est masqué — son libellé « Choose Files » vient de la
+                  langue du NAVIGATEUR, ni le lang de la page ni le CSS n'y changent rien. */}
+              <form
+                ref={formJustif}
+                action={ajouterJustificatifs.bind(null, e.id)}
+                onSubmit={() => setEnvoiJustif(true)}
+              >
                 <FileDropzone
                   name="justificatifs"
                   accept=".pdf,.jpg,.jpeg,.png,.webp"
                   multiple
-                  libelle="Glisser un justificatif ici, ou cliquer pour choisir"
-                  onFile={setFichierJustif}
+                  libelle={envoiJustif ? "Association en cours…" : "Glisser un justificatif ici, ou cliquer pour choisir"}
+                  onFile={(f) => { if (f) formJustif.current?.requestSubmit(); }}
                 />
-                {fichierJustif && (
-                  <SubmitButton pendingLabel="Ajout…" className="!py-1.5 !text-xs">Associer</SubmitButton>
-                )}
               </form>
             </div>
           )}

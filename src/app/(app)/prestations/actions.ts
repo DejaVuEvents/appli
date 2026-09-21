@@ -299,9 +299,14 @@ function prestationFromForm(formData: FormData) {
 export async function createPrestation(formData: FormData) {
   const supabase = await createSupabase();
   const { data: { user } } = await supabase.auth.getUser();
+  // est_evenement vaut false PAR DÉFAUT en base, et ce drapeau ne distingue pas
+  // « événement » de « autre chose » : il marque les prestations SUPPORT d'une location.
+  // Sans le poser ici, la prestation créée depuis « Créer un devis » n'était ni un
+  // événement ni une location — donc absente des deux listes, et le devis semblait
+  // disparaître.
   const { data, error } = await supabase
     .from("prestation")
-    .insert({ ...prestationFromForm(formData), created_by: user?.id ?? null })
+    .insert({ ...prestationFromForm(formData), est_evenement: true, created_by: user?.id ?? null })
     .select("id")
     .single();
   if (error) throw new Error(error.message);

@@ -25,7 +25,7 @@ export async function chargerNotifications(
   const today = ymd(new Date());
 
   const in7 = ymd(new Date(Date.now() + 7 * 864e5));
-  const [{ data: ndfData }, { data: reunionsData }, { data: ffData }, { data: unitesData }, { data: fcData }, { data: devisData }] = await Promise.all([
+  const [{ data: ndfData }, { data: reunionsData }, { data: ffData }, { data: unitesData }, { data: fcData }, { data: devisData }, { data: entData }] = await Promise.all([
     supabase.from("note_frais").select("id, titre, statut, demandeur_id").in("statut", ["soumise", "refusee", "validee"]),
     supabase.from("reunion").select("id, titre, date, heure_debut, participants:reunion_participant(membre_id)").gte("date", today).order("date"),
     supabase.from("facture_fournisseur").select("id, fournisseur, montant_ttc, date_echeance, statut_paiement").neq("statut_paiement", "paye"),
@@ -36,13 +36,43 @@ export async function chargerNotifications(
     // Devis récemment signés / refusés par le client
     supabase.from("devis").select("id, nom, statut_signature, updated_at").in("statut_signature", ["signe", "refuse"])
       .order("updated_at", { ascending: false }).limit(10),
+    // Dernier écart banque/outil mémorisé par la synchro.
+    supabase.from("parametres_entreprise").select("qonto_ecart, qonto_ecart_le, qonto_derniere_sync").limit(1).maybeSingle(),
   ]);
+
 
   const ndf = (ndfData ?? []) as { id: string; titre: string | null; statut: string; demandeur_id: string | null }[];
   const reunions = (reunionsData ?? []) as unknown as { id: string; titre: string; date: string; heure_debut: string | null; participants: { membre_id: string }[] }[];
   const fournisseurs = (ffData ?? []) as { id: string; fournisseur: string; montant_ttc: number; date_echeance: string | null; statut_paiement: string }[];
 
   const notifs: Notif[] = [];
+
+  // Le rapprochement bancaire ne doit plus dépendre de la vigilance de quelqu'un :
+  // un écart non nul, ou une synchro qui date, remonte dans la cloche.
+  const ent = entData as { qonto_ecart: number | null; qonto_ecart_le: string | null; qonto_derniere_sync: string | null } | null;
+  if (ent) {
+    const ecart = Number(ent.qonto_ecart ?? 0);
+    const syncLe = ent.qonto_derniere_sync ? ent.qonto_derniere_sync.slice(0, 10) : null;
+    const vieille = !syncLe || syncLe < ymd(new Date(Date.now() - 7 * 864e5));
+    if (Math.abs(ecart) >= 0.01) {
+      notifs.push({
+        id: `qonto-ecart-${ecart.toFixed(2)}`,
+        icon: "⚖️",
+        text: `Écart de ${ecart > 0 ? "+" : ""}${ecart.toFixed(2)} € entre la banque et l'outil`,
+        href: "/finance/qonto",
+        cls: "border-red-200 bg-red-50 text-red-900",
+      });
+    } else if (vieille) {
+      notifs.push({
+        id: "qonto-sync-vieille",
+        icon: "⚖️",
+        text: syncLe ? `Aucune synchro bancaire depuis le ${syncLe}` : "Compte bancaire jamais synchronisé",
+        href: "/finance/qonto",
+        cls: "border-amber-200 bg-amber-50 text-amber-900",
+      });
+    }
+  }
+
   const isCoPres = membre.role === "co_president";
 
   // Factures fournisseurs en retard / à échéance proche

@@ -53,10 +53,12 @@ export async function previewQonto(): Promise<
       .select("date, montant_ttc, sens, statut")
       .is("qonto_transaction_id", null);
 
-    // Deux index distincts : face à une écriture RÉELLE saisie à la main, la transaction
-    // Qonto ferait bel et bien doublon. Face à une PRÉVISION, non : c'est le règlement
-    // attendu, il doit s'importer et consommer la prévision. Les confondre bloquait
-    // l'import automatique de mouvements parfaitement légitimes.
+    // Signalement, PAS exclusion. Une transaction qui ressemble à une écriture saisie
+    // à la main était auparavant écartée de l'import : l'outil gardait la saisie et
+    // n'a jamais reçu le mouvement bancaire, définitivement — la suppression n'expirait
+    // pas. C'est la source des écarts qui revenaient sans cesse. Désormais la banque
+    // fait foi : tout est importé, et c'est la saisie manuelle sans origine bancaire
+    // qui est signalée comme l'anomalie à arbitrer.
     const idxReel = new Map<string, number[]>();
     for (const e of manualEntries ?? []) {
       if (e.statut !== "reel") continue;
@@ -223,6 +225,9 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
         doublon: false, pending: tx.status !== "completed", attachment_ids: tx.attachment_ids ?? [],
       });
     }
+    // Écritures réelles que la banque ne connaît pas. Sur une période couverte par
+    // Qonto, elles n'ont pas lieu d'être : soit elles doublonnent un mouvement importé,
+    // soit elles décrivent un flux qui n'est jamais passé par le compte.
     const enTrop = manuels
       .filter((m) => !m.used)
       .map((m) => ({ id: m.id, date: m.date, denomination: m.denomination ?? "—", montant: Number(m.montant_ttc), sens: m.sens }));
@@ -233,6 +238,13 @@ export async function rapprochementQonto(): Promise<RapportRapprochement> {
     // et les écritures en trop. Les opérations en attente ne sont plus déduites : elles
     // sont importées comme les autres et comptent déjà des deux côtés.
     const ajustementBaseline = r2(ecart - (netManquantes - netEnTrop));
+
+    // Mémorisé pour être signalé ailleurs qu'ici : personne ne vient consulter cette
+    // page spontanément, l'écart se découvrait donc longtemps après son apparition.
+    await supabase
+      .from("parametres_entreprise")
+      .update({ qonto_ecart: ecart, qonto_ecart_le: new Date().toISOString() })
+      .not("id", "is", null);
 
     return {
       ok: true, balanceQonto, soldeOutil, ecart, manquantes, enTrop,
@@ -473,11 +485,11 @@ export async function syncGlobal(): Promise<
 > {
   const prev = await previewQonto();
   if (!prev.ok) return { ok: false, error: prev.error };
-  // Les opérations EN ATTENTE sont importées elles aussi : Qonto les décompte déjà du
-  // solde du compte, les écarter creusait un trou permanent entre l'outil et la banque.
-  // Leur date et leur montant sont recalés au règlement par corrigerDonneesQonto.
-  const propres = prev.items.filter((i) => !i.doublon);
-  const ignoresDoublons = prev.items.filter((i) => i.doublon).length;
+  // TOUT ce que la banque connaît entre dans le journal — opérations en attente et
+  // ressemblances avec une saisie manuelle comprises. Refuser une transaction, c'était
+  // garantir un écart permanent puisque rien ne revenait dessus ensuite.
+  const propres = prev.items;
+  const ignoresDoublons = 0;
   let importees = 0;
   if (propres.length) {
     const r = await importQontoTransactions(propres);
@@ -487,6 +499,8 @@ export async function syncGlobal(): Promise<
   const j = await recupererJustificatifsQonto();
   const justificatifs = j.ok ? j.ajoutes : 0;
   const datesCorrigees = await corrigerDonneesQonto();
+  // Recalcul en sortie : l'écart mémorisé reflète l'état APRÈS import.
+  await rapprochementQonto();
   return { ok: true, importees, justificatifs, ignoresDoublons, datesCorrigees };
 }
 

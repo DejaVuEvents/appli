@@ -42,7 +42,7 @@ export function EcriturePanel({
   /** Factures émises impayées, pour rattacher un encaissement déjà au journal. */
   facturesOuvertes?: FactureOuverte[];
   /** Page d'où le panneau est ouvert, pour y revenir après édition (défaut : journal). */
-  retour?: "previsionnel" | "journal" | "dashboard" | "qonto" | "calendrier";
+  retour?: "previsionnel" | "journal" | "journal_entrees" | "journal_sorties" | "journal_previsionnel" | "dashboard" | "qonto" | "calendrier";
   onClose: () => void;
 }) {
   const [delOpen, setDelOpen] = useState(false);

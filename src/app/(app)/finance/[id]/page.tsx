@@ -25,6 +25,9 @@ export default async function EditEcriturePage({
   const retourParam = (await searchParams)?.retour;
   const RETOURS: Record<string, { href: string; label: string }> = {
     dashboard: { href: "/finance", label: "Tableau de bord" },
+    journal_entrees: { href: "/finance/journal?tab=entrees", label: "Journal" },
+    journal_sorties: { href: "/finance/journal?tab=sorties", label: "Journal" },
+    journal_previsionnel: { href: "/finance/journal?tab=previsionnel", label: "Journal" },
     previsionnel: { href: "/finance/previsionnel", label: "Prévisionnel" },
     calendrier: { href: "/calendrier", label: "Calendrier" },
     qonto: { href: "/finance/qonto", label: "Sync Qonto" },

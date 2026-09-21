@@ -13,10 +13,11 @@ import type { EcritureFinanciere } from "@/lib/types";
 export default async function JournalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ annee?: string }>;
+  searchParams: Promise<{ annee?: string; tab?: string }>;
 }) {
   const sp = await searchParams;
   const annee = Number(sp?.annee) || new Date().getFullYear();
+  const tabInitial = sp?.tab === "sorties" || sp?.tab === "previsionnel" ? sp.tab : "entrees";
 
   const supabase = await createClient();
   const [{ data }, { data: prestData }, { data: justifData }] = await Promise.all([
@@ -94,7 +95,8 @@ export default async function JournalPage({
       <PageHeader title="Comptabilité" />
       <FinanceTabs annee={annee} />
       <JournalTabs
-        facturesOuvertes={facturesOuvertes} all={ecritures} prestations={prestations} sidebar={sidebar} avecJustif={[...avecJustif]} facturesLiees={facturesLiees} nomenclature={nomenclature} />
+        facturesOuvertes={facturesOuvertes}
+        tabInitial={tabInitial} all={ecritures} prestations={prestations} sidebar={sidebar} avecJustif={[...avecJustif]} facturesLiees={facturesLiees} nomenclature={nomenclature} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { IconPaperclip, IconAlert } from "@/components/icons";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -42,9 +43,9 @@ function groupByMonth(list: EcritureFinanciere[]): [string, EcritureFinanciere[]
 
 
 
-export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], facturesLiees = {}, facturesOuvertes = [], nomenclature = NOMENCLATURE }: { all: EcritureFinanciere[]; prestations?: Prestation[]; sidebar?: React.ReactNode; avecJustif?: string[]; facturesLiees?: Record<string, FactureLiee[]>; facturesOuvertes?: FactureOuverte[]; nomenclature?: Nomenclature }) {
+export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], facturesLiees = {}, facturesOuvertes = [], tabInitial = "entrees", nomenclature = NOMENCLATURE }: { all: EcritureFinanciere[]; prestations?: Prestation[]; sidebar?: React.ReactNode; avecJustif?: string[]; facturesLiees?: Record<string, FactureLiee[]>; facturesOuvertes?: FactureOuverte[]; tabInitial?: Tab; nomenclature?: Nomenclature }) {
   const justifSet = useMemo(() => new Set(avecJustif), [avecJustif]);
-  const [tab, setTab] = useState<Tab>("entrees");
+  const [tab, setTab] = useState<Tab>(tabInitial);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [aValiderOnly, setAValiderOnly] = useState(false);
@@ -94,9 +95,16 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
       return next;
     });
 
+  const router = useRouter();
+  const chemin = usePathname();
+  // L'onglet est inscrit dans l'URL : sans ça, revenir d'une fiche d'écriture
+  // repartait toujours sur « Entrées », quel que soit l'onglet d'où l'on venait.
   const switchTab = (t: Tab) => {
     setTab(t);
     setCollapsed(new Set());
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", t);
+    router.replace(`${chemin}?${params}`, { scroll: false });
   };
 
   const collapseAll = () => setCollapsed(new Set(groups.map(([k]) => k)));
@@ -345,7 +353,7 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
           catManquante={catFlag(selected)}
           hasJustif={justifSet.has(selected.id)}
           facturesOuvertes={facturesOuvertes}
-          retour="journal"
+          retour={tab === "sorties" ? "journal_sorties" : tab === "previsionnel" ? "journal_previsionnel" : "journal"}
           onClose={() => setSelected(null)}
         />
       )}

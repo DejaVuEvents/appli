@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileDropzone } from "@/components/file-dropzone";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
@@ -116,7 +117,11 @@ export default async function RetourPage({ params }: { params: Promise<{ id: str
                       <input name="remarque" defaultValue={c?.remarque ?? ""} placeholder="Remarque (constat de casse…)" className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm" />
                     </div>
                     <div className="flex items-center gap-2">
-                      <input name="photo" type="file" accept="image/*" capture="environment" className="block w-full text-xs text-muted file:mr-2 file:rounded-lg file:border file:border-border file:bg-surface file:px-2 file:py-1 file:text-xs hover:file:bg-background" />
+                      <FileDropzone
+          name="photo"
+          accept="image/*"
+          libelle="Glisser une photo ici, ou cliquer pour choisir"
+        />
                       <SubmitButton pendingLabel="…">Enregistrer</SubmitButton>
                     </div>
                     {c?.photo_url && photoUrl.get(r.unite_id) && (

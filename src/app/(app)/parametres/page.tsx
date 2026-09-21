@@ -5,7 +5,7 @@ import { Field, TextArea, Select } from "@/components/form";
 import { SubmitButton } from "@/components/submit-button";
 import { InfoTip } from "@/components/info-tip";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte, supprimerImageProfil } from "./actions";
+import { addTarifDegressifGlobal, deleteTarifDegressifGlobal, updateEntreprise, updateEmailModele, updateMembre, updateMonCompte, supprimerImageProfil, supprimerLogoEntreprise } from "./actions";
 import { FileDropzone } from "@/components/file-dropzone";
 import { updateTresorerieReglages, updatePrixCarburant } from "../finance/actions";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
@@ -184,17 +184,15 @@ export default async function ParametresPage({
                     <img src={ent.logo} alt="Logo" className="h-16 w-16 rounded border border-border object-contain bg-white" />
                   )}
                   <div className="flex-1">
-                    <input
-                      type="file"
-                      name="logo_file"
-                      accept="image/*"
-                      className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-foreground"
-                    />
+                    <FileDropzone name="logo_file" accept="image/*" libelle="Glisser le logo ici, ou cliquer pour choisir" />
                     {ent.logo && (
-                      <label className="mt-2 flex items-center gap-2 text-xs text-muted">
-                        <input type="checkbox" name="supprimer_logo" className="h-4 w-4 rounded border-border" />
-                        Supprimer le logo actuel
-                      </label>
+                      <button
+                        type="submit"
+                        formAction={supprimerLogoEntreprise.bind(null, ent.id)}
+                        className="mt-2 text-xs text-red-600 underline"
+                      >
+                        Supprimer le logo
+                      </button>
                     )}
                   </div>
                 </div>

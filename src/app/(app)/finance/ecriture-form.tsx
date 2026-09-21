@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FileDropzone } from "@/components/file-dropzone";
 import { DateInput } from "@/components/date-input";
 import { useState } from "react";
 import { SubmitButton } from "@/components/submit-button";
@@ -145,11 +146,11 @@ export function EcritureForm({
         {!ecriture?.facture && (
           <input name="facture" defaultValue="" className={`${input} mb-1`} placeholder="Réf. ou numéro de facture (optionnel)" />
         )}
-        <input
+        <FileDropzone
           name="facture_pdf"
-          type="file"
           accept=".pdf,.jpg,.jpeg,.png,.webp"
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-background"
+          maxMo={10}
+          libelle="Glisser une facture ici, ou cliquer pour choisir"
         />
         <p className="mt-1 text-xs text-muted">PDF, image — max 10 Mo. Si un fichier est sélectionné, il remplace la référence textuelle.</p>
       </div>

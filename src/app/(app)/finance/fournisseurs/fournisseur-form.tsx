@@ -1,6 +1,7 @@
 "use client";
 
 import { Field, Select, TextArea } from "@/components/form";
+import { FileDropzone } from "@/components/file-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
 import { STATUT_FOURNISSEUR_LABELS, type StatutFournisseur, type FactureFournisseur } from "@/lib/types";
@@ -44,11 +45,11 @@ export function FournisseurForm({
       <TextArea label="Notes (optionnel)" name="notes" defaultValue={facture?.notes ?? ""} rows={2} />
       <div>
         <span className="mb-1 block text-sm font-medium">Justificatif (PDF / image)</span>
-        <input
+        <FileDropzone
           name="fichier"
-          type="file"
           accept=".pdf,.jpg,.jpeg,.png,.webp"
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-background"
+          maxMo={10}
+          libelle="Glisser la facture ici, ou cliquer pour choisir"
         />
         {facture?.fichier_url && (
           <a href={facture.fichier_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs text-primary hover:underline">Justificatif actuel</a>

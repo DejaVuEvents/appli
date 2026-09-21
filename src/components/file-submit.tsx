@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FileDropzone } from "@/components/file-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 
 /**
@@ -28,13 +29,11 @@ export function FileSubmit({
   const [aFichier, setAFichier] = useState(false);
   return (
     <>
-      <input
-        type="file"
+      <FileDropzone
         name={name}
         accept={accept}
-        required
-        onChange={(e) => setAFichier((e.target.files?.length ?? 0) > 0)}
-        className={inputClassName}
+        libelle="Glisser un fichier ici, ou cliquer pour choisir"
+        onFile={(f) => setAFichier(!!f)}
       />
       <SubmitButton disabled={!aFichier} pendingLabel={pendingLabel} className={buttonClassName}>
         {children}

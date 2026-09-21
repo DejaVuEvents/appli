@@ -100,6 +100,14 @@ export async function updateMonCompte(formData: FormData) {
   revalidatePath("/parametres");
 }
 
+/** Retire le logo de l'entreprise. Bouton dédié plutôt qu'une case à valider ensuite. */
+export async function supprimerLogoEntreprise(id: string) {
+  const supabase = await createSupabase();
+  const { error } = await supabase.from("parametres_entreprise").update({ logo: null }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/parametres");
+}
+
 /**
  * Retire la photo ou la signature du profil. Action dédiée plutôt qu'une case à
  * cocher à valider ensuite : le bouton fait ce qu'il annonce, tout de suite.

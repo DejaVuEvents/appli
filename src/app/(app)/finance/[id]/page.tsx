@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileDropzone } from "@/components/file-dropzone";
 import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -129,12 +130,12 @@ export default async function EditEcriturePage({
           triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
         >
         <ModalForm action={ajouterJustificatifs.bind(null, id)} className="space-y-3">
-          <input
+          <FileDropzone
             name="justificatifs"
-            type="file"
-            multiple
             accept=".pdf,.jpg,.jpeg,.png,.webp"
-            className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-background"
+            multiple
+            maxMo={10}
+            libelle="Glisser un justificatif ici, ou cliquer pour choisir"
           />
           <input
             name="justificatif_ref"

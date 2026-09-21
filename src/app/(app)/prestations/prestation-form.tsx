@@ -31,14 +31,26 @@ function Fields({
     <div className="space-y-4">
       {type && <input type="hidden" name="devis_type" value={type} />}
       {type === "devis" && (
-        <Select
-          label="Nature du devis"
-          name="devis_nature"
-          options={[
-            { value: "location", label: "Location / prestation — facturée à la durée" },
-            { value: "vente", label: "Vente de matériel — prix unitaires, installation" },
-          ]}
-        />
+        <fieldset>
+          <legend className="mb-1.5 block text-sm font-medium">Nature du devis</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              { v: "location", t: "Location / prestation", d: "Facturée à la durée" },
+              { v: "vente", t: "Vente de matériel", d: "Prix unitaires, installation" },
+            ].map((o, i) => (
+              <label
+                key={o.v}
+                className="flex cursor-pointer items-start gap-2 rounded-lg border border-border px-3 py-2 hover:bg-background has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+              >
+                <input type="radio" name="devis_nature" value={o.v} defaultChecked={i === 0} className="mt-0.5 h-4 w-4" />
+                <span className="text-sm">
+                  <span className="block font-medium">{o.t}</span>
+                  <span className="block text-xs text-muted">{o.d}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       )}
       <Field label="Nom de l'événement" name="nom" required defaultValue={prestation?.nom} placeholder="Festival X — scène principale" />
       <div className="grid gap-4 sm:grid-cols-2">

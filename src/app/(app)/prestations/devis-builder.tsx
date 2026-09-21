@@ -90,11 +90,18 @@ export async function DevisBuilder(props: {
     if (!lignesParBucket.has(b)) lignesParBucket.set(b, []);
     lignesParBucket.get(b)!.push(l);
   }
-  const blocs: { catId: string | null; nom: string; lignes: LignePrestation[] }[] = ORDRE_BUCKETS.map((b) => ({
-    catId: bucketCatId[b] ?? null, nom: b, lignes: lignesParBucket.get(b) ?? [],
-  }));
+  // Les familles (Lumière, Son, Structure…) organisent une PRESTATION. Sur une vente
+  // elles n'ont pas d'objet : on liste le matériel cédé et l'installation d'une traite.
+  const estVente = devis.nature === "vente";
+  const blocs: { catId: string | null; nom: string; lignes: LignePrestation[] }[] = estVente
+    ? [{ catId: null, nom: "Matériel et installation", lignes }]
+    : ORDRE_BUCKETS.map((b) => ({
+        catId: bucketCatId[b] ?? null, nom: b, lignes: lignesParBucket.get(b) ?? [],
+      }));
   // Catégories proposées dans le formulaire « + Ajouter » = les 4 familles.
-  const catsDevis = ORDRE_BUCKETS.map((b) => ({ id: bucketCatId[b] ?? "", nom: b })).filter((c) => c.id) as { id: string; nom: string }[];
+  const catsDevis = estVente
+    ? []
+    : (ORDRE_BUCKETS.map((b) => ({ id: bucketCatId[b] ?? "", nom: b })).filter((c) => c.id) as { id: string; nom: string }[]);
 
   // Données sérialisables pour l'éditeur client (drag-and-drop + édition inline).
   const blocsData: BlocData[] = blocs.map((b) => ({
@@ -169,7 +176,6 @@ export async function DevisBuilder(props: {
   // Coefficient multi-jours appliqué au TOTAL final (coef × total).
   // Une VENTE se facture au prix unitaire : la durée n'a aucun sens, le coefficient
   // est neutralisé quoi qu'il y ait en base.
-  const estVente = devis.nature === "vente";
   const coeff = estVente ? 1 : Number(devis.coefficient_duree ?? 0) > 0 ? Number(devis.coefficient_duree) : 1;
 
   // Marge sous-location (coût fournisseur et revenu matos externe suivent la durée).

@@ -120,7 +120,9 @@ export default async function PrestationsPage({
       prestationId: d.prestation?.id ?? "",
       client: d.prestation?.client?.nom ?? null,
       lieu: d.prestation?.lieu ?? null,
-      date: d.prestation?.date_event_debut ?? (d.created_at ? d.created_at.slice(0, 10) : null),
+      // Date de CRÉATION du document, pas de l'événement : on cherche un devis par le
+      // moment où on l'a rédigé. La date de l'événement reste sur la fiche événement.
+      date: d.created_at ? d.created_at.slice(0, 10) : d.prestation?.date_event_debut ?? null,
       montant: montantDevis(d),
     };
     if (commeFacture) {

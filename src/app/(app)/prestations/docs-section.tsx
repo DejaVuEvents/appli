@@ -14,7 +14,7 @@ export type DocRow = {
   titre: string;           // nom du document (+ n° éventuel)
   client: string | null;
   lieu: string | null;
-  date: string | null;     // date de l'événement (regroupement + affichage)
+  date: string | null;     // date de création du document (regroupement + affichage)
   type: "devis" | "facture";
   montant: number;                   // total HT
   emis: boolean;                     // facture émise (a un n°)

@@ -448,14 +448,15 @@ export async function recupererJustificatifsQonto(): Promise<
  *    (autorisation carte, pourboire, frais de change) et gagne alors sa date de
  *    règlement, plus tardive que sa date d'émission.
  */
-async function corrigerDonneesQonto(): Promise<number> {
+async function corrigerDonneesQonto(): Promise<{ corrigees: number; disparues: number; refusDeSuppression: boolean }> {
   const supabase = await createClient();
   const { data: ent } = await supabase
     .from("parametres_entreprise")
     .select("qonto_login, qonto_token, qonto_account_slug")
     .limit(1)
     .maybeSingle();
-  if (!ent?.qonto_login || !ent?.qonto_token || !ent?.qonto_account_slug) return 0;
+  const rienAFaire = { corrigees: 0, disparues: 0, refusDeSuppression: false };
+  if (!ent?.qonto_login || !ent?.qonto_token || !ent?.qonto_account_slug) return rienAFaire;
 
   const txs = await fetchQontoTransactions(ent.qonto_login, ent.qonto_token, ent.qonto_account_slug, undefined, true);
   const parId = new Map(txs.map((t) => [t.transaction_id, t]));
@@ -477,11 +478,30 @@ async function corrigerDonneesQonto(): Promise<number> {
     await supabase.from("ecriture_financiere").update(patch).eq("id", e.id);
     corrigees++;
   }
-  return corrigees;
+
+  // Miroir : une transaction retirée de Qonto (autorisation temporaire, caution
+  // relâchée, opération annulée) doit disparaître de l'outil, sinon le solde reste
+  // grevé d'un mouvement qui n'a jamais eu lieu.
+  const connues = new Set(txs.map((t) => t.transaction_id));
+  const orphelines = ((rows ?? []) as { id: string; qonto_transaction_id: string }[])
+    .filter((e) => !connues.has(e.qonto_transaction_id));
+
+  // Garde-fou : une réponse tronquée ou une panne d'API ne doit jamais vider le
+  // journal. Au-delà du quart des écritures bancaires, on s'abstient et on le dit.
+  const total = (rows ?? []).length;
+  if (orphelines.length > 0 && total > 0 && orphelines.length > total / 4) {
+    return { corrigees, disparues: 0, refusDeSuppression: true };
+  }
+  if (orphelines.length) {
+    await supabase.from("ecriture_financiere").delete().in("id", orphelines.map((e) => e.id));
+  }
+  return { corrigees, disparues: orphelines.length, refusDeSuppression: false };
 }
 
 export async function syncGlobal(): Promise<
-  { ok: true; importees: number; justificatifs: number; ignoresDoublons: number; datesCorrigees: number } | { ok: false; error: string }
+  | { ok: true; importees: number; justificatifs: number; ignoresDoublons: number;
+      datesCorrigees: number; disparues: number; refusDeSuppression: boolean }
+  | { ok: false; error: string }
 > {
   const prev = await previewQonto();
   if (!prev.ok) return { ok: false, error: prev.error };
@@ -498,10 +518,13 @@ export async function syncGlobal(): Promise<
   }
   const j = await recupererJustificatifsQonto();
   const justificatifs = j.ok ? j.ajoutes : 0;
-  const datesCorrigees = await corrigerDonneesQonto();
+  const { corrigees, disparues, refusDeSuppression } = await corrigerDonneesQonto();
   // Recalcul en sortie : l'écart mémorisé reflète l'état APRÈS import.
   await rapprochementQonto();
-  return { ok: true, importees, justificatifs, ignoresDoublons, datesCorrigees };
+  return {
+    ok: true, importees, justificatifs, ignoresDoublons,
+    datesCorrigees: corrigees, disparues, refusDeSuppression,
+  };
 }
 
 

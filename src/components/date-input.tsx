@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CalendrierPopup } from "@/components/calendrier-popup";
 
 /**
  * Champ de date au format français.
@@ -63,7 +64,7 @@ export function DateInput({
     setVuDehors(value);
     setTexte(isoVersFr(value));
   }
-  const natif = useRef<HTMLInputElement>(null);
+  const [calendrier, setCalendrier] = useState(false);
 
   const iso = frVersIso(texte);
   const invalide = texte.length === 10 && !iso;
@@ -74,13 +75,6 @@ export function DateInput({
     onChange?.(frVersIso(t));
   };
 
-  const ouvrirCalendrier = () => {
-    const el = natif.current;
-    if (!el) return;
-    el.value = iso;
-    if (typeof el.showPicker === "function") el.showPicker();
-    else el.focus();
-  };
 
   return (
     <div className={`relative ${className}`}>
@@ -101,7 +95,7 @@ export function DateInput({
       />
       <button
         type="button"
-        onClick={ouvrirCalendrier}
+        onClick={() => setCalendrier((v) => !v)}
         aria-label="Ouvrir le calendrier"
         title="Ouvrir le calendrier"
         className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted hover:bg-surface hover:text-foreground"
@@ -111,15 +105,13 @@ export function DateInput({
           <path d="M3 10h18M8 3v4M16 3v4" strokeLinecap="round" />
         </svg>
       </button>
-      {/* Sélecteur natif, invisible : il ne sert qu'à ouvrir le calendrier du système. */}
-      <input
-        ref={natif}
-        type="date"
-        tabIndex={-1}
-        aria-hidden
-        onChange={(e) => majSaisie(isoVersFr(e.target.value))}
-        className="pointer-events-none absolute right-2 top-1/2 h-0 w-0 -translate-y-1/2 opacity-0"
-      />
+      {calendrier && (
+        <CalendrierPopup
+          valeur={iso}
+          onChoisir={(v) => { setTexte(isoVersFr(v)); onChange?.(v); }}
+          onFermer={() => setCalendrier(false)}
+        />
+      )}
     </div>
   );
 }

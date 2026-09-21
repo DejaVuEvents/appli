@@ -83,6 +83,11 @@ Points clés à NE PAS casser :
   doit pas poser à sa place un état que l'outil vérifie normalement (signature, validation,
   paiement). Une NDF importée avec une signature supposée a été validée puis remboursée
   sans qu'aucune signature n'existe.
+- **Le journal réel est un miroir de la banque.** Toute transaction présente sur Qonto —
+  y compris en attente — existe dans l'outil et pèse sur le solde ; toute transaction qui
+  en disparaît (autorisation temporaire, caution relâchée) est retirée à la synchro
+  suivante. Ne jamais refuser une transaction bancaire au motif qu'elle ressemble à une
+  saisie : c'est la saisie sans origine bancaire qui est l'anomalie.
 
 ## État actuel
 

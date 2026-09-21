@@ -139,6 +139,8 @@ export function QontoSync({ derniereSync, balanceQonto, soldeOutil, nomenclature
       ];
       if (r.ignoresDoublons > 0) bits.push(`${r.ignoresDoublons} doublon${r.ignoresDoublons > 1 ? "s" : ""} ignoré${r.ignoresDoublons > 1 ? "s" : ""}`);
       if (r.datesCorrigees > 0) bits.push(`${r.datesCorrigees} écriture${r.datesCorrigees > 1 ? "s" : ""} recalée${r.datesCorrigees > 1 ? "s" : ""}`);
+      if (r.disparues > 0) bits.push(`${r.disparues} opération${r.disparues > 1 ? "s" : ""} retirée${r.disparues > 1 ? "s" : ""} (disparue${r.disparues > 1 ? "s" : ""} de Qonto)`);
+      if (r.refusDeSuppression) bits.push("suppressions suspendues : trop d'opérations manquantes d'un coup, vérifie la connexion Qonto");
       setResult(`Synchro terminée : ${bits.join(" · ")}.`);
     });
   };

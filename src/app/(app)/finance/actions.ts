@@ -335,9 +335,23 @@ export async function rattacherEcritureAFacture(ecritureId: string, formData: Fo
     .maybeSingle();
   if (!fac) throw new Error("Facture introuvable.");
 
+  // Un virement peut solder PLUSIEURS factures : c'est le cas quand un client règle
+  // d'un coup un solde et une facture additionnelle. La table de liaison
+  // ecriture_facture porte donc tous les liens ; le champ devis_facture_id ne retient
+  // que le premier, pour le code qui n'en attend qu'un.
+  const { error: lienErr } = await supabase
+    .from("ecriture_facture")
+    .upsert({ ecriture_id: ecritureId, devis_facture_id: fac.id }, { onConflict: "ecriture_id,devis_facture_id" });
+  if (lienErr) throw new Error(lienErr.message);
+
+  const { data: dejaLie } = await supabase
+    .from("ecriture_financiere").select("devis_facture_id, prestation_id").eq("id", ecritureId).maybeSingle();
   const { error } = await supabase
     .from("ecriture_financiere")
-    .update({ devis_facture_id: fac.id, prestation_id: fac.prestation_id })
+    .update({
+      devis_facture_id: dejaLie?.devis_facture_id ?? fac.id,
+      prestation_id: dejaLie?.prestation_id ?? fac.prestation_id,
+    })
     .eq("id", ecritureId);
   if (error) throw new Error(error.message);
 

@@ -67,10 +67,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
   const estPredepense = ndf.type_ndf === "predepense";
   const isCoPres = membre?.role === "co_president";
   // « Remboursée » = l'écriture de trésorerie liée est passée en réel.
-  const { data: ecrLiee } = ndf.ecriture_id
-    ? await supabase.from("ecriture_financiere").select("statut").eq("id", ndf.ecriture_id).maybeSingle()
-    : { data: null };
-  const estRemboursee = ecrLiee?.statut === "reel";
+  // Le lien note ↔ écriture existe dans les deux sens ; l'un peut sauter (suppression
+  // d'une écriture → ecriture_id mis à null par la clé étrangère). On regarde les deux,
+  // sinon une note remboursée réaffiche « validée ».
+  const { data: ecrLiees } = await supabase
+    .from("ecriture_financiere")
+    .select("id, statut")
+    .or(`id.eq.${ndf.ecriture_id ?? "00000000-0000-0000-0000-000000000000"},note_frais_id.eq.${id}`);
+  const estRemboursee = (ecrLiees ?? []).some((e) => e.statut === "reel");
 
   // Conditions de soumission, évaluées une seule fois : le bandeau d'état et le
   // bouton doivent dire la même chose.

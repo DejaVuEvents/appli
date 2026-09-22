@@ -32,15 +32,23 @@ export default async function NotesFraisPage() {
   const total = (n: NdfRow) => (n.lignes ?? []).reduce((s, l) => s + Number(l.montant_ttc ?? 0), 0);
   const isCoPres = membre?.role === "co_president";
 
-  // Détection « payée » : l'écriture liée (remboursement) est passée en réel.
-  const ecrIds = notes.map((n) => (n as { ecriture_id?: string | null }).ecriture_id).filter(Boolean) as string[];
-  const { data: ecrPayees } = ecrIds.length
-    ? await supabase.from("ecriture_financiere").select("id").in("id", ecrIds).eq("statut", "reel")
+  // Détection « payée » : une écriture RÉELLE de remboursement existe pour la note.
+  // Le lien est double — note_frais.ecriture_id d'un côté, ecriture.note_frais_id de
+  // l'autre — et l'un des deux peut sauter (suppression d'une écriture, la clé
+  // étrangère met alors ecriture_id à null). On interroge donc les deux sens, sans
+  // quoi une note remboursée réapparaît en « validée ».
+  const { data: ecrPayees } = notes.length
+    ? await supabase
+        .from("ecriture_financiere")
+        .select("id, note_frais_id")
+        .eq("statut", "reel")
+        .or(`id.in.(${notes.map((n) => (n as { ecriture_id?: string | null }).ecriture_id).filter(Boolean).join(",") || "00000000-0000-0000-0000-000000000000"}),note_frais_id.in.(${notes.map((n) => n.id).join(",")})`)
     : { data: [] };
   const payeSet = new Set((ecrPayees ?? []).map((e) => e.id as string));
+  const payeParNote = new Set((ecrPayees ?? []).map((e) => e.note_frais_id as string).filter(Boolean));
   const estPayee = (n: NdfRow) => {
     const eid = (n as { ecriture_id?: string | null }).ecriture_id;
-    return !!eid && payeSet.has(eid);
+    return (!!eid && payeSet.has(eid)) || payeParNote.has(n.id);
   };
 
   const aValider = isCoPres ? notes.filter((n) => n.statut === "soumise" && n.demandeur_id !== membre?.id) : [];

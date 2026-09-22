@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ModalForm } from "@/components/modal";
 import { useState, useMemo, useRef } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { euros } from "@/lib/format";
@@ -73,7 +74,7 @@ export function LigneForm({
   }
 
   return (
-    <form action={action} className="space-y-3">
+    <ModalForm action={action} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="relative">
           <span className="mb-1 block text-sm font-medium">Depuis le catalogue</span>
@@ -210,6 +211,6 @@ export function LigneForm({
         <SubmitButton>{submitLabel}</SubmitButton>
         {cancelHref && <Link href={cancelHref} className="text-sm text-muted hover:underline">Annuler</Link>}
       </div>
-    </form>
+    </ModalForm>
   );
 }

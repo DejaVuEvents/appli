@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { montantLigne, coutTransport, periodeReservation, montantRemise, totalApresCoeffEtRemise, type RemiseType } from "@/lib/devis";
+import { totalDevis } from "@/lib/acompte";
 import { BUCKET_PRIVE } from "@/lib/storage";
 import { extraireMaterielPdf } from "@/lib/gemini";
 import { copierDevisDans, copieLigne } from "@/lib/devis-copie";
@@ -1151,4 +1152,79 @@ export async function creerDocument(formData: FormData) {
 
   revalidatePath("/prestations");
   redirect(devisId ? `/prestations/devis/${devisId}?edit=1` : `/prestations/${prestationId}`);
+}
+
+/**
+ * Crée la facture de SOLDE d'un devis dont une ou plusieurs tranches sont déjà émises.
+ *
+ * creerAcompteSolde découpe un devis intact en deux factures d'un coup. Il ne sait pas
+ * traiter le cas où l'acompte existe déjà — facturé plus tôt, ou repris d'un autre
+ * outil : l'utiliser alors créerait un second acompte. Ici on ne facture que ce qui
+ * reste : total du devis moins les tranches déjà émises.
+ */
+export async function creerFactureSolde(devisId: string) {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: base } = await supabase
+    .from("devis")
+    .select("id, nom, prestation_id, type")
+    .eq("id", devisId)
+    .maybeSingle();
+  if (!base || base.type !== "devis") throw new Error("Le solde se crée depuis le devis, pas depuis une facture.");
+
+  const total = await totalDevis(supabase, devisId);
+
+  // Tranches déjà émises : on ne compte que les factures filles qui portent un numéro,
+  // un brouillon non émis n'a encore rien facturé.
+  const { data: filles } = await supabase
+    .from("devis")
+    .select("id")
+    .eq("source_devis_id", devisId)
+    .eq("type", "facture");
+  let dejaFacture = 0;
+  for (const f of filles ?? []) {
+    const { data: doc } = await supabase
+      .from("devis_facture").select("numero, montant_ttc").eq("devis_id", f.id).eq("type", "facture").maybeSingle();
+    if (doc?.numero) dejaFacture += Number(doc.montant_ttc ?? 0) || (await totalDevis(supabase, f.id as string));
+  }
+
+  const solde = Math.round((total - dejaFacture) * 100) / 100;
+  if (solde <= 0) {
+    throw new Error(
+      dejaFacture > 0
+        ? `Rien à facturer : le devis (${total.toFixed(2)} €) est déjà couvert par les factures émises (${dejaFacture.toFixed(2)} €).`
+        : "Le devis est à 0 € : il n'y a pas de solde à facturer.",
+    );
+  }
+
+  const { data: fille, error } = await supabase
+    .from("devis")
+    .insert({
+      prestation_id: base.prestation_id,
+      nom: "Solde",
+      type: "facture",
+      source_devis_id: base.id,
+      created_by: user?.id ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await supabase.from("ligne_prestation").insert({
+    prestation_id: base.prestation_id,
+    devis_id: fille.id,
+    designation: `Solde — ${base.nom ?? "devis"}`,
+    quantite: 1,
+    prix_unitaire: solde,
+    prix_total: solde,
+    remise_type: "pct",
+    remise_valeur: 0,
+    est_accessoire_auto: false,
+  });
+
+  // Le devis source ne porte plus la recette : ses tranches s'en chargent.
+  await synchroniserEcritureDevisSigne(supabase, devisId);
+  revalidatePath(`/prestations/devis/${devisId}`);
+  redirect(`/prestations/devis/${fille.id}`);
 }

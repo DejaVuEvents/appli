@@ -11,7 +11,7 @@ import { Field } from "@/components/form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement, creerAcompteSolde, recalculerSolde } from "../../actions";
+import { updateStatut, associerDevisAEvenement, creerAcompteSolde, creerFactureSolde, recalculerSolde } from "../../actions";
 import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck, IconDownload } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture, redaterDevis } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
@@ -118,6 +118,19 @@ export default async function DevisEditorPage({
   const coutSousLoc = await coutSousLocationDevis(supabase, devisId);
 
   // Facture issue d'un découpage acompte/solde : le devis source a-t-il changé depuis ?
+  // Tranches déjà émises sur ce devis : elles changent ce qu'il reste à facturer.
+  const { data: fillesEmises } = await supabase
+    .from("devis")
+    .select("id, devis_facture(numero, montant_ttc, type)")
+    .eq("source_devis_id", devisId)
+    .eq("type", "facture");
+  const dejaFactureFilles = ((fillesEmises ?? []) as unknown as {
+    devis_facture: { numero: string | null; montant_ttc: number | null; type: string }[] | null;
+  }[]).reduce((s2, f) => {
+    const doc = (f.devis_facture ?? []).find((d) => d.type === "facture" && d.numero);
+    return s2 + (doc ? Number(doc.montant_ttc ?? 0) : 0);
+  }, 0);
+
   const ecartSoldeInfo = await ecartSolde(supabase, devisId);
   const soldeADecaler = ecartSoldeInfo && Math.abs(ecartSoldeInfo.ecart) >= 0.01;
 
@@ -339,8 +352,24 @@ export default async function DevisEditorPage({
                     <SubmitButton>Émettre la facture</SubmitButton>
                   </form>
 
-                  {/* Option 2 — découpage acompte + solde (saisie % ou €, aperçu en direct) */}
-                  <AcompteForm action={creerAcompteSolde.bind(null, devisId)} total={contenu?.tva.totalTtc ?? 0} />
+                  {/* Option 2 — le solde seul, quand une tranche est déjà facturée
+                      (acompte émis plus tôt, ou repris d'un autre outil). Le découpage
+                      en deux créerait alors un second acompte. */}
+                  {dejaFactureFilles > 0 && (
+                    <form action={creerFactureSolde.bind(null, devisId)} className="rounded-xl border border-border p-4">
+                      <div className="text-sm font-semibold">Facture de solde</div>
+                      <p className="mb-3 mt-1 text-sm text-muted">
+                        {euros(dejaFactureFilles)} déjà facturé{contenu ? ` sur ${euros(contenu.tva.totalTtc)}` : ""} —
+                        reste <strong className="text-foreground">{euros(Math.max((contenu?.tva.totalTtc ?? 0) - dejaFactureFilles, 0))}</strong>.
+                      </p>
+                      <SubmitButton>Créer la facture de solde</SubmitButton>
+                    </form>
+                  )}
+
+                  {/* Option 3 — découpage acompte + solde (saisie % ou €, aperçu en direct) */}
+                  {dejaFactureFilles === 0 && (
+                    <AcompteForm action={creerAcompteSolde.bind(null, devisId)} total={contenu?.tva.totalTtc ?? 0} />
+                  )}
                 </div>
               </Modal>
             )

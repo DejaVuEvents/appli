@@ -215,6 +215,13 @@ export default async function DevisEditorPage({
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
             )}
           </div>
+          {/* « Brouillon » ne dit pas ce qui manque : c'est le numéro, donné à l'émission. */}
+          {!emis && (
+            <div className="mt-1.5 text-xs text-amber-700 dark:text-amber-500">
+              Pas encore émis{estFacture ? "e" : ""} : le document n&apos;a pas de numéro et n&apos;est pas
+              opposable au client. Utilise « Émettre {estFacture ? "la facture" : "le devis"} » ci-dessous.
+            </div>
+          )}
           <div className="mt-1.5 text-xs text-muted">
             Créé le {dateFr(devis.created_at?.slice(0, 10) ?? null)}{createur !== "—" ? ` · ${createur}` : ""}
           </div>

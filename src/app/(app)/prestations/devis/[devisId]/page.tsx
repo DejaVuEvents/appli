@@ -76,6 +76,8 @@ export default async function DevisEditorPage({
 
   const estFacture = devis.type === "facture";
   const titre = estFacture ? "Facture" : "Devis";
+  // « Facture » est féminin, « Devis » masculin : l'article ne peut pas être codé en dur.
+  const leDoc = estFacture ? "la facture" : "le devis";
   const titreDoc = devis.nom || titre;
   // Retour contextuel : la provenance est transmise par le lien d'origine (?retour=…),
   // sinon on remonte à l'événement / la location qui porte le document.
@@ -328,7 +330,7 @@ export default async function DevisEditorPage({
         <div className="space-y-2">
           <form action={emettreDocument.bind(null, devisId, devis.type)}>
             <button className={`${fullBtn} border border-border hover:bg-surface`}>
-              {emis ? <><IconRefresh /> Mettre à jour les montants</> : <><IconFile /> Émettre le {titre.toLowerCase()}</>}
+              {emis ? <><IconRefresh /> Mettre à jour les montants</> : <><IconFile /> Émettre {leDoc}</>}
             </button>
           </form>
           {!estFacture && (

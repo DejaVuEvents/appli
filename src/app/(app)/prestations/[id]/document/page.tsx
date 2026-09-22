@@ -159,7 +159,7 @@ export default async function DocumentPage({
         )}
         {!emis && (
           <p className="print:hidden mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-            Brouillon — ce {titre.toLowerCase()} n&apos;a pas encore de numéro. Clique « Émettre » pour lui attribuer un numéro et figer les montants.
+            Brouillon — {titre === "Facture" ? "cette facture n'a" : "ce devis n'a"} pas encore de numéro. Clique « Émettre » pour lui attribuer un numéro et figer les montants.
           </p>
         )}
 

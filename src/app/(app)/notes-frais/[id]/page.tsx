@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { statutNdfAffichage } from "@/lib/ndf-statut";
 import { DateInput } from "@/components/date-input";
 import { IconDownload, IconEdit, IconFile } from "@/components/icons";
 import { notFound } from "next/navigation";
@@ -18,13 +19,6 @@ import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
 import { STATUT_NDF_LABELS, TYPE_NDF_LABELS, type LigneNoteFrais, type NoteFrais, type StatutNoteFrais } from "@/lib/types";
-
-const STATUT_CLS: Record<StatutNoteFrais, string> = {
-  brouillon: "bg-surface text-muted",
-  soumise: "bg-amber-100 text-amber-800",
-  validee: "bg-green-100 text-green-700",
-  refusee: "bg-red-100 text-red-700",
-};
 
 export default async function NoteFraisDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -118,9 +112,8 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
               </span>
             )}
             <a href={`/notes-frais/${id}/pdf`} download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background" title="Télécharger le PDF"><IconDownload className="h-4 w-4" /> PDF</a>
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUT_CLS[ndf.statut]}`}>
-              {/* Validée = signée et approuvée ; le remboursement est une étape de plus. */}
-              {estRemboursee ? "Remboursée" : STATUT_NDF_LABELS[ndf.statut]}
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statutNdfAffichage(ndf.statut, estRemboursee).cls}`}>
+              {statutNdfAffichage(ndf.statut, estRemboursee).label}
             </span>
           </div>
         }

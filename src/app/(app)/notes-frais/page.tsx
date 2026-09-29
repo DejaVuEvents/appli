@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { statutNdfAffichage } from "@/lib/ndf-statut";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card } from "@/components/ui";
 import { Field } from "@/components/form";
@@ -10,13 +11,6 @@ import { createNoteFrais } from "./actions";
 import { NotesFraisListe, type NoteLite } from "./notes-liste";
 import { ImportNdf } from "./import-ndf";
 import { STATUT_NDF_LABELS, TYPE_NDF_LABELS, type NoteFrais } from "@/lib/types";
-
-const STATUT_CLS: Record<string, string> = {
-  brouillon: "bg-surface text-muted",
-  soumise: "bg-amber-100 text-amber-800",
-  validee: "bg-green-100 text-green-700",
-  refusee: "bg-red-100 text-red-700",
-};
 
 type NdfRow = NoteFrais & { lignes: { montant_ttc: number }[] };
 
@@ -131,20 +125,12 @@ export default async function NotesFraisPage() {
               {aValider.map((n) => (
                 <Link key={n.id} href={`/notes-frais/${n.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-background">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{n.titre || "Note de frais"}</div>
+                    <div className="truncate font-medium">{n.titre || "Note de frais"}{(n as { numero?: string | null }).numero ? <span className="ml-1.5 text-xs font-normal text-muted">{(n as { numero?: string | null }).numero}</span> : null}</div>
                     <div className="text-xs text-muted">{TYPE_NDF_LABELS[n.type_ndf]} · {mMap.get(n.demandeur_id ?? "") ?? "—"} · {dateFr((n as { date?: string | null }).date ?? n.created_at)}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="font-semibold">{euros(total(n))}</span>
-                    {/* Une note déjà remboursée qui attend encore sa validation : le
-                        virement est parti avant la régularisation. Le taire ferait croire
-                        au validateur qu'il engage une dépense à venir. */}
-                    {estPayee(n) && (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">
-                        déjà remboursée
-                      </span>
-                    )}
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[n.statut]}`}>{STATUT_NDF_LABELS[n.statut]}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statutNdfAffichage(n.statut, estPayee(n)).cls}`}>{statutNdfAffichage(n.statut, estPayee(n)).label}</span>
                   </div>
                 </Link>
               ))}

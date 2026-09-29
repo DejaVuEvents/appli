@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { statutNdfAffichage } from "@/lib/ndf-statut";
 import { DateInput } from "@/components/date-input";
 import { JustificatifPreview } from "@/components/justificatif-preview";
 import Link from "next/link";
@@ -11,13 +12,6 @@ import { deleteNoteFrais } from "./actions";
 import { STATUT_NDF_LABELS, TYPE_NDF_LABELS, type StatutNoteFrais, type TypeNoteFrais } from "@/lib/types";
 
 const delBtn = "shrink-0 rounded-lg border border-border px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30";
-
-const STATUT_CLS: Record<StatutNoteFrais, string> = {
-  brouillon: "bg-surface text-muted",
-  soumise: "bg-amber-100 text-amber-800",
-  validee: "bg-green-100 text-green-700",
-  refusee: "bg-red-100 text-red-700",
-};
 
 const MOIS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
@@ -138,11 +132,7 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
                         <span className="font-semibold">{euros(n.total)}</span>
-                        {n.paye ? (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">Remboursée</span>
-                        ) : (
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[n.statut]}`}>{n.statut === "soumise" && n.sienne ? "En attente d'un autre co-président" : STATUT_NDF_LABELS[n.statut]}</span>
-                        )}
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statutNdfAffichage(n.statut, n.paye).cls}`}>{statutNdfAffichage(n.statut, n.paye).label}</span>
                       </div>
                     </Link>
                     {/* Aperçu du PDF sans quitter la liste */}

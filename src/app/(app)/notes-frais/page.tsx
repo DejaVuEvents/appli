@@ -136,6 +136,14 @@ export default async function NotesFraisPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="font-semibold">{euros(total(n))}</span>
+                    {/* Une note déjà remboursée qui attend encore sa validation : le
+                        virement est parti avant la régularisation. Le taire ferait croire
+                        au validateur qu'il engage une dépense à venir. */}
+                    {estPayee(n) && (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">
+                        déjà remboursée
+                      </span>
+                    )}
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[n.statut]}`}>{STATUT_NDF_LABELS[n.statut]}</span>
                   </div>
                 </Link>

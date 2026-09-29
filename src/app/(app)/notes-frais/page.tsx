@@ -68,6 +68,8 @@ export default async function NotesFraisPage() {
       created_at: (n as { date?: string | null }).date ?? n.created_at,
       total: total(n),
       paye: estPayee(n),
+      // Sa propre note : c'est un AUTRE co-président qui doit la valider.
+      sienne: n.demandeur_id === membre?.id,
     }));
   const membresListe = (membresData ?? []).map((m) => ({ id: m.id, nom: nomMembre(m) }));
 
@@ -120,7 +122,7 @@ export default async function NotesFraisPage() {
       {isCoPres && (
         <section className="mb-6">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-700">
-            À valider {aValider.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs">{aValider.length}</span>}
+            À valider par toi {aValider.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs">{aValider.length}</span>}
           </h2>
           {aValider.length === 0 ? (
             <Card className="px-4 py-3 text-sm text-muted">Aucune note de frais en attente de ta validation.</Card>

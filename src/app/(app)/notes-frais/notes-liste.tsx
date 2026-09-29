@@ -32,6 +32,8 @@ export type NoteLite = {
   created_at: string;
   total: number;
   paye?: boolean;
+  /** Note dont l'utilisateur est le demandeur : il ne peut pas la valider lui-même. */
+  sienne?: boolean;
 };
 
 const input = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm";
@@ -139,7 +141,7 @@ export function NotesFraisListe({ notes, membres }: { notes: NoteLite[]; membres
                         {n.paye ? (
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-950/50 dark:text-green-300">Remboursée</span>
                         ) : (
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[n.statut]}`}>{STATUT_NDF_LABELS[n.statut]}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUT_CLS[n.statut]}`}>{n.statut === "soumise" && n.sienne ? "En attente d'un autre co-président" : STATUT_NDF_LABELS[n.statut]}</span>
                         )}
                       </div>
                     </Link>

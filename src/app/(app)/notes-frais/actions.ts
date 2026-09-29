@@ -465,15 +465,20 @@ export async function validerNDF(noteId: string) {
   const { data: dem } = await supabase.from("membre").select("nom, email").eq("id", ndf.demandeur_id ?? "").maybeSingle();
   const demandeur = nomMembre(dem);
 
-  // Une prévision peut déjà exister pour cette note : créée à la main depuis le
-  // prévisionnel (« document associé »), elle porte note_frais_id. La valider en
-  // créait une seconde — le remboursement était compté deux fois.
-  const { data: dejaPrevue } = await supabase
+  // Une écriture peut déjà exister pour cette note. Deux cas :
+  //  — PRÉVISIONNELLE : créée à la main depuis le prévisionnel (« document associé »).
+  //    On la réutilise, sinon le remboursement serait compté deux fois.
+  //  — RÉELLE : la note a déjà été remboursée, et on la revalide après coup (une
+  //    signature régularisée, par exemple). Le virement est parti : il ne faut surtout
+  //    pas lui ajouter une prévision, qui ferait réapparaître la dépense à venir.
+  const { data: dejaLiee } = await supabase
     .from("ecriture_financiere")
-    .select("id")
+    .select("id, statut")
     .eq("note_frais_id", noteId)
-    .eq("statut", "previsionnel")
+    .order("statut")
     .maybeSingle();
+  const dejaRemboursee = dejaLiee?.statut === "reel";
+  const dejaPrevue = dejaLiee?.statut === "previsionnel" ? dejaLiee : null;
 
   // Ligne de trésorerie prévisionnelle (sortie : remboursement de frais)
   const payloadPrev = {
@@ -491,7 +496,10 @@ export async function validerNDF(noteId: string) {
   };
 
   let ecr: { id: string };
-  if (dejaPrevue) {
+  if (dejaRemboursee && dejaLiee) {
+    // Déjà décaissé : on garde l'écriture réelle telle quelle, on ne la retouche pas.
+    ecr = { id: dejaLiee.id as string };
+  } else if (dejaPrevue) {
     await supabase.from("ecriture_financiere").update(payloadPrev).eq("id", dejaPrevue.id);
     ecr = { id: dejaPrevue.id as string };
   } else {

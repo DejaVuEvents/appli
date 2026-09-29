@@ -14,7 +14,7 @@ import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
 import {
-  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF } from "../actions";
+  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF, genererReleveTrajet } from "../actions";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
 import { TrajetForm, type VehiculeTrajet } from "./trajet-form";
@@ -226,6 +226,15 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                     )}
                     {l.tarif_km != null && (
                       <span className="text-muted">barème {Number(l.tarif_km).toFixed(2)} €/km</span>
+                    )}
+                    {/* Déplacement sans pièce jointe : l'outil sait produire le relevé
+                        (carte + calcul). Les lignes créées avant ne l'ont pas. */}
+                    {editable && !justifUrl.get(l.id) && (
+                      <form action={genererReleveTrajet.bind(null, id, l.id)}>
+                        <SubmitButton className="!px-2 !py-0.5 !text-[11px]" pendingLabel="Génération…">
+                          Générer le relevé
+                        </SubmitButton>
+                      </form>
                     )}
                   </div>
                 )}

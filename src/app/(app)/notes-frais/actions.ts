@@ -9,7 +9,7 @@ import { dansUnMois } from "@/lib/format";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
-import { calculerTrajet, itineraire } from "@/lib/routage";
+import { calculerTrajet, itineraire, geocode } from "@/lib/routage";
 import { genererTrajetPdf } from "@/lib/pdf/trajet";
 import { coutTrajet, libelleTrajet, type ModeTrajet } from "@/lib/trajet";
 import { BUCKET_PRIVE, urlDocument } from "@/lib/storage";
@@ -277,9 +277,26 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   // l'outil produit lui-même — c'est ce qu'on imprimait sur Mappy pour l'agrafer.
   let justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
   if (!justificatif) {
+    const lire = (cle: string): [number, number] | null => {
+      const v = str(formData.get(cle));
+      if (!v) return null;
+      const [lon, lat] = v.split(",").map(Number);
+      return Number.isFinite(lon) && Number.isFinite(lat) ? [lon, lat] : null;
+    };
     justificatif = await releveItineraire(supabase, {
-      formData, depart: departLabel, arrivee: arriveeLabel, eviterPeages, allerRetour,
-      mode, entree, detail, vehicule: veh?.nom ?? null,
+      depart: departLabel,
+      arrivee: arriveeLabel,
+      coordDepart: lire("depart_coord"),
+      coordArrivee: lire("arrivee_coord"),
+      date: str(formData.get("date")),
+      eviterPeages,
+      allerRetour,
+      mode,
+      conso: entree.conso,
+      prixCarburant: entree.prixCarburant,
+      tarifKm: entree.tarifKm,
+      detail,
+      vehicule: veh?.nom ?? null,
     });
   }
 
@@ -700,33 +717,32 @@ export async function itineraireNDF(
 
 
 /**
- * Produit le relevé d'itinéraire en PDF et le range comme justificatif de la ligne.
+ * Produit le relevé d'itinéraire en PDF et le range dans le bucket privé.
  * Best-effort : un échec (tuiles injoignables, moteur d'itinéraire en panne) ne doit
  * pas empêcher d'enregistrer le déplacement.
  */
 async function releveItineraire(
   supabase: Supa,
   a: {
-    formData: FormData;
     depart: string;
     arrivee: string;
+    /** Coordonnées déjà connues ; sinon les adresses sont localisées. */
+    coordDepart?: [number, number] | null;
+    coordArrivee?: [number, number] | null;
+    date: string | null;
     eviterPeages: boolean;
     allerRetour: boolean;
     mode: ModeTrajet;
-    entree: { conso: number; prixCarburant: number; tarifKm: number };
+    conso: number;
+    prixCarburant: number;
+    tarifKm: number;
     detail: { km: number; carburant: number; peages: number; total: number };
     vehicule: string | null;
   },
 ): Promise<{ path: string; nom: string } | null> {
   try {
-    const lire = (cle: string): [number, number] | null => {
-      const v = str(a.formData.get(cle));
-      if (!v) return null;
-      const [lon, lat] = v.split(",").map(Number);
-      return Number.isFinite(lon) && Number.isFinite(lat) ? [lon, lat] : null;
-    };
-    const ca = lire("depart_coord");
-    const cb = lire("arrivee_coord");
+    const ca = a.coordDepart ?? (await geocode(a.depart).then((g) => g.coord).catch(() => null));
+    const cb = a.coordArrivee ?? (await geocode(a.arrivee).then((g) => g.coord).catch(() => null));
 
     let trace: [number, number][] = [];
     let dureeMin: number | null = null;
@@ -743,7 +759,7 @@ async function releveItineraire(
       ent: (ent ?? null) as ParametresEntreprise | null,
       depart: a.depart,
       arrivee: a.arrivee,
-      date: str(a.formData.get("date")),
+      date: a.date,
       allerRetour: a.allerRetour,
       eviterPeages: a.eviterPeages,
       km: a.detail.km,
@@ -751,24 +767,79 @@ async function releveItineraire(
       peage,
       vehicule: a.vehicule,
       mode: a.mode,
-      conso: a.mode === "reel" ? a.entree.conso : null,
-      prixCarburant: a.mode === "reel" ? a.entree.prixCarburant : null,
+      conso: a.mode === "reel" ? a.conso : null,
+      prixCarburant: a.mode === "reel" ? a.prixCarburant : null,
       peages: a.detail.peages,
-      tarifKm: a.mode === "bareme" ? a.entree.tarifKm : null,
+      tarifKm: a.mode === "bareme" ? a.tarifKm : null,
       carburant: a.detail.carburant,
       total: a.detail.total,
       trace,
     });
 
-    const path = `ndf/${Date.now()}-itineraire.pdf`;
-    const { data, error } = await supabase.storage.from(BUCKET_PRIVE).upload(path, pdf, {
+    const chemin = `ndf/${Date.now()}-itineraire.pdf`;
+    const { data, error } = await supabase.storage.from(BUCKET_PRIVE).upload(chemin, pdf, {
       contentType: "application/pdf",
       upsert: false,
     });
     if (error) throw new Error(error.message);
-    return { path: data.path, nom: `Itinéraire ${a.depart} - ${a.arrivee}.pdf`.replace(/[\\/]/g, "-") };
+    return { path: data.path, nom: `Itineraire ${a.depart} - ${a.arrivee}.pdf`.replace(/[\\/]/g, "-") };
   } catch (e) {
     console.error("[ndf] relevé d'itinéraire non généré :", e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+/**
+ * Génère (ou remplace) le relevé d'itinéraire d'une ligne de déplacement déjà
+ * enregistrée — utile pour les lignes créées avant que l'outil ne sache le produire.
+ */
+export async function genererReleveTrajet(noteId: string, ligneId: string) {
+  const supabase = await createSupabase();
+  await assertModifiable(supabase, noteId);
+  const { data: l } = await supabase
+    .from("ligne_note_frais")
+    .select("depart, arrivee, date, distance_km, aller_retour, conso_l_100km, prix_carburant, peages, tarif_km, vehicule_id")
+    .eq("id", ligneId)
+    .single();
+  if (!l?.depart || !l?.arrivee) throw new Error("Cette ligne n'est pas un déplacement : pas de départ ni d'arrivée.");
+
+  const { data: veh } = l.vehicule_id
+    ? await supabase.from("vehicule").select("nom").eq("id", l.vehicule_id).maybeSingle()
+    : { data: null };
+
+  const mode: ModeTrajet = l.tarif_km != null ? "bareme" : "reel";
+  const km = Number(l.distance_km ?? 0);
+  const carburant = Math.round((km * Number(l.conso_l_100km ?? 0) * Number(l.prix_carburant ?? 0)) / 100 * 100) / 100;
+  const peages = Number(l.peages ?? 0);
+  const detail = {
+    km,
+    carburant,
+    peages,
+    total: mode === "bareme"
+      ? Math.round(km * Number(l.tarif_km ?? 0) * 100) / 100
+      : Math.round((carburant + peages) * 100) / 100,
+  };
+
+  const releve = await releveItineraire(supabase, {
+    depart: l.depart,
+    arrivee: l.arrivee,
+    date: l.date,
+    // Le détail stocké ne dit pas si les péages ont été évités ; on retrace
+    // l'itinéraire standard, celui qui correspond à la distance enregistrée.
+    eviterPeages: false,
+    allerRetour: l.aller_retour === true,
+    mode,
+    conso: Number(l.conso_l_100km ?? 0),
+    prixCarburant: Number(l.prix_carburant ?? 0),
+    tarifKm: Number(l.tarif_km ?? 0),
+    detail,
+    vehicule: veh?.nom ?? null,
+  });
+  if (!releve) throw new Error("Le relevé n'a pas pu être produit (itinéraire ou carte indisponible). Réessaie.");
+
+  await supabase
+    .from("ligne_note_frais")
+    .update({ justificatif_url: releve.path, justificatif_nom: releve.nom })
+    .eq("id", ligneId);
+  revalidatePath(`/notes-frais/${noteId}`);
 }

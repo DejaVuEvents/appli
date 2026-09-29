@@ -617,7 +617,7 @@ export async function deleteNoteFrais(noteId: string) {
   const supabase = await createSupabase();
   // L'écriture de remboursement liée doit disparaître avec la note (la FK est en
   // SET NULL dans l'autre sens : sans ça elle resterait orpheline et invisible).
-  const { data: n } = await supabase.from("note_frais").select("ecriture_id").eq("id", noteId).maybeSingle();
+  const { data: n } = await supabase.from("note_frais").select("ecriture_id, numero").eq("id", noteId).maybeSingle();
   // Une note déjà remboursée porte un décaissement RÉEL, rapproché de la banque.
   // La supprimer effacerait ce mouvement et déséquilibrerait le solde face à Qonto.
   if (n?.ecriture_id) {
@@ -631,6 +631,9 @@ export async function deleteNoteFrais(noteId: string) {
   }
   await supabase.from("note_frais").delete().eq("id", noteId);
   if (n?.ecriture_id) await supabase.from("ecriture_financiere").delete().eq("id", n.ecriture_id);
+  // Note créée puis supprimée aussitôt : on rend son numéro s'il était le dernier
+  // attribué, sinon la numérotation part en trous à chaque essai abandonné.
+  if (n?.numero) await supabase.rpc("liberer_numero_ndf", { p_numero: n.numero });
   revalidatePath("/notes-frais");
   revalidatePath("/finance");
   revalidatePath("/finance/journal");

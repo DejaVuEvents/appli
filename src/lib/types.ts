@@ -353,6 +353,14 @@ export interface LigneNoteFrais {
   depart: string | null;
   arrivee: string | null;
   distance_km: number | null;
+  /** Déplacements : détail du chiffrage (carburant + péages, ou barème). */
+  aller_retour: boolean | null;
+  vehicule_id: string | null;
+  carburant: string | null;
+  conso_l_100km: number | null;
+  prix_carburant: number | null;
+  peages: number | null;
+  tarif_km: number | null;
   created_at: string;
 }
 export const STATUT_NDF_LABELS: Record<StatutNoteFrais, string> = {

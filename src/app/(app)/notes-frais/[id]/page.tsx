@@ -18,6 +18,7 @@ import {
 import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
+import { TrajetForm, type VehiculeTrajet } from "./trajet-form";
 import { STATUT_NDF_LABELS, TYPE_NDF_LABELS, type LigneNoteFrais, type NoteFrais, type StatutNoteFrais } from "@/lib/types";
 
 export default async function NoteFraisDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -59,6 +60,17 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
     : { data: null };
   const signatureReelle = !!ndf.demandeur_signe_le && !!fiche?.signature_url;
   const estPredepense = ndf.type_ndf === "predepense";
+
+  // Frais kilométriques : véhicules de l'association et prix du carburant, pour
+  // pré-remplir le calcul plutôt que de le ressaisir à chaque déplacement.
+  const [{ data: vehiculesData }, { data: paramsEnt }] =
+    ndf.type_ndf === "km"
+      ? await Promise.all([
+          supabase.from("vehicule").select("id, nom, type_carburant, conso_l_100km").order("nom"),
+          supabase.from("parametres_entreprise").select("prix_essence, prix_diesel").limit(1).maybeSingle(),
+        ])
+      : [{ data: [] }, { data: null }];
+  const vehicules = (vehiculesData ?? []) as VehiculeTrajet[];
   const isCoPres = membre?.role === "co_president";
   // « Remboursée » = l'écriture de trésorerie liée est passée en réel.
   // Le lien note ↔ écriture existe dans les deux sens ; l'un peut sauter (suppression
@@ -206,6 +218,16 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                     <a href={mappyUrl(l.depart, l.arrivee)} target="_blank" rel="noopener noreferrer" className="rounded border border-border px-1.5 py-0.5 hover:bg-background">Mappy</a>
                     <a href={googleMapsUrl(l.depart, l.arrivee)} target="_blank" rel="noopener noreferrer" className="rounded border border-border px-1.5 py-0.5 hover:bg-background">Google Maps</a>
                     {l.distance_km != null && <span className="text-muted">{l.distance_km} km</span>}
+                    {/* Le détail du calcul se relit sans rouvrir la ligne. */}
+                    {l.conso_l_100km != null && l.prix_carburant != null && (
+                      <span className="text-muted">
+                        {Number(l.conso_l_100km)} L/100 km × {Number(l.prix_carburant).toFixed(3)} €/L
+                        {Number(l.peages ?? 0) > 0 && ` + ${euros(Number(l.peages))} de péages`}
+                      </span>
+                    )}
+                    {l.tarif_km != null && (
+                      <span className="text-muted">barème {Number(l.tarif_km).toFixed(2)} €/km</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -303,40 +325,20 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
         </Modal>
       )}
 
-      {/* Frais de déplacement (véhicule perso) — calcul auto de la distance */}
-      {editable && ndf.type_ndf === "km" && !orsConfigured() && (
-        <Card className="p-4 text-sm text-amber-700">Calcul d&apos;itinéraire non configuré (clé OpenRouteService manquante).</Card>
-      )}
-      {editable && ndf.type_ndf === "km" && orsConfigured() && (
+      {/* Frais de déplacement — chiffrage « à la Mappy », dans l'outil */}
+      {editable && ndf.type_ndf === "km" && (
         <Modal
           trigger={<>+ Ajouter un déplacement</>}
-          title="Frais de déplacement (véhicule perso)"
+          title="Frais de déplacement"
           triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
         >
-          <p className="mb-3 text-sm text-muted">Distance calculée automatiquement (OpenRouteService) puis appliquée au barème kilométrique.</p>
-          <ModalForm action={ajouterTrajetNDF.bind(null, id)} className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Départ (adresse / ville)" name="depart" placeholder="19 rue Achille Viadieu, Toulouse" />
-              <Field label="Arrivée (adresse / ville)" name="arrivee" placeholder="Lieu de l&apos;événement" />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
-              <Field label="Date" name="date" type="date" />
-              <Field label="Tarif (€/km)" name="tarif_km" type="number" step="0.01" defaultValue={0.5} />
-              <label className="flex items-center gap-2 pb-2 text-sm">
-                <input type="checkbox" name="aller_retour" defaultChecked className="h-4 w-4 rounded border-border" />
-                Aller-retour
-              </label>
-            </div>
-            <div className="block">
-              <span className="mb-1 block text-sm font-medium">Relevé Mappy / itinéraire (optionnel)</span>
-              <FileDropzone name="justificatif" accept="image/*,application/pdf" />
-              <p className="mt-1 text-xs text-muted">Un lien Mappy et Google Maps est généré automatiquement pour justifier la distance ; tu peux aussi joindre une capture.</p>
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <SubmitButton pendingLabel="Calcul…">Calculer &amp; ajouter</SubmitButton>
-              <ModalCancelButton />
-            </div>
-          </ModalForm>
+          <TrajetForm
+            action={ajouterTrajetNDF.bind(null, id)}
+            vehicules={vehicules}
+            prixEssence={Number(paramsEnt?.prix_essence ?? 0)}
+            prixDiesel={Number(paramsEnt?.prix_diesel ?? 0)}
+            itineraireAuto={orsConfigured()}
+          />
         </Modal>
       )}
 

@@ -9,7 +9,8 @@ import { dansUnMois } from "@/lib/format";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
-import { calculerTrajet } from "@/lib/ors";
+import { calculerTrajet, orsConfigured } from "@/lib/ors";
+import { coutTrajet, libelleTrajet, type ModeTrajet } from "@/lib/trajet";
 import { BUCKET_PRIVE, urlDocument } from "@/lib/storage";
 
 type Supa = Awaited<ReturnType<typeof createSupabase>>;
@@ -232,23 +233,60 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   const depart = str(formData.get("depart"));
   const arrivee = str(formData.get("arrivee"));
   if (!depart || !arrivee) throw new Error("Renseigne le départ et l'arrivée.");
-  const allerRetour = formData.get("aller_retour") === "on";
-  const tarifKm = num(formData.get("tarif_km")) || 0.5;
 
-  const t = await calculerTrajet(depart, arrivee);
-  const km = Math.round(t.km * (allerRetour ? 2 : 1) * 10) / 10;
-  const montant = Math.round(km * tarifKm * 100) / 100;
-  const libelle = `Déplacement (véhicule perso) : ${t.departLabel} → ${t.arriveeLabel}${allerRetour ? " (aller-retour)" : ""} — ${km} km × ${tarifKm.toFixed(2)} €/km`;
+  const mode: ModeTrajet = formData.get("mode") === "bareme" ? "bareme" : "reel";
+  const allerRetour = formData.get("aller_retour") === "on";
+  const vehiculeId = str(formData.get("vehicule_id")) || null;
+
+  // Distance : celle saisie prime (relevé Mappy en main) ; sinon on la calcule.
+  let km = num(formData.get("km")) ?? 0;
+  let departLabel = depart;
+  let arriveeLabel = arrivee;
+  if (km <= 0) {
+    if (!orsConfigured()) {
+      throw new Error("Saisis la distance : le calcul automatique d'itinéraire n'est pas configuré.");
+    }
+    const t = await calculerTrajet(depart, arrivee);
+    km = t.km;
+    departLabel = t.departLabel || depart;
+    arriveeLabel = t.arriveeLabel || arrivee;
+  }
+
+  const entree = {
+    mode,
+    km,
+    allerRetour,
+    conso: num(formData.get("conso")) ?? 0,
+    prixCarburant: num(formData.get("prix_carburant")) ?? 0,
+    peages: num(formData.get("peages")) ?? 0,
+    tarifKm: num(formData.get("tarif_km")) ?? 0.5,
+  };
+  if (mode === "reel" && (entree.conso <= 0 || entree.prixCarburant <= 0) && entree.peages <= 0) {
+    throw new Error("Renseigne la consommation et le prix du carburant (ou des péages) pour chiffrer le trajet.");
+  }
+  const detail = coutTrajet(entree);
+
+  const { data: veh } = vehiculeId
+    ? await supabase.from("vehicule").select("nom, type_carburant").eq("id", vehiculeId).maybeSingle()
+    : { data: null };
+
   const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
 
   const { error } = await supabase.from("ligne_note_frais").insert({
     note_frais_id: noteId,
-    libelle,
+    libelle: libelleTrajet(entree, detail, departLabel, arriveeLabel, veh?.nom ?? null),
     date: str(formData.get("date")),
-    montant_ttc: montant,
-    depart: t.departLabel || depart,
-    arrivee: t.arriveeLabel || arrivee,
-    distance_km: km,
+    montant_ttc: detail.total,
+    depart: departLabel,
+    arrivee: arriveeLabel,
+    distance_km: detail.km,
+    aller_retour: allerRetour,
+    vehicule_id: vehiculeId,
+    carburant: mode === "reel" ? (veh?.type_carburant ?? null) : null,
+    conso_l_100km: mode === "reel" ? entree.conso : null,
+    prix_carburant: mode === "reel" ? entree.prixCarburant : null,
+    peages: mode === "reel" ? detail.peages : null,
+    tarif_km: mode === "bareme" ? entree.tarifKm : null,
     justificatif_url: justificatif?.path ?? null,
     justificatif_nom: justificatif?.nom ?? null,
   });

@@ -69,6 +69,8 @@ export function TrajetForm({
   const [km, setKm] = useState("");
   const [tarifKm, setTarifKm] = useState("0.5");
   const [allerRetour, setAllerRetour] = useState(true);
+  const [eviterPeages, setEviterPeages] = useState(false);
+  const [peageSurRoute, setPeageSurRoute] = useState<boolean | undefined>(undefined);
 
   // Adresse tapée sans passer par la liste : on retient la meilleure proposition,
   // comme le fait Mappy. Sans ça, un utilisateur qui saisit une adresse correcte
@@ -97,12 +99,13 @@ export function TrajetForm({
     if (!depart || !arrivee) {
       setItin({ etat: "vide" });
       setTrace(null);
+      setPeageSurRoute(undefined);
       return;
     }
     const jeton = ++requete.current;
     setItin({ etat: "calcul" });
     (async () => {
-      const r = await itineraireNDF(depart.coord, arrivee.coord);
+      const r = await itineraireNDF(depart.coord, arrivee.coord, eviterPeages);
       if (jeton !== requete.current) return;
       if ("erreur" in r) {
         setItin({ etat: "ko", motif: r.erreur });
@@ -111,9 +114,10 @@ export function TrajetForm({
       }
       setKm(String(r.km));
       setTrace(r.trace);
+      setPeageSurRoute(r.peage);
       setItin({ etat: "ok", min: r.dureeMin });
     })();
-  }, [depart, arrivee]);
+  }, [depart, arrivee, eviterPeages]);
 
   // Choisir un véhicule enregistré reprend sa motorisation et sa consommation.
   const choisirVehicule = (id: string) => {
@@ -159,6 +163,10 @@ export function TrajetForm({
   return (
     <ModalForm action={action} className="space-y-4">
       <input type="hidden" name="mode" value={mode} />
+      {/* Coordonnées retenues : le serveur retrace l'itinéraire pour produire le
+          justificatif PDF, sans refaire de géocodage ni transporter le tracé. */}
+      {depart && <input type="hidden" name="depart_coord" value={depart.coord.join(",")} />}
+      {arrivee && <input type="hidden" name="arrivee_coord" value={arrivee.coord.join(",")} />}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         {/* ---- Colonne gauche : la saisie ---- */}
@@ -224,15 +232,38 @@ export function TrajetForm({
                 placeholder={itin.etat === "calcul" ? "…" : "ex. 84"}
               />
             </label>
-            <label className="flex items-center gap-2 pb-2 text-sm">
-              <input
-                type="checkbox" name="aller_retour" checked={allerRetour}
-                onChange={(e) => setAllerRetour(e.target.checked)}
-                className="h-4 w-4 rounded border-border"
-              />
-              Aller-retour
-            </label>
+            <div className="space-y-1.5 pb-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox" name="aller_retour" checked={allerRetour}
+                  onChange={(e) => setAllerRetour(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Aller-retour
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox" name="eviter_peages" checked={eviterPeages}
+                  onChange={(e) => setEviterPeages(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Éviter les péages
+              </label>
+            </div>
           </div>
+
+          {/* Éviter les péages est une préférence forte, pas une interdiction :
+              quand il n'existe pas d'alternative, on le dit plutôt que de laisser
+              croire à un trajet gratuit. */}
+          {peageSurRoute !== undefined && itin.etat === "ok" && (
+            <p className="-mt-2 text-xs text-muted">
+              {peageSurRoute
+                ? eviterPeages
+                  ? "Un péage subsiste malgré l'évitement : aucun contournement raisonnable. Vérifie sur place et saisis-le le cas échéant."
+                  : "Cet itinéraire comporte un péage — saisis son montant ci-dessous, ou coche « Éviter les péages »."
+                : "Aucun péage sur cet itinéraire."}
+            </p>
+          )}
 
           {mode === "reel" ? (
             <>

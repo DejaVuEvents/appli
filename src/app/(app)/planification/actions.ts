@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
-import { geocode, itineraireMulti } from "@/lib/ors";
+import { geocode, itineraireMulti } from "@/lib/routage";
 import { copierDevisDans } from "@/lib/devis-copie";
 import { ROLES_MEMBRE } from "@/lib/roles";
 

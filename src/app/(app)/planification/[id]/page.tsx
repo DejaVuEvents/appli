@@ -10,7 +10,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { PrintButton } from "@/components/print-button";
 import { dateFr, euros } from "@/lib/format";
 import { addEtape, deleteEtape, toggleEtapeFait, deplacerEtape, calculerItineraire, setVehiculeTournee } from "../actions";
-import { orsConfigured } from "@/lib/ors";
+import { orsConfigured } from "@/lib/routage";
 import { coutKmVehicule } from "@/lib/vehicule";
 import { ajouterJourVehicule, supprimerJourVehicule } from "../actions";
 import { InfoHint } from "@/components/info-hint";

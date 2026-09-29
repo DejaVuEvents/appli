@@ -9,9 +9,11 @@ import { dansUnMois } from "@/lib/format";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
-import { calculerTrajet, itineraireTrace } from "@/lib/ors";
+import { calculerTrajet, itineraire } from "@/lib/routage";
+import { genererTrajetPdf } from "@/lib/pdf/trajet";
 import { coutTrajet, libelleTrajet, type ModeTrajet } from "@/lib/trajet";
 import { BUCKET_PRIVE, urlDocument } from "@/lib/storage";
+import type { ParametresEntreprise } from "@/lib/types";
 
 type Supa = Awaited<ReturnType<typeof createSupabase>>;
 
@@ -237,6 +239,7 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   const mode: ModeTrajet = formData.get("mode") === "bareme" ? "bareme" : "reel";
   const allerRetour = formData.get("aller_retour") === "on";
   const vehiculeId = str(formData.get("vehicule_id")) || null;
+  const eviterPeages = formData.get("eviter_peages") === "on";
 
   // Distance : celle saisie prime (relevé Mappy en main) ; sinon on la calcule.
   let km = num(formData.get("km")) ?? 0;
@@ -245,7 +248,7 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   if (km <= 0) {
     // Dernier recours : l'utilisateur n'a pas choisi d'adresse dans les suggestions.
     // On localise et on calcule ici plutôt que de refuser l'enregistrement.
-    const t = await calculerTrajet(depart, arrivee);
+    const t = await calculerTrajet(depart, arrivee, { eviterPeages });
     km = t.km;
     departLabel = t.departLabel || depart;
     arriveeLabel = t.arriveeLabel || arrivee;
@@ -270,7 +273,15 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
     ? await supabase.from("vehicule").select("nom, type_carburant").eq("id", vehiculeId).maybeSingle()
     : { data: null };
 
-  const justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
+  // Justificatif : celui déposé s'il y en a un, sinon le relevé d'itinéraire que
+  // l'outil produit lui-même — c'est ce qu'on imprimait sur Mappy pour l'agrafer.
+  let justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
+  if (!justificatif) {
+    justificatif = await releveItineraire(supabase, {
+      formData, depart: departLabel, arrivee: arriveeLabel, eviterPeages, allerRetour,
+      mode, entree, detail, vehicule: veh?.nom ?? null,
+    });
+  }
 
   const { error } = await supabase.from("ligne_note_frais").insert({
     note_frais_id: noteId,
@@ -668,16 +679,96 @@ export async function marquerNDFRemboursee(noteId: string, formData?: FormData) 
 
 /**
  * Itinéraire entre deux points déjà localisés par l'autocomplétion d'adresses :
- * distance, durée et tracé, pour la carte du formulaire de déplacement.
- * Ne lève pas — le formulaire affiche le motif et laisse saisir la distance à la main.
+ * distance, durée, tracé et présence de péage, pour la carte du formulaire.
+ * Ne lève pas — le formulaire affiche le motif et laisse saisir la distance.
  */
 export async function itineraireNDF(
   a: [number, number],
   b: [number, number],
-): Promise<{ km: number; dureeMin: number; trace: [number, number][] } | { erreur: string }> {
+  eviterPeages = false,
+): Promise<
+  | { km: number; dureeMin: number; trace: [number, number][]; peage?: boolean }
+  | { erreur: string }
+> {
   try {
-    return await itineraireTrace(a, b);
+    const r = await itineraire([a, b], { eviterPeages });
+    return { km: r.km, dureeMin: r.dureeMin, trace: r.trace, peage: r.peage };
   } catch (e) {
     return { erreur: e instanceof Error ? e.message : "Itinéraire introuvable." };
+  }
+}
+
+
+/**
+ * Produit le relevé d'itinéraire en PDF et le range comme justificatif de la ligne.
+ * Best-effort : un échec (tuiles injoignables, moteur d'itinéraire en panne) ne doit
+ * pas empêcher d'enregistrer le déplacement.
+ */
+async function releveItineraire(
+  supabase: Supa,
+  a: {
+    formData: FormData;
+    depart: string;
+    arrivee: string;
+    eviterPeages: boolean;
+    allerRetour: boolean;
+    mode: ModeTrajet;
+    entree: { conso: number; prixCarburant: number; tarifKm: number };
+    detail: { km: number; carburant: number; peages: number; total: number };
+    vehicule: string | null;
+  },
+): Promise<{ path: string; nom: string } | null> {
+  try {
+    const lire = (cle: string): [number, number] | null => {
+      const v = str(a.formData.get(cle));
+      if (!v) return null;
+      const [lon, lat] = v.split(",").map(Number);
+      return Number.isFinite(lon) && Number.isFinite(lat) ? [lon, lat] : null;
+    };
+    const ca = lire("depart_coord");
+    const cb = lire("arrivee_coord");
+
+    let trace: [number, number][] = [];
+    let dureeMin: number | null = null;
+    let peage: boolean | undefined;
+    if (ca && cb) {
+      const r = await itineraire([ca, cb], { eviterPeages: a.eviterPeages });
+      trace = r.trace;
+      dureeMin = r.dureeMin * (a.allerRetour ? 2 : 1);
+      peage = r.peage;
+    }
+
+    const { data: ent } = await supabase.from("parametres_entreprise").select("*").limit(1).maybeSingle();
+    const pdf = await genererTrajetPdf({
+      ent: (ent ?? null) as ParametresEntreprise | null,
+      depart: a.depart,
+      arrivee: a.arrivee,
+      date: str(a.formData.get("date")),
+      allerRetour: a.allerRetour,
+      eviterPeages: a.eviterPeages,
+      km: a.detail.km,
+      dureeMin,
+      peage,
+      vehicule: a.vehicule,
+      mode: a.mode,
+      conso: a.mode === "reel" ? a.entree.conso : null,
+      prixCarburant: a.mode === "reel" ? a.entree.prixCarburant : null,
+      peages: a.detail.peages,
+      tarifKm: a.mode === "bareme" ? a.entree.tarifKm : null,
+      carburant: a.detail.carburant,
+      total: a.detail.total,
+      trace,
+    });
+
+    const path = `ndf/${Date.now()}-itineraire.pdf`;
+    const { data, error } = await supabase.storage.from(BUCKET_PRIVE).upload(path, pdf, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    return { path: data.path, nom: `Itinéraire ${a.depart} - ${a.arrivee}.pdf`.replace(/[\\/]/g, "-") };
+  } catch (e) {
+    console.error("[ndf] relevé d'itinéraire non généré :", e instanceof Error ? e.message : e);
+    return null;
   }
 }

@@ -6,6 +6,7 @@ import { Modal } from "@/components/modal";
 import { FinanceTabs } from "../finance-tabs";
 import { deleteRoiItem, createRoiItem, updateRoiItem } from "./actions";
 import { RoiForm } from "./roi-form";
+import { revenuReelParReference, type LigneRevenu } from "@/lib/roi-revenu";
 import { calcROI } from "@/lib/finance";
 import { euros } from "@/lib/format";
 import type { RoiMateriel, MaterielReference } from "@/lib/types";
@@ -26,13 +27,7 @@ function moisBadge(m: number | null) {
   return <span className="font-semibold text-red-600">{label}</span>;
 }
 
-type LignePrest = {
-  reference_id: string | null;
-  prix_total: number | null;
-  prix_unitaire: number | null;
-  quantite: number;
-  prestation: { statut: string; date_event_debut: string | null } | null;
-};
+
 
 type ItemCalc = {
   item: RoiMateriel;
@@ -194,29 +189,27 @@ export default async function RoiPage({
   const annee = Number(sp.annee) || new Date().getFullYear();
 
   const supabase = await createClient();
-  const [{ data: roiData }, { data: refData }, { data: prestData }] = await Promise.all([
+  const [{ data: roiData }, { data: refData }, { data: prestData }, { data: facturesData }] = await Promise.all([
     supabase.from("roi_materiel").select("*").order("nom"),
     supabase.from("materiel_reference").select("id, nom").order("nom"),
     supabase
       .from("ligne_prestation")
-      .select("reference_id, prix_total, prix_unitaire, quantite, prestation:prestation_id(statut, date_event_debut)")
-      .not("reference_id", "is", null),
+      .select("reference_id, devis_id, prix_total, prix_unitaire, quantite, prestation_id, prestation:prestation_id(statut, date_event_debut)"),
+    // Quels documents ont donné lieu à une facture émise : c'est elle qui fait foi.
+    supabase.from("devis_facture").select("devis_id").eq("type", "facture"),
   ]);
 
   const items = (roiData ?? []) as RoiMateriel[];
   const references = (refData ?? []) as MaterielReference[];
-  const lignes = (prestData ?? []) as unknown as LignePrest[];
+  const lignes = (prestData ?? []) as unknown as LigneRevenu[];
+  const devisFactures = new Set(
+    ((facturesData ?? []) as { devis_id: string | null }[]).map((f) => f.devis_id).filter(Boolean) as string[],
+  );
 
-  // Revenus réels par reference_id pour l'année
-  const revenuReel = new Map<string, number>();
-  for (const l of lignes) {
-    if (!l.reference_id || !l.prestation) continue;
-    if (!["signe", "realise"].includes(l.prestation.statut)) continue;
-    const dateStr = l.prestation.date_event_debut;
-    if (!dateStr || new Date(dateStr).getFullYear() !== annee) continue;
-    const montant = l.prix_total ?? (l.prix_unitaire ?? 0) * l.quantite;
-    revenuReel.set(l.reference_id, (revenuReel.get(l.reference_id) ?? 0) + montant);
-  }
+  // Un seul document par événement : sans ça, un devis converti en facture comptait
+  // son chiffre d'affaires deux fois (voir src/lib/roi-revenu.ts).
+  const reel = revenuReelParReference(lignes, annee, devisFactures);
+  const revenuReel = reel.parReference;
 
   // Calcul ROI pour chaque item
   const calculs: ItemCalc[] = items.map((item) => ({
@@ -326,7 +319,16 @@ export default async function RoiPage({
           <p><strong>Coût annuel</strong> = (achat − revente) ÷ durée + maintenance</p>
           <p><strong>Taux de marge</strong> = (gains − coût annuel) ÷ gains — part des recettes qui reste en bénéfice, à ne pas confondre avec un retour sur investissement, qui se rapporterait au capital engagé</p>
           <p><strong>Rentabilité</strong> = (achat − revente) ÷ ((gains − maintenance) ÷ 12)</p>
-          <p><strong>Réel {annee}</strong> = revenus issus des prestations facturées dans l'app pour les références liées au catalogue.</p>
+          <p>
+            <strong>Réel {annee}</strong> = revenus des événements <strong>signés ou réalisés</strong> de l&apos;année,
+            pour les références liées au catalogue. Un événement porte souvent plusieurs documents (versions d&apos;un devis,
+            puis la facture, qui reprend les mêmes lignes) : on n&apos;en retient donc qu&apos;<strong>un seul</strong> —
+            la facture si elle existe, sinon le devis le plus complet.
+            {reel.documentsEcartes > 0 && (
+              <> Cette année, {reel.documentsEcartes} document{reel.documentsEcartes > 1 ? "s" : ""} en double
+              {reel.documentsEcartes > 1 ? " ont" : " a"} été écarté{reel.documentsEcartes > 1 ? "s" : ""} du calcul.</>
+            )}
+          </p>
           <p><strong>4 situations modélisées</strong> : prestation + matériel propre / prestation + location externe / interne + matériel propre / interne + location externe.</p>
         </div>
       </details>

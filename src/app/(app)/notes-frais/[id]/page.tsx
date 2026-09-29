@@ -136,11 +136,6 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           </div>
         </Card>
       )}
-      {ndf.statut === "soumise" && (
-        <Card className="border-primary/30 bg-primary/5 p-4 text-sm">
-          <strong>Soumise</strong> — en attente de validation par un co-président autre que le demandeur.
-        </Card>
-      )}
       {ndf.statut === "refusee" && (
         <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <strong>Refusée</strong> par {mMap.get(ndf.valide_par ?? "") ?? "—"} le {dateFr(ndf.valide_le)}.
@@ -423,16 +418,13 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
 
         {ndf.statut === "soumise" && estDemandeur && (
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-            <span>En attente de validation par un co-président (autre que toi).</span>
+            <span>Un <strong>autre</strong> co-président doit la valider.</span>
             <form action={repasserBrouillonNDF.bind(null, id)}>
               <button className="text-primary underline" type="submit">Repasser en brouillon</button>
             </form>
           </div>
         )}
 
-        {ndf.statut === "soumise" && membre?.role === "co_president" && estDemandeur && (
-          <p className="text-sm text-muted">Tu es le demandeur : un <strong>autre</strong> co-président doit valider.</p>
-        )}
 
         {peutValider && !membre?.signature_url && (
           <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-950/20 dark:text-red-300">

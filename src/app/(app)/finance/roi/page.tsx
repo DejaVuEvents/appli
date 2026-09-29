@@ -6,7 +6,6 @@ import { Modal } from "@/components/modal";
 import { FinanceTabs } from "../finance-tabs";
 import { deleteRoiItem, createRoiItem, updateRoiItem } from "./actions";
 import { RoiForm } from "./roi-form";
-import { revenuReelParReference, type LigneRevenu } from "@/lib/roi-revenu";
 import { calcROI } from "@/lib/finance";
 import { euros } from "@/lib/format";
 import type { RoiMateriel, MaterielReference } from "@/lib/types";
@@ -189,27 +188,40 @@ export default async function RoiPage({
   const annee = Number(sp.annee) || new Date().getFullYear();
 
   const supabase = await createClient();
-  const [{ data: roiData }, { data: refData }, { data: prestData }, { data: facturesData }] = await Promise.all([
+  const [{ data: roiData }, { data: refData }, { data: prestData }] = await Promise.all([
     supabase.from("roi_materiel").select("*").order("nom"),
     supabase.from("materiel_reference").select("id, nom").order("nom"),
+    // Le revenu réel vient de la liste du matériel de l'événement, pas des lignes de
+    // devis : c'est elle qui dit ce qui est réellement parti (cf. src/lib/materiel-evenement.ts).
     supabase
-      .from("ligne_prestation")
-      .select("reference_id, devis_id, prix_total, prix_unitaire, quantite, prestation_id, prestation:prestation_id(statut, date_event_debut)"),
-    // Quels documents ont donné lieu à une facture émise : c'est elle qui fait foi.
-    supabase.from("devis_facture").select("devis_id").eq("type", "facture"),
+      .from("prestation_materiel")
+      .select("reference_id, montant, utilise, prestation:prestation_id(statut, date_event_debut)")
+      .eq("utilise", true)
+      .not("reference_id", "is", null),
   ]);
 
   const items = (roiData ?? []) as RoiMateriel[];
   const references = (refData ?? []) as MaterielReference[];
-  const lignes = (prestData ?? []) as unknown as LigneRevenu[];
-  const devisFactures = new Set(
-    ((facturesData ?? []) as { devis_id: string | null }[]).map((f) => f.devis_id).filter(Boolean) as string[],
-  );
+  const materiel = (prestData ?? []) as unknown as {
+    reference_id: string; montant: number;
+    prestation: { statut: string; date_event_debut: string | null } | null;
+  }[];
 
-  // Un seul document par événement : sans ça, un devis converti en facture comptait
-  // son chiffre d'affaires deux fois (voir src/lib/roi-revenu.ts).
-  const reel = revenuReelParReference(lignes, annee, devisFactures);
-  const revenuReel = reel.parReference;
+  const revenuReel = new Map<string, number>();
+  let materielEcarte = 0;
+  for (const m of materiel) {
+    const p = m.prestation;
+    if (!p || !["signe", "realise"].includes(p.statut)) continue;
+    if (!p.date_event_debut || new Date(p.date_event_debut).getFullYear() !== annee) continue;
+    revenuReel.set(m.reference_id, (revenuReel.get(m.reference_id) ?? 0) + Number(m.montant ?? 0));
+  }
+
+  // Matériel de l'année décoché « non utilisé » : il ne rapporte rien et on le dit.
+  const { count: nonUtilises } = await supabase
+    .from("prestation_materiel")
+    .select("id", { count: "exact", head: true })
+    .eq("utilise", false);
+  materielEcarte = nonUtilises ?? 0;
 
   // Calcul ROI pour chaque item
   const calculs: ItemCalc[] = items.map((item) => ({
@@ -321,12 +333,12 @@ export default async function RoiPage({
           <p><strong>Rentabilité</strong> = (achat − revente) ÷ ((gains − maintenance) ÷ 12)</p>
           <p>
             <strong>Réel {annee}</strong> = revenus des événements <strong>signés ou réalisés</strong> de l&apos;année,
-            pour les références liées au catalogue. Un événement porte souvent plusieurs documents (versions d&apos;un devis,
-            puis la facture, qui reprend les mêmes lignes) : on n&apos;en retient donc qu&apos;<strong>un seul</strong> —
-            la facture si elle existe, sinon le devis le plus complet.
-            {reel.documentsEcartes > 0 && (
-              <> Cette année, {reel.documentsEcartes} document{reel.documentsEcartes > 1 ? "s" : ""} en double
-              {reel.documentsEcartes > 1 ? " ont" : " a"} été écarté{reel.documentsEcartes > 1 ? "s" : ""} du calcul.</>
+            d&apos;après la <strong>liste du matériel de chaque événement</strong> (onglet Préparation) : c&apos;est
+            elle qui dit ce qui est réellement parti, pas le devis. Les doublons entre versions d&apos;un devis
+            et sa facture y sont déjà écartés.
+            {materielEcarte > 0 && (
+              <> {materielEcarte} matériel{materielEcarte > 1 ? "s" : ""} décoché{materielEcarte > 1 ? "s" : ""}
+              « non utilisé » {materielEcarte > 1 ? "sont exclus" : "est exclu"} du calcul.</>
             )}
           </p>
           <p><strong>4 situations modélisées</strong> : prestation + matériel propre / prestation + location externe / interne + matériel propre / interne + location externe.</p>

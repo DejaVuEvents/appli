@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { getMembreActuel } from "@/lib/membre";
+import { synchroniserMaterielEvenement } from "@/lib/materiel-evenement";
 
 const str = (v: FormDataEntryValue | null) => {
   const s = String(v ?? "").trim();
@@ -36,7 +37,7 @@ export async function rattacherLibelle(formData: FormData) {
 
   const { data: lignes } = await supabase
     .from("ligne_prestation")
-    .select("id, categorie_id")
+    .select("id, categorie_id, prestation_id")
     .is("reference_id", null)
     .eq("designation", designation);
 
@@ -46,6 +47,12 @@ export async function rattacherLibelle(formData: FormData) {
       .update({ reference_id: referenceId, categorie_id: l.categorie_id ?? ref?.categorie_id ?? null })
       .eq("id", l.id);
   }
+
+  // Ces lignes deviennent du matériel : la liste de chaque événement concerné doit
+  // les reprendre, sinon elles resteraient invisibles du ROI et de la check-list.
+  const evenements = new Set((lignes ?? []).map((l) => l.prestation_id).filter(Boolean) as string[]);
+  for (const p of evenements) await synchroniserMaterielEvenement(supabase, p);
+
   rafraichir();
 }
 

@@ -190,3 +190,73 @@ export async function remplacerUnite(prestationId: string, ancienneUniteId: stri
   revalider(prestationId);
   return { ok: true, message: `Remplacée par ${remplacant.numero_serie || "une autre unité"}.` };
 }
+
+/* ---------------------------------------------- Matériel réellement utilisé ---- */
+
+function rafraichirMateriel(prestationId: string) {
+  revalidatePath(`/prestations/${prestationId}/preparation`);
+  revalidatePath(`/prestations/${prestationId}`);
+  revalidatePath("/finance/roi");
+}
+
+/**
+ * Coche ou décoche un matériel de la liste de l'événement.
+ * Décoché = il n'est pas parti : il sort du ROI et de l'historique d'usage.
+ */
+export async function basculerMaterielUtilise(
+  prestationId: string,
+  materielId: string,
+  utilise: boolean,
+) {
+  const supabase = await createSupabase();
+  await supabase.from("prestation_materiel").update({ utilise }).eq("id", materielId);
+  rafraichirMateriel(prestationId);
+}
+
+/**
+ * Ajoute du matériel embarqué au dernier moment, absent des documents.
+ * Son montant est nul : il use du matériel sans rien rapporter. Pour le facturer,
+ * il faut créer un document — ses lignes rejoindront alors cette liste d'elles-mêmes.
+ */
+export async function ajouterMaterielEvenement(prestationId: string, formData: FormData) {
+  const supabase = await createSupabase();
+  const referenceId = String(formData.get("reference_id") ?? "").trim();
+  if (!referenceId) throw new Error("Choisis une référence du catalogue.");
+  const quantite = Math.max(1, Math.round(num(formData.get("quantite")) || 1));
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  const { data: ref } = await supabase
+    .from("materiel_reference")
+    .select("nom")
+    .eq("id", referenceId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("prestation_materiel").insert({
+    prestation_id: prestationId,
+    reference_id: referenceId,
+    designation: ref?.nom ?? null,
+    quantite,
+    montant: 0,
+    origine: "ajout",
+    note,
+  });
+  if (error) throw new Error(error.message);
+  rafraichirMateriel(prestationId);
+}
+
+/** Retire un ajout manuel. Le matériel issu d'un document se décoche, il ne se supprime pas. */
+export async function supprimerMaterielEvenement(prestationId: string, materielId: string) {
+  const supabase = await createSupabase();
+  const { data: m } = await supabase
+    .from("prestation_materiel")
+    .select("origine")
+    .eq("id", materielId)
+    .maybeSingle();
+  if (m?.origine !== "ajout") {
+    throw new Error(
+      "Ce matériel vient d'un devis : décoche-le « non utilisé » plutôt que de le supprimer, sinon il reviendrait à la prochaine synchronisation.",
+    );
+  }
+  await supabase.from("prestation_materiel").delete().eq("id", materielId);
+  rafraichirMateriel(prestationId);
+}

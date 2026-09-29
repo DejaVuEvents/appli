@@ -6,6 +6,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { etatDepuisMouvements, type EtatPrepa } from "@/lib/mouvements";
 import { chargerUnite, rentrerUnite, annulerSortieUnite, basculerCharge } from "./actions";
 import { PrepaScanner, RemplacerBtn } from "./prepa-scanner";
+import { MaterielEvenement, type MaterielRow } from "./materiel-evenement";
+import { synchroniserMaterielEvenement } from "@/lib/materiel-evenement";
 import type { Prestation } from "@/lib/types";
 import { EventTabBar } from "@/components/event-tab-bar";
 import { IconPrint } from "@/components/icons";
@@ -47,7 +49,12 @@ export default async function PreparationPage({
   const retourLocation = retourBrut && retourBrut.startsWith("/planification/location/") ? retourBrut : null;
   const supabase = await createClient();
 
-  const [{ data: prest }, { data: resaData }, { data: mvtData }, { data: lignesData }] = await Promise.all([
+  // La liste du matériel se met à jour au chargement : les documents ont pu bouger
+  // depuis la dernière visite, et c'est elle qui alimente le ROI.
+  await synchroniserMaterielEvenement(supabase, id);
+
+  const [{ data: prest }, { data: resaData }, { data: mvtData }, { data: lignesData },
+         { data: materielData }, { data: refData }] = await Promise.all([
     supabase.from("prestation").select("*").eq("id", id).single(),
     supabase
       .from("reservation_unite")
@@ -59,6 +66,13 @@ export default async function PreparationPage({
       .select("id, designation, quantite, unite, charge, reference_id")
       .eq("prestation_id", id)
       .order("created_at"),
+    supabase
+      .from("prestation_materiel")
+      .select("id, designation, quantite, utilise, origine, note")
+      .eq("prestation_id", id)
+      .order("origine")
+      .order("designation"),
+    supabase.from("materiel_reference").select("id, nom").order("nom"),
   ]);
 
   if (!prest) notFound();
@@ -66,6 +80,8 @@ export default async function PreparationPage({
   const reservations = (resaData ?? []) as unknown as ResaRow[];
   const mouvements = (mvtData ?? []) as { unite_id: string; type: string }[];
   const lignes = (lignesData ?? []) as LigneRow[];
+  const materiel = (materielData ?? []) as MaterielRow[];
+  const references = (refData ?? []) as { id: string; nom: string }[];
 
   // État de chaque unité réservée
   const etatUnite = (uniteId: string): EtatPrepa =>
@@ -120,6 +136,8 @@ export default async function PreparationPage({
           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </Card>
+
+      <MaterielEvenement prestationId={id} materiel={materiel} references={references} />
 
       {total === 0 && (
         <Card className="px-4 py-4 text-sm text-muted">

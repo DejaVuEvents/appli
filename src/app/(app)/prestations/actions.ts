@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
+import { synchroniserMaterielEvenement } from "@/lib/materiel-evenement";
 import { montantLigne, coutTransport, periodeReservation, montantRemise, totalApresCoeffEtRemise, type RemiseType } from "@/lib/devis";
 import { totalDevis } from "@/lib/acompte";
 import { BUCKET_PRIVE } from "@/lib/storage";
@@ -62,8 +63,17 @@ async function toucherDevis(supabase: Supa, devisId: string) {
   // Un devis signé alimente le prévisionnel : on resynchronise son montant à chaque
   // modification (lignes, remise, coefficient) pour qu'il ne reste pas figé.
   await synchroniserEcritureDevisSigne(supabase, devisId);
+
+  // La liste du matériel de l'événement suit les documents : sans ça, une ligne
+  // ajoutée au devis n'apparaîtrait ni dans la check-list ni dans le ROI.
+  const { data: dv } = await supabase.from("devis").select("prestation_id").eq("id", devisId).maybeSingle();
+  if (dv?.prestation_id) {
+    await synchroniserMaterielEvenement(supabase, dv.prestation_id);
+    revalidatePath(`/prestations/${dv.prestation_id}/preparation`);
+  }
   revalidatePath("/finance");
   revalidatePath("/finance/previsionnel");
+  revalidatePath("/finance/roi");
 }
 
 /**

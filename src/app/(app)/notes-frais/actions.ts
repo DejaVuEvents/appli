@@ -434,6 +434,14 @@ export async function validerNDF(noteId: string) {
   const supabase = await createSupabase();
   const membre = await getMembreActuel(supabase);
   if (!membre || membre.role !== "co_president") throw new Error("Seul un co-président peut valider une note de frais.");
+  // Valider APPOSE la signature du responsable sur le document : sans image enregistrée,
+  // la case « Responsable » du PDF resterait vide et la note ne vaudrait rien.
+  if (!membre.signature_url) {
+    throw new Error(
+      "Tu n'as aucune signature enregistrée : la case « Responsable » du document resterait vide. "
+      + "Ajoute-la dans Paramètres → Mon compte, puis valide.",
+    );
+  }
 
   const { data: ndf } = await supabase
     .from("note_frais")

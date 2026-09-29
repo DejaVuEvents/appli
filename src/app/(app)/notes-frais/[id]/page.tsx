@@ -434,7 +434,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           <p className="text-sm text-muted">Tu es le demandeur : un <strong>autre</strong> co-président doit valider.</p>
         )}
 
-        {peutValider && !estPredepense && !signatureReelle && (
+        {peutValider && !membre?.signature_url && (
+          <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-950/20 dark:text-red-300">
+            <strong>Validation bloquée</strong> — tu n&apos;as aucune signature enregistrée. Valider appose
+            ta signature sur le document ; sans elle, la case « Responsable » resterait vide.{" "}
+            <Link href="/parametres?tab=moncompte" className="underline">Ajouter ma signature</Link>
+          </div>
+        )}
+        {peutValider && !!membre?.signature_url && !estPredepense && !signatureReelle && (
           <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-950/20 dark:text-red-300">
             <strong>Validation bloquée</strong> — cette note ne porte pas de signature.
             {!ndf.demandeur_signe_le
@@ -442,7 +449,7 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
               : ` ${demandeur} n'a aucune signature enregistrée : le document produit n'en porterait aucune.`}
           </div>
         )}
-        {peutValider && (estPredepense || signatureReelle) && (
+        {peutValider && !!membre?.signature_url && (estPredepense || signatureReelle) && (
           <div className="space-y-3">
             <form action={validerNDF.bind(null, id)}>
               {estPredepense ? (

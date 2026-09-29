@@ -357,7 +357,7 @@ export interface LigneNoteFrais {
 }
 export const STATUT_NDF_LABELS: Record<StatutNoteFrais, string> = {
   brouillon: "Brouillon",
-  soumise: "En attente de validation",
+  soumise: "Attente de validation",
   validee: "Validée",
   refusee: "Refusée",
 };

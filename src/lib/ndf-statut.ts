@@ -2,7 +2,7 @@
 //
 // UN SEUL statut par document, partout : liste, file de validation, fiche.
 // L'échelle va du moins au plus avancé —
-//   Brouillon → En attente de validation → Validée → Remboursée,
+//   Brouillon → Attente de validation → Validée → Remboursée,
 // « Refusée » étant la sortie de route. Le remboursement est la dernière marche,
 // pas une étiquette à part : une note remboursée affiche « Remboursée », point.
 // (Deux pastilles côte à côte laissaient croire à deux statuts concurrents.)

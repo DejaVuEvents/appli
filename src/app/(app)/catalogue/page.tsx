@@ -120,6 +120,15 @@ export default async function CataloguePage({
     .order("nom");
   const refs = (refData ?? []) as unknown as RefRow[];
 
+  // Lignes de devis encore hors catalogue, écartées mises à part.
+  const [{ data: libresData }, { data: ignoresData }] = await Promise.all([
+    supabase.from("ligne_prestation").select("designation").is("reference_id", null),
+    supabase.from("libelle_ignore").select("designation"),
+  ]);
+  const ignores = new Set(((ignoresData ?? []) as { designation: string }[]).map((i) => i.designation));
+  const aRattacher = ((libresData ?? []) as { designation: string | null }[])
+    .filter((l) => l.designation && !ignores.has(l.designation.trim())).length;
+
   const isExterne = activeCatId === EXTERNE_ID;
 
   const nouvelleReference = (
@@ -158,7 +167,21 @@ export default async function CataloguePage({
       <PageHeader
         title="Catalogue matériel"
         subtitle={`${refs.length} référence${refs.length !== 1 ? "s" : ""}`}
-        action={nouvelleReference}
+        action={
+          <div className="flex items-center gap-2">
+            {/* Les lignes de devis non reliées au catalogue sont invisibles du ROI
+                et de l'inventaire : on donne l'accès au tri depuis ici. */}
+            {aRattacher > 0 && (
+              <Link
+                href="/catalogue/rattachement"
+                className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+              >
+                {aRattacher} ligne{aRattacher > 1 ? "s" : ""} à rattacher
+              </Link>
+            )}
+            {nouvelleReference}
+          </div>
+        }
       />
 
       <GlobalSearchForm q={q} />

@@ -1,6 +1,8 @@
-// Calcul d'itinéraire via OpenRouteService (géocodage + distance routière).
-// Sert à estimer le coût de déplacement (véhicule perso) pour les notes de frais.
-// Nécessite ORS_API_KEY (clé gratuite openrouteservice.org). No-op si absente.
+// Itinéraires routiers via OpenRouteService (distance, durée, tracé).
+// Le géocodage passe par la Base Adresse Nationale (voir `geocode` plus bas).
+// Nécessite ORS_API_KEY (clé gratuite openrouteservice.org).
+
+import { chercherAdresses } from "@/lib/adresse";
 
 const BASE = "https://api.openrouteservice.org";
 
@@ -8,15 +10,19 @@ export function orsConfigured(): boolean {
   return !!process.env.ORS_API_KEY;
 }
 
+/**
+ * Adresse → coordonnées.
+ *
+ * Passe par la Base Adresse Nationale (api-adresse.data.gouv.fr) : gratuite, sans
+ * clé, et surtout disponible — le géocodage d'OpenRouteService répondait « Géocodage
+ * indisponible » en production. ORS reste utilisé pour le calcul d'itinéraire, qui
+ * n'a besoin que de coordonnées.
+ */
 export async function geocode(text: string): Promise<{ coord: [number, number]; label: string }> {
-  const key = process.env.ORS_API_KEY as string;
-  const url = `${BASE}/geocode/search?api_key=${key}&text=${encodeURIComponent(text)}&size=1&boundary.country=FR`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("Géocodage indisponible.");
-  const j = await r.json();
-  const f = j.features?.[0];
-  if (!f) throw new Error(`Adresse introuvable : « ${text} ».`);
-  return { coord: f.geometry.coordinates as [number, number], label: f.properties.label as string };
+  const r = await chercherAdresses(text);
+  const a = r[0];
+  if (!a) throw new Error(`Adresse introuvable : « ${text} ».`);
+  return { coord: a.coord, label: a.label };
 }
 
 export type Trajet = { km: number; dureeMin: number; departLabel: string; arriveeLabel: string };

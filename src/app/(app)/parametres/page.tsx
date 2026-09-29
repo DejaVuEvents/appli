@@ -126,7 +126,7 @@ export default async function ParametresPage({
                     <img src={moiPhoto} alt="Photo" className="h-16 w-16 rounded-full border border-border object-cover" />
                   )}
                   <div className="flex-1">
-                    <FileDropzone name="photo" accept="image/*" libelle="Glisse une image ou clique pour choisir" />
+                    <FileDropzone name="photo" accept="image/*" maxMo={2} libelle="Glisse une image ou clique pour choisir" />
                     {moi.photo_url && (
                       <button
                         type="submit"
@@ -143,14 +143,14 @@ export default async function ParametresPage({
               {/* Signature */}
               <div>
                 <span className="mb-1 block text-sm font-medium">Signature</span>
-                <p className="mb-1 text-xs text-muted">Image de ta signature (PNG transparent idéalement). Utilisée pour signer les notes de frais.</p>
+                <p className="mb-1 text-xs text-muted">Image de ta signature (PNG transparent idéalement, 2 Mo maximum). Utilisée pour signer les notes de frais.</p>
                 <div className="flex items-center gap-4">
                   {moiSignature && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={moiSignature} alt="Signature" className="h-14 w-32 rounded border border-border object-contain bg-white" />
                   )}
                   <div className="flex-1">
-                    <FileDropzone name="signature" accept="image/*" libelle="Glisse ta signature ou clique pour choisir" />
+                    <FileDropzone name="signature" accept="image/*" maxMo={2} libelle="Glisse ta signature ou clique pour choisir" />
                     {moi.signature_url && (
                       <button
                         type="submit"
@@ -184,7 +184,7 @@ export default async function ParametresPage({
                     <img src={ent.logo} alt="Logo" className="h-16 w-16 rounded border border-border object-contain bg-white" />
                   )}
                   <div className="flex-1">
-                    <FileDropzone name="logo_file" accept="image/*" libelle="Glisser le logo ici, ou cliquer pour choisir" />
+                    <FileDropzone name="logo_file" accept="image/*" maxMo={1} libelle="Glisser le logo ici, ou cliquer pour choisir" />
                     {ent.logo && (
                       <button
                         type="submit"

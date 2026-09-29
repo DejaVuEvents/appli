@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
 import { AdresseAutocomplete } from "@/components/adresse-autocomplete";
 import { CarteTrajet } from "@/components/carte-trajet";
-import type { Adresse } from "@/lib/adresse";
+import { chercherAdresses, type Adresse } from "@/lib/adresse";
 import { euros } from "@/lib/format";
 import { coutTrajet, type ModeTrajet } from "@/lib/trajet";
 import { itineraireNDF } from "../actions";
@@ -61,12 +61,34 @@ export function TrajetForm({
   const [itin, setItin] = useState<EtatItineraire>({ etat: "vide" });
 
   const [vehiculeId, setVehiculeId] = useState("");
-  const [conso, setConso] = useState("");
+  // Consommation par défaut d'une voiture, comme le calculateur de Mappy :
+  // le coût s'affiche tout de suite, quitte à l'ajuster.
+  const [conso, setConso] = useState("6.5");
   const [prix, setPrix] = useState(String(prixEssence || 1.8));
   const [peages, setPeages] = useState("");
   const [km, setKm] = useState("");
   const [tarifKm, setTarifKm] = useState("0.5");
   const [allerRetour, setAllerRetour] = useState(true);
+
+  // Adresse tapée sans passer par la liste : on retient la meilleure proposition,
+  // comme le fait Mappy. Sans ça, un utilisateur qui saisit une adresse correcte
+  // mais ne clique aucune suggestion se retrouvait bloqué, sans trajet ni distance.
+  useEffect(() => {
+    if (depart || departTxt.trim().length < 4) return;
+    const t = setTimeout(async () => {
+      const r = await chercherAdresses(departTxt);
+      if (r[0]) setDepart(r[0]);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [departTxt, depart]);
+  useEffect(() => {
+    if (arrivee || arriveeTxt.trim().length < 4) return;
+    const t = setTimeout(async () => {
+      const r = await chercherAdresses(arriveeTxt);
+      if (r[0]) setArrivee(r[0]);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [arriveeTxt, arrivee]);
 
   // Itinéraire dès que les deux points sont localisés. On ignore la réponse d'une
   // requête périmée : sinon un ancien tracé écrase le bon.
@@ -119,6 +141,20 @@ export function TrajetForm({
   );
 
   const dureeTotale = itin.etat === "ok" ? itin.min * (allerRetour ? 2 : 1) : null;
+
+  // Ce qui empêche encore d'enregistrer, dit avant le clic.
+  const manque =
+    !departTxt.trim() || !arriveeTxt.trim()
+      ? "Renseigne le départ et l'arrivée."
+      : itin.etat === "calcul"
+        ? "Calcul de l'itinéraire en cours…"
+        : n(km) <= 0
+          ? "Distance inconnue : choisis les adresses dans les suggestions, ou saisis-la."
+          : mode === "reel" && n(conso) * n(prix) <= 0 && n(peages) <= 0
+            ? "Renseigne la consommation et le prix du carburant, ou des péages."
+            : mode === "bareme" && n(tarifKm) <= 0
+              ? "Renseigne le tarif au kilomètre."
+              : null;
 
   return (
     <ModalForm action={action} className="space-y-4">
@@ -281,9 +317,15 @@ export function TrajetForm({
         </p>
       </div>
 
-      <div className="flex items-center gap-3 pt-1">
-        <SubmitButton pendingLabel="Enregistrement…">Ajouter le déplacement</SubmitButton>
+      {/* Le serveur refuse un déplacement sans distance ni adresses exploitables ;
+          Next masque le message d'une Server Action en production, donc on dit ici
+          ce qui manque plutôt que de laisser une page d'erreur. */}
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        <SubmitButton pendingLabel="Enregistrement…" disabled={!!manque}>
+          Ajouter le déplacement
+        </SubmitButton>
         <ModalCancelButton />
+        {manque && <span className="text-xs text-amber-700 dark:text-amber-400">{manque}</span>}
       </div>
     </ModalForm>
   );

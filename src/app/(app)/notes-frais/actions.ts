@@ -9,7 +9,7 @@ import { dansUnMois } from "@/lib/format";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
-import { calculerTrajet, orsConfigured, itineraireTrace } from "@/lib/ors";
+import { calculerTrajet, itineraireTrace } from "@/lib/ors";
 import { coutTrajet, libelleTrajet, type ModeTrajet } from "@/lib/trajet";
 import { BUCKET_PRIVE, urlDocument } from "@/lib/storage";
 
@@ -243,14 +243,14 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   let departLabel = depart;
   let arriveeLabel = arrivee;
   if (km <= 0) {
-    if (!orsConfigured()) {
-      throw new Error("Saisis la distance : le calcul automatique d'itinéraire n'est pas configuré.");
-    }
+    // Dernier recours : l'utilisateur n'a pas choisi d'adresse dans les suggestions.
+    // On localise et on calcule ici plutôt que de refuser l'enregistrement.
     const t = await calculerTrajet(depart, arrivee);
     km = t.km;
     departLabel = t.departLabel || depart;
     arriveeLabel = t.arriveeLabel || arrivee;
   }
+  if (km <= 0) throw new Error("Distance inconnue : saisis-la dans le formulaire.");
 
   const entree = {
     mode,
@@ -675,7 +675,6 @@ export async function itineraireNDF(
   a: [number, number],
   b: [number, number],
 ): Promise<{ km: number; dureeMin: number; trace: [number, number][] } | { erreur: string }> {
-  if (!orsConfigured()) return { erreur: "Calcul d'itinéraire non configuré sur le serveur." };
   try {
     return await itineraireTrace(a, b);
   } catch (e) {

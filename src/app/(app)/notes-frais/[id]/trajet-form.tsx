@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Field } from "@/components/form";
 import { FileDropzone } from "@/components/file-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros } from "@/lib/format";
 import { coutTrajet, type ModeTrajet } from "@/lib/trajet";
+import { distanceItineraire } from "../actions";
 
 export type VehiculeTrajet = {
   id: string;
@@ -45,6 +46,11 @@ export function TrajetForm({
   itineraireAuto: boolean;
 }) {
   const [mode, setMode] = useState<ModeTrajet>("reel");
+  const [depart, setDepart] = useState("");
+  const [arrivee, setArrivee] = useState("");
+  const [itineraire, setItineraire] = useState<
+    { etat: "vide" } | { etat: "calcul" } | { etat: "ok"; label: string; min: number } | { etat: "ko"; motif: string }
+  >({ etat: "vide" });
   const [vehiculeId, setVehiculeId] = useState("");
   const [conso, setConso] = useState("");
   const [prix, setPrix] = useState(String(prixEssence || 1.8));
@@ -52,6 +58,32 @@ export function TrajetForm({
   const [km, setKm] = useState("");
   const [tarifKm, setTarifKm] = useState("0.5");
   const [allerRetour, setAllerRetour] = useState(true);
+
+  // Distance calculée depuis les adresses, pendant la saisie — comme sur Mappy.
+  // On attend une pause de frappe, et on ignore la réponse d'une requête périmée
+  // (adresse modifiée entre-temps), sinon un ancien résultat écrase le bon.
+  const requete = useRef(0);
+  useEffect(() => {
+    const d = depart.trim();
+    const a = arrivee.trim();
+    if (d.length < 3 || a.length < 3) {
+      setItineraire({ etat: "vide" });
+      return;
+    }
+    const jeton = ++requete.current;
+    setItineraire({ etat: "calcul" });
+    const t = setTimeout(async () => {
+      const r = await distanceItineraire(d, a);
+      if (jeton !== requete.current) return;
+      if ("erreur" in r) {
+        setItineraire({ etat: "ko", motif: r.erreur });
+        return;
+      }
+      setKm(String(r.km));
+      setItineraire({ etat: "ok", label: `${r.departLabel} → ${r.arriveeLabel}`, min: r.dureeMin });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [depart, arrivee]);
 
   // Choisir un véhicule enregistré reprend sa motorisation et sa consommation.
   const choisirVehicule = (id: string) => {
@@ -108,9 +140,36 @@ export function TrajetForm({
       </fieldset>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Départ (adresse / ville)" name="depart" placeholder="19 rue Achille Viadieu, Toulouse" />
-        <Field label="Arrivée (adresse / ville)" name="arrivee" placeholder="Lieu de l'événement" />
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">Départ (adresse / ville)</span>
+          <input name="depart" className={input} value={depart} onChange={(e) => setDepart(e.target.value)}
+            placeholder="19 rue Achille Viadieu, Toulouse" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">Arrivée (adresse / ville)</span>
+          <input name="arrivee" className={input} value={arrivee} onChange={(e) => setArrivee(e.target.value)}
+            placeholder="Lieu de l'événement" />
+        </label>
       </div>
+
+      {/* État du calcul : l'utilisateur doit savoir si la distance vient de l'outil
+          ou s'il doit la saisir. */}
+      <p className="-mt-1 text-xs">
+        {itineraire.etat === "calcul" && <span className="text-muted">Calcul de l&apos;itinéraire…</span>}
+        {itineraire.etat === "ok" && (
+          <span className="text-green-700 dark:text-green-400">
+            Itinéraire trouvé : {itineraire.label} · {itineraire.min} min
+          </span>
+        )}
+        {itineraire.etat === "ko" && (
+          <span className="text-amber-700 dark:text-amber-400">
+            {itineraire.motif} Saisis la distance à la main ci-dessous.
+          </span>
+        )}
+        {itineraire.etat === "vide" && (
+          <span className="text-muted">La distance se calcule toute seule dès que les deux adresses sont renseignées.</span>
+        )}
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
         <Field label="Date" name="date" type="date" />
@@ -119,7 +178,7 @@ export function TrajetForm({
           <input
             name="km" type="number" step="0.1" inputMode="decimal" className={input}
             value={km} onChange={(e) => setKm(e.target.value)}
-            placeholder={itineraireAuto ? "auto" : "ex. 84"}
+            placeholder={itineraire.etat === "calcul" ? "…" : "ex. 84"}
           />
         </label>
         <label className="flex items-center gap-2 pb-2 text-sm">
@@ -132,9 +191,7 @@ export function TrajetForm({
         </label>
       </div>
       <p className="-mt-2 text-xs text-muted">
-        {itineraireAuto
-          ? "Distance laissée vide : elle est calculée automatiquement depuis les adresses."
-          : "Le calcul automatique d'itinéraire n'est pas configuré : saisis la distance à la main."}
+        Distance remplie automatiquement, modifiable si ton relevé diffère.
         {allerRetour && " L'aller-retour double la distance et les péages."}
       </p>
 

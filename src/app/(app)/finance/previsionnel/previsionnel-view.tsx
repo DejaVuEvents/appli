@@ -20,7 +20,14 @@ export type PrevRow = EcritureFinanciere & {
   prestation?: PrestationLiee | null;
 };
 export type DocAPrevoir = { id: string; kind: "ndf" | "devis"; libelle: string; montant: number; date: string | null };
-export type Suggestion = { previsionId: string; ecritureId: string; libelle: string; date: string };
+export type Suggestion = {
+  previsionId: string;
+  ecritureId: string;
+  libelle: string;
+  date: string;
+  noteNumero: string | null;
+  noteTitre: string | null;
+};
 
 export type Recurrent = { id: string; nom: string; sens: string; montant_ttc: number; frequence: string; jour: number; mois: number | null; type: string | null; specification: string | null; actif: boolean };
 
@@ -393,7 +400,14 @@ function PonctuellesView({
                           <form action={rapprocherPrevisionNdf.bind(null, r.id, sugg.ecritureId)} onClick={(ev) => ev.stopPropagation()}>
                             <SubmitButton
                               className="!px-2 !py-1 !text-xs"
-                              confirm={`Rattacher cette prévision à l'opération :\n« ${sugg.libelle} » — ${dateFr(sugg.date)} — ${euros(r.montant_ttc)}\n\nLa prévision disparaît et la note passe en « Remboursée ».`}
+                              confirm={[
+                                `Solder ${[sugg.noteNumero, sugg.noteTitre].filter(Boolean).join(" — ") || "cette note de frais"}`,
+                                ``,
+                                `par le décaissement du ${dateFr(sugg.date)} — ${euros(r.montant_ttc)}`,
+                                `(libellé bancaire : « ${sugg.libelle} »)`,
+                                ``,
+                                `La prévision disparaît et la note passe en « Remboursée ».`,
+                              ].join("\n")}
                             >
                               Rapprocher
                             </SubmitButton>

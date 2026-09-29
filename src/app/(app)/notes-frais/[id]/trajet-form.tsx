@@ -5,9 +5,12 @@ import { Field } from "@/components/form";
 import { FileDropzone } from "@/components/file-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { ModalForm, ModalCancelButton } from "@/components/modal";
+import { AdresseAutocomplete } from "@/components/adresse-autocomplete";
+import { CarteTrajet } from "@/components/carte-trajet";
+import type { Adresse } from "@/lib/adresse";
 import { euros } from "@/lib/format";
 import { coutTrajet, type ModeTrajet } from "@/lib/trajet";
-import { distanceItineraire } from "../actions";
+import { itineraireNDF } from "../actions";
 
 export type VehiculeTrajet = {
   id: string;
@@ -23,34 +26,40 @@ const carte = (actif: boolean) =>
     actif ? "border-primary bg-primary/5" : "border-border"
   }`;
 
+type EtatItineraire =
+  | { etat: "vide" }
+  | { etat: "calcul" }
+  | { etat: "ok"; min: number }
+  | { etat: "ko"; motif: string };
+
 /**
- * Saisie d'un déplacement, avec les mêmes champs que le calculateur de Mappy
- * (consommation, prix du carburant, péages) — pour que le chiffrage se fasse ici
- * plutôt que sur un site extérieur dont on ne garde qu'une capture d'écran.
+ * Saisie d'un déplacement, sur le modèle du calculateur de Mappy : suggestions
+ * d'adresses pendant la frappe, carte du trajet, distance et durée calculées, puis
+ * le coût (consommation, prix du carburant, péages) — le tout dans l'outil, au lieu
+ * de reporter à la main un montant obtenu sur un site extérieur.
  *
  * Le véhicule peut être choisi parmi ceux de l'association : sa motorisation et sa
- * consommation pré-remplissent le calcul, au lieu d'être ressaisies à chaque fois.
+ * consommation pré-remplissent le calcul.
  */
 export function TrajetForm({
   action,
   vehicules,
   prixEssence,
   prixDiesel,
-  itineraireAuto,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   vehicules: VehiculeTrajet[];
   prixEssence: number;
   prixDiesel: number;
-  /** Le calcul automatique de distance est disponible (clé d'itinéraire configurée). */
-  itineraireAuto: boolean;
 }) {
   const [mode, setMode] = useState<ModeTrajet>("reel");
-  const [depart, setDepart] = useState("");
-  const [arrivee, setArrivee] = useState("");
-  const [itineraire, setItineraire] = useState<
-    { etat: "vide" } | { etat: "calcul" } | { etat: "ok"; label: string; min: number } | { etat: "ko"; motif: string }
-  >({ etat: "vide" });
+  const [departTxt, setDepartTxt] = useState("");
+  const [arriveeTxt, setArriveeTxt] = useState("");
+  const [depart, setDepart] = useState<Adresse | null>(null);
+  const [arrivee, setArrivee] = useState<Adresse | null>(null);
+  const [trace, setTrace] = useState<[number, number][] | null>(null);
+  const [itin, setItin] = useState<EtatItineraire>({ etat: "vide" });
+
   const [vehiculeId, setVehiculeId] = useState("");
   const [conso, setConso] = useState("");
   const [prix, setPrix] = useState(String(prixEssence || 1.8));
@@ -59,30 +68,29 @@ export function TrajetForm({
   const [tarifKm, setTarifKm] = useState("0.5");
   const [allerRetour, setAllerRetour] = useState(true);
 
-  // Distance calculée depuis les adresses, pendant la saisie — comme sur Mappy.
-  // On attend une pause de frappe, et on ignore la réponse d'une requête périmée
-  // (adresse modifiée entre-temps), sinon un ancien résultat écrase le bon.
+  // Itinéraire dès que les deux points sont localisés. On ignore la réponse d'une
+  // requête périmée : sinon un ancien tracé écrase le bon.
   const requete = useRef(0);
   useEffect(() => {
-    const d = depart.trim();
-    const a = arrivee.trim();
-    if (d.length < 3 || a.length < 3) {
-      setItineraire({ etat: "vide" });
+    if (!depart || !arrivee) {
+      setItin({ etat: "vide" });
+      setTrace(null);
       return;
     }
     const jeton = ++requete.current;
-    setItineraire({ etat: "calcul" });
-    const t = setTimeout(async () => {
-      const r = await distanceItineraire(d, a);
+    setItin({ etat: "calcul" });
+    (async () => {
+      const r = await itineraireNDF(depart.coord, arrivee.coord);
       if (jeton !== requete.current) return;
       if ("erreur" in r) {
-        setItineraire({ etat: "ko", motif: r.erreur });
+        setItin({ etat: "ko", motif: r.erreur });
+        setTrace(null);
         return;
       }
       setKm(String(r.km));
-      setItineraire({ etat: "ok", label: `${r.departLabel} → ${r.arriveeLabel}`, min: r.dureeMin });
-    }, 700);
-    return () => clearTimeout(t);
+      setTrace(r.trace);
+      setItin({ etat: "ok", min: r.dureeMin });
+    })();
   }, [depart, arrivee]);
 
   // Choisir un véhicule enregistré reprend sa motorisation et sa consommation.
@@ -110,163 +118,171 @@ export function TrajetForm({
     [mode, km, allerRetour, conso, prix, peages, tarifKm],
   );
 
-  const distanceInconnue = n(km) <= 0;
+  const dureeTotale = itin.etat === "ok" ? itin.min * (allerRetour ? 2 : 1) : null;
 
   return (
     <ModalForm action={action} className="space-y-4">
       <input type="hidden" name="mode" value={mode} />
 
-      <fieldset>
-        <legend className="mb-1.5 block text-sm font-medium">Méthode de calcul</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {([
-            { v: "reel", t: "Coût réel", d: "Carburant + péages, comme Mappy" },
-            { v: "bareme", t: "Barème kilométrique", d: "Un forfait au kilomètre" },
-          ] as const).map((o) => (
-            <label key={o.v} className={carte(mode === o.v)}>
-              <input
-                type="radio" name="mode_radio" value={o.v}
-                checked={mode === o.v}
-                onChange={() => setMode(o.v)}
-                className="mt-0.5 h-4 w-4"
-              />
-              <span>
-                <span className="block font-medium">{o.t}</span>
-                <span className="block text-xs text-muted">{o.d}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium">Départ (adresse / ville)</span>
-          <input name="depart" className={input} value={depart} onChange={(e) => setDepart(e.target.value)}
-            placeholder="19 rue Achille Viadieu, Toulouse" />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium">Arrivée (adresse / ville)</span>
-          <input name="arrivee" className={input} value={arrivee} onChange={(e) => setArrivee(e.target.value)}
-            placeholder="Lieu de l'événement" />
-        </label>
-      </div>
-
-      {/* État du calcul : l'utilisateur doit savoir si la distance vient de l'outil
-          ou s'il doit la saisir. */}
-      <p className="-mt-1 text-xs">
-        {itineraire.etat === "calcul" && <span className="text-muted">Calcul de l&apos;itinéraire…</span>}
-        {itineraire.etat === "ok" && (
-          <span className="text-green-700 dark:text-green-400">
-            Itinéraire trouvé : {itineraire.label} · {itineraire.min} min
-          </span>
-        )}
-        {itineraire.etat === "ko" && (
-          <span className="text-amber-700 dark:text-amber-400">
-            {itineraire.motif} Saisis la distance à la main ci-dessous.
-          </span>
-        )}
-        {itineraire.etat === "vide" && (
-          <span className="text-muted">La distance se calcule toute seule dès que les deux adresses sont renseignées.</span>
-        )}
-      </p>
-
-      <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
-        <Field label="Date" name="date" type="date" />
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium">Distance aller (km)</span>
-          <input
-            name="km" type="number" step="0.1" inputMode="decimal" className={input}
-            value={km} onChange={(e) => setKm(e.target.value)}
-            placeholder={itineraire.etat === "calcul" ? "…" : "ex. 84"}
-          />
-        </label>
-        <label className="flex items-center gap-2 pb-2 text-sm">
-          <input
-            type="checkbox" name="aller_retour" checked={allerRetour}
-            onChange={(e) => setAllerRetour(e.target.checked)}
-            className="h-4 w-4 rounded border-border"
-          />
-          Aller-retour
-        </label>
-      </div>
-      <p className="-mt-2 text-xs text-muted">
-        Distance remplie automatiquement, modifiable si ton relevé diffère.
-        {allerRetour && " L'aller-retour double la distance et les péages."}
-      </p>
-
-      {mode === "reel" ? (
-        <>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Véhicule</span>
-            <select
-              name="vehicule_id" className={input}
-              value={vehiculeId} onChange={(e) => choisirVehicule(e.target.value)}
-            >
-              <option value="">Véhicule personnel (saisie libre)</option>
-              {vehicules.map((v) => (
-                <option key={v.id} value={v.id}>{v.nom}</option>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        {/* ---- Colonne gauche : la saisie ---- */}
+        <div className="space-y-4">
+          <fieldset>
+            <legend className="mb-1.5 block text-sm font-medium">Méthode de calcul</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                { v: "reel", t: "Coût réel", d: "Carburant + péages" },
+                { v: "bareme", t: "Barème kilométrique", d: "Un forfait au kilomètre" },
+              ] as const).map((o) => (
+                <label key={o.v} className={carte(mode === o.v)}>
+                  <input
+                    type="radio" name="mode_radio" value={o.v}
+                    checked={mode === o.v}
+                    onChange={() => setMode(o.v)}
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block font-medium">{o.t}</span>
+                    <span className="block text-xs text-muted">{o.d}</span>
+                  </span>
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
+          </fieldset>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AdresseAutocomplete
+              label="Départ" name="depart" placeholder="14 rue Marie-Louise Dissard, Toulouse"
+              valeur={departTxt}
+              onChoisir={(a, t) => { setDepartTxt(t); setDepart(a); }}
+            />
+            <AdresseAutocomplete
+              label="Arrivée" name="arrivee" placeholder="Léguevin"
+              valeur={arriveeTxt}
+              onChoisir={(a, t) => { setArriveeTxt(t); setArrivee(a); }}
+            />
+          </div>
+
+          <p className="-mt-1 text-xs">
+            {itin.etat === "calcul" && <span className="text-muted">Calcul de l&apos;itinéraire…</span>}
+            {itin.etat === "ok" && (
+              <span className="text-green-700 dark:text-green-400">
+                Itinéraire calculé · {detail.km} km · {dureeTotale} min{allerRetour ? " aller-retour" : ""}
+              </span>
+            )}
+            {itin.etat === "ko" && (
+              <span className="text-amber-700 dark:text-amber-400">{itin.motif} Saisis la distance à la main.</span>
+            )}
+            {itin.etat === "vide" && (
+              <span className="text-muted">Choisis les adresses dans la liste de suggestions pour tracer le trajet.</span>
+            )}
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
+            <Field label="Date" name="date" type="date" />
             <label className="block">
-              <span className="mb-1 block text-sm font-medium">Consommation (L/100 km)</span>
-              <input name="conso" type="number" step="0.1" inputMode="decimal" className={input}
-                value={conso} onChange={(e) => setConso(e.target.value)} placeholder="6.5" />
+              <span className="mb-1 block text-sm font-medium">Distance aller (km)</span>
+              <input
+                name="km" type="number" step="0.1" inputMode="decimal" className={input}
+                value={km} onChange={(e) => setKm(e.target.value)}
+                placeholder={itin.etat === "calcul" ? "…" : "ex. 84"}
+              />
             </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">Prix du carburant (€/L)</span>
-              <input name="prix_carburant" type="number" step="0.001" inputMode="decimal" className={input}
-                value={prix} onChange={(e) => setPrix(e.target.value)} />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">Péages (€, aller)</span>
-              <input name="peages" type="number" step="0.01" inputMode="decimal" className={input}
-                value={peages} onChange={(e) => setPeages(e.target.value)} placeholder="0" />
+            <label className="flex items-center gap-2 pb-2 text-sm">
+              <input
+                type="checkbox" name="aller_retour" checked={allerRetour}
+                onChange={(e) => setAllerRetour(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              Aller-retour
             </label>
           </div>
-        </>
-      ) : (
-        <label className="block sm:max-w-xs">
-          <span className="mb-1 block text-sm font-medium">Tarif (€/km)</span>
-          <input name="tarif_km" type="number" step="0.01" inputMode="decimal" className={input}
-            value={tarifKm} onChange={(e) => setTarifKm(e.target.value)} />
-        </label>
-      )}
 
-      {/* Le total se lit avant d'enregistrer : c'est ce qu'on allait chercher sur Mappy. */}
-      <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
-        {distanceInconnue ? (
-          <span className="text-muted">
-            {itineraireAuto
-              ? "Coût calculé à l'enregistrement, une fois la distance connue."
-              : "Saisis la distance pour voir le coût."}
-          </span>
-        ) : (
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-muted">
-              {detail.km} km
-              {mode === "reel"
-                ? ` · carburant ${euros(detail.carburant)}${detail.peages > 0 ? ` · péages ${euros(detail.peages)}` : ""}`
-                : ` × ${n(tarifKm).toFixed(2)} €/km`}
-            </span>
-            <span className="text-base font-bold">{euros(detail.total)}</span>
+          {mode === "reel" ? (
+            <>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium">Véhicule</span>
+                <select
+                  name="vehicule_id" className={input}
+                  value={vehiculeId} onChange={(e) => choisirVehicule(e.target.value)}
+                >
+                  <option value="">Véhicule personnel (saisie libre)</option>
+                  {vehicules.map((v) => (
+                    <option key={v.id} value={v.id}>{v.nom}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Consommation (L/100 km)</span>
+                  <input name="conso" type="number" step="0.1" inputMode="decimal" className={input}
+                    value={conso} onChange={(e) => setConso(e.target.value)} placeholder="6.5" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Prix du carburant (€/L)</span>
+                  <input name="prix_carburant" type="number" step="0.001" inputMode="decimal" className={input}
+                    value={prix} onChange={(e) => setPrix(e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Péages (€, aller)</span>
+                  <input name="peages" type="number" step="0.01" inputMode="decimal" className={input}
+                    value={peages} onChange={(e) => setPeages(e.target.value)} placeholder="0" />
+                </label>
+              </div>
+            </>
+          ) : (
+            <label className="block sm:max-w-xs">
+              <span className="mb-1 block text-sm font-medium">Tarif (€/km)</span>
+              <input name="tarif_km" type="number" step="0.01" inputMode="decimal" className={input}
+                value={tarifKm} onChange={(e) => setTarifKm(e.target.value)} />
+            </label>
+          )}
+        </div>
+
+        {/* ---- Colonne droite : la carte et le coût ---- */}
+        <div className="flex flex-col gap-3">
+          <div className="h-64 lg:h-[22rem]">
+            <CarteTrajet depart={depart} arrivee={arrivee} trace={trace} />
           </div>
-        )}
+
+          {/* Le coût se lit avant d'enregistrer : c'est ce qu'on allait chercher sur Mappy. */}
+          <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
+            {n(km) <= 0 ? (
+              <span className="text-muted">Le coût s&apos;affiche dès que la distance est connue.</span>
+            ) : (
+              <>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <span className="font-medium">Coût du trajet</span>
+                  <span className="text-base font-bold">{euros(detail.total)}</span>
+                </div>
+                <div className="text-xs text-muted">
+                  {detail.km} km{dureeTotale ? ` · ${dureeTotale} min` : ""}
+                  {mode === "reel" ? (
+                    <>
+                      <br />Carburant {euros(detail.carburant)}
+                      {detail.peages > 0 && <> · Péages {euros(detail.peages)}</>}
+                    </>
+                  ) : (
+                    <> × {n(tarifKm).toFixed(2)} €/km</>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="block">
         <span className="mb-1 block text-sm font-medium">Justificatif (optionnel)</span>
         <FileDropzone name="justificatif" accept="image/*,application/pdf" />
         <p className="mt-1 text-xs text-muted">
-          Un lien Mappy et Google Maps est généré sur la ligne pour justifier la distance ; tu peux aussi joindre une capture ou un ticket de péage.
+          Le trajet est déjà tracé et daté ici ; tu peux joindre un ticket de péage ou un plein.
         </p>
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <SubmitButton pendingLabel="Calcul…">Ajouter le déplacement</SubmitButton>
+        <SubmitButton pendingLabel="Enregistrement…">Ajouter le déplacement</SubmitButton>
         <ModalCancelButton />
       </div>
     </ModalForm>

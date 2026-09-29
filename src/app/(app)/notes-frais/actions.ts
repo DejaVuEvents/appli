@@ -9,7 +9,7 @@ import { dansUnMois } from "@/lib/format";
 import { archiverDepuisUrl, archiverSurDrive, driveConfigured, nomFichierSafe } from "@/lib/drive";
 import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
-import { calculerTrajet, orsConfigured } from "@/lib/ors";
+import { calculerTrajet, orsConfigured, itineraireTrace } from "@/lib/ors";
 import { coutTrajet, libelleTrajet, type ModeTrajet } from "@/lib/trajet";
 import { BUCKET_PRIVE, urlDocument } from "@/lib/storage";
 
@@ -664,20 +664,17 @@ export async function marquerNDFRemboursee(noteId: string, formData?: FormData) 
 }
 
 /**
- * Distance routière entre deux adresses, appelée en direct depuis le formulaire de
- * déplacement : le kilométrage s'affiche pendant la saisie, comme sur Mappy, au lieu
- * d'être demandé à l'utilisateur.
- * Ne lève pas : le formulaire affiche le motif et laisse saisir la distance à la main.
+ * Itinéraire entre deux points déjà localisés par l'autocomplétion d'adresses :
+ * distance, durée et tracé, pour la carte du formulaire de déplacement.
+ * Ne lève pas — le formulaire affiche le motif et laisse saisir la distance à la main.
  */
-export async function distanceItineraire(
-  depart: string,
-  arrivee: string,
-): Promise<{ km: number; dureeMin: number; departLabel: string; arriveeLabel: string } | { erreur: string }> {
-  if (!depart?.trim() || !arrivee?.trim()) return { erreur: "Renseigne le départ et l'arrivée." };
+export async function itineraireNDF(
+  a: [number, number],
+  b: [number, number],
+): Promise<{ km: number; dureeMin: number; trace: [number, number][] } | { erreur: string }> {
   if (!orsConfigured()) return { erreur: "Calcul d'itinéraire non configuré sur le serveur." };
   try {
-    const t = await calculerTrajet(depart, arrivee);
-    return { km: t.km, dureeMin: t.dureeMin, departLabel: t.departLabel, arriveeLabel: t.arriveeLabel };
+    return await itineraireTrace(a, b);
   } catch (e) {
     return { erreur: e instanceof Error ? e.message : "Itinéraire introuvable." };
   }

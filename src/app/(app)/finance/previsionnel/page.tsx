@@ -97,6 +97,10 @@ export default async function PrevisionnelPage({ searchParams }: { searchParams:
     ecritureId: x.ecriture_id,
     libelle: x.ecriture_libelle ?? "Décaissement",
     date: x.ecriture_date,
+    // Le libellé bancaire est le nom du bénéficiaire (« DELMAS Léo ») : il ne dit
+    // pas QUELLE note on solde. On nomme donc aussi le document rapproché.
+    noteNumero: x.note_numero,
+    noteTitre: x.note_titre,
   }));
 
   const recurrentesParMois: Record<string, number> = {};

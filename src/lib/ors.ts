@@ -71,3 +71,37 @@ export async function itineraireMulti(coords: [number, number][]): Promise<Itine
     segments,
   };
 }
+
+export type ItineraireTrace = {
+  km: number;
+  dureeMin: number;
+  /** Tracé de la route en [lon, lat], pour l'afficher sur une carte. */
+  trace: [number, number][];
+};
+
+/**
+ * Itinéraire routier entre deux points DÉJÀ localisés, avec son tracé.
+ * Les coordonnées viennent de l'autocomplétion d'adresses (Base Adresse Nationale) :
+ * on n'utilise donc plus le géocodage d'ORS, qui échouait en production.
+ */
+export async function itineraireTrace(
+  a: [number, number],
+  b: [number, number],
+): Promise<ItineraireTrace> {
+  if (!orsConfigured()) throw new Error("Calcul d'itinéraire non configuré (clé OpenRouteService manquante).");
+  const r = await fetch(`${BASE}/v2/directions/driving-car/geojson`, {
+    method: "POST",
+    headers: { Authorization: process.env.ORS_API_KEY as string, "Content-Type": "application/json" },
+    body: JSON.stringify({ coordinates: [a, b] }),
+  });
+  if (!r.ok) throw new Error("Calcul d'itinéraire indisponible.");
+  const j = await r.json();
+  const f = j.features?.[0];
+  if (!f) throw new Error("Itinéraire introuvable entre ces deux points.");
+  const sum = f.properties?.summary ?? {};
+  return {
+    km: Math.round((sum.distance ?? 0) / 100) / 10,
+    dureeMin: Math.round((sum.duration ?? 0) / 60),
+    trace: (f.geometry?.coordinates ?? []) as [number, number][],
+  };
+}

@@ -15,7 +15,6 @@ import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
 import {
   addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF } from "../actions";
-import { orsConfigured } from "@/lib/ors";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
 import { TrajetForm, type VehiculeTrajet } from "./trajet-form";
@@ -331,13 +330,13 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
           trigger={<>+ Ajouter un déplacement</>}
           title="Frais de déplacement"
           triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
+          panelClassName="max-w-5xl"
         >
           <TrajetForm
             action={ajouterTrajetNDF.bind(null, id)}
             vehicules={vehicules}
             prixEssence={Number(paramsEnt?.prix_essence ?? 0)}
             prixDiesel={Number(paramsEnt?.prix_diesel ?? 0)}
-            itineraireAuto={orsConfigured()}
           />
         </Modal>
       )}

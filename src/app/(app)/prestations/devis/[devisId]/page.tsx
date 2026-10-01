@@ -6,12 +6,12 @@ import { getMembreActuel } from "@/lib/membre";
 import { PageHeader, Card } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { FileSubmit } from "@/components/file-submit";
-import { Modal, ModalForm } from "@/components/modal";
+import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { Field } from "@/components/form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement, creerAcompteSolde, creerFactureSolde, recalculerSolde } from "../../actions";
+import { updateStatut, associerDevisAEvenement, creerAcompteSolde, creerFactureSolde, recalculerSolde, renameDevis } from "../../actions";
 import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck, IconDownload } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture, redaterDevis } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
@@ -79,6 +79,29 @@ export default async function DevisEditorPage({
   // « Facture » est féminin, « Devis » masculin : l'article ne peut pas être codé en dur.
   const leDoc = estFacture ? "la facture" : "le devis";
   const titreDoc = devis.nom || titre;
+
+  // Renommage : même geste que sur une note de frais — le nom se modifie depuis le
+  // titre de la page, via un crayon qui ouvre une modale. Un champ toujours visible
+  // dans un encadré latéral, c'était un second mécanisme pour le même besoin.
+  const titreRenommable = (
+    <>
+      <span className="min-w-0 truncate">{titreDoc}</span>
+      <Modal
+        trigger={<IconEdit className="h-4 w-4" />}
+        triggerTitle={`Renommer ${leDoc}`}
+        triggerClassName="shrink-0 rounded p-1 text-muted hover:bg-background hover:text-foreground"
+        title={`Renommer ${leDoc}`}
+      >
+        <ModalForm action={renameDevis.bind(null, devisId)} className="space-y-3">
+          <Field label="Nom du document" name="nom" defaultValue={devis.nom ?? ""} required />
+          <div className="flex items-center gap-3">
+            <SubmitButton>Enregistrer</SubmitButton>
+            <ModalCancelButton />
+          </div>
+        </ModalForm>
+      </Modal>
+    </>
+  );
   // Retour contextuel : la provenance est transmise par le lien d'origine (?retour=…),
   // sinon on remonte à l'événement / la location qui porte le document.
   const provenance = sp?.retour;
@@ -540,7 +563,7 @@ export default async function DevisEditorPage({
       <div className="max-w-6xl space-y-5">
         <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← {backLabel}</Link>
 
-        <PageHeader title={titreDoc} subtitle={prestation?.client?.nom ?? "Sans client"} />
+        <PageHeader title={titreRenommable} subtitle={prestation?.client?.nom ?? "Sans client"} />
 
         <div className="lg:flex lg:items-start lg:gap-6">
           <div className="min-w-0 flex-1">{contenuLecture}</div>
@@ -611,7 +634,7 @@ export default async function DevisEditorPage({
 
   return (
     <div className="max-w-7xl space-y-6">
-      <PageHeader title={titreDoc} subtitle={`${prestation.nom}${prestation.client?.nom ? ` · ${prestation.client.nom}` : ""}`} />
+      <PageHeader title={titreRenommable} subtitle={`${prestation.nom}${prestation.client?.nom ? ` · ${prestation.client.nom}` : ""}`} />
 
       <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
         <Link href={backHref} className="inline-flex items-center gap-1 text-muted hover:text-foreground">← {backLabel}</Link>

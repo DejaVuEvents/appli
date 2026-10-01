@@ -11,7 +11,6 @@ import {
   updateCoefficientDuree,
   duplicerDevis,
   deleteDevis,
-  renameDevis,
   creerAcompteSolde,
 } from "./actions";
 import { euros, dateFr } from "@/lib/format";
@@ -287,14 +286,6 @@ export async function DevisBuilder(props: {
         <Card className="p-4">
           <label className="mb-1 block text-xs font-medium text-muted">Statut de l&apos;événement</label>
           <StatutSelect action={statutAction} statut={statut} />
-        </Card>
-
-        <Card className="p-4">
-          <form action={renameDevis.bind(null, devis.id)} className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted">Nom du document</label>
-            <input name="nom" defaultValue={devis.nom ?? ""} placeholder="Devis lumière…" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            <SubmitButton className="w-full">Renommer</SubmitButton>
-          </form>
         </Card>
 
         <Card className="p-4">

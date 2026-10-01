@@ -15,7 +15,7 @@ type Ref = {
   categorie_id: string | null;
   cout_location_jour?: number | null;
 };
-type Cat = { id: string; nom: string };
+type Cat = { id: string; nom: string; parent_id?: string | null };
 
 const input =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -49,15 +49,61 @@ export function LigneForm({
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Arbre des catégories : « Amplificateurs » existe sous Son ET sous Catalogue
+  // Externe. Sans son parent, le choix est ambigu dans la liste comme dans le filtre.
+  const parentDe = useMemo(() => new Map(categories.map((c) => [c.id, c.parent_id ?? null])), [categories]);
+  const nomDe = useMemo(() => new Map(categories.map((c) => [c.id, c.nom])), [categories]);
+
+  /** Remonte à la racine de l'arborescence. */
+  const racine = (catId: string | null): string | null => {
+    let cur = catId;
+    for (let i = 0; cur && i < 10; i++) {
+      const p = parentDe.get(cur) ?? null;
+      if (!p) return cur;
+      cur = p;
+    }
+    return cur;
+  };
+  const estExterne = (r: Ref) => nomDe.get(racine(r.categorie_id) ?? "") === "Catalogue Externe";
+
+  /** La catégorie choisie couvre-t-elle cette référence ? (elle-même ou un descendant) */
+  const dansCategorie = (r: Ref, catId: string) => {
+    let cur = r.categorie_id;
+    for (let i = 0; cur && i < 10; i++) {
+      if (cur === catId) return true;
+      cur = parentDe.get(cur) ?? null;
+    }
+    return false;
+  };
+
+  // Catégories présentées par arborescence : les racines, chacune avec ses enfants.
+  const groupesCategories = useMemo(() => {
+    const racines = categories.filter((c) => !c.parent_id);
+    const groupes = racines.map((r) => ({
+      id: r.id,
+      nom: r.nom,
+      enfants: categories.filter((c) => c.parent_id === r.id),
+    }));
+    // Catégories dont le parent n'a pas été chargé : à plat, pour ne pas les perdre.
+    const vues = new Set(groupes.flatMap((g) => [g.id, ...g.enfants.map((e) => e.id)]));
+    for (const c of categories) {
+      if (!vues.has(c.id)) groupes.push({ id: c.id, nom: c.nom, enfants: [] });
+    }
+    return groupes;
+  }, [categories]);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const base = !q
-      ? references
-      : references.filter(
+    // La catégorie choisie restreint le catalogue : c'est elle qu'on choisit d'abord.
+    const base = references.filter((r) => !categorieId || dansCategorie(r, categorieId));
+    const filtres = !q
+      ? base
+      : base.filter(
           (r) => r.nom.toLowerCase().includes(q) || (r.designation ?? "").toLowerCase().includes(q),
         );
-    return base.slice(0, 60);
-  }, [references, query]);
+    return filtres.slice(0, 60);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [references, query, categorieId, parentDe]);
 
   function pick(r: Ref | null) {
     if (!r) {
@@ -68,7 +114,8 @@ export function LigneForm({
       setQuery(labelOf(r));
       setDesignation(labelOf(r));
       setPrix(String(r.prix_location_jour ?? 0));
-      setCategorieId(r.categorie_id ?? "");
+      // La catégorie vient en premier : un article choisi ensuite ne la réécrit pas.
+      if (!categorieId) setCategorieId(r.categorie_id ?? "");
     }
     setOpen(false);
   }
@@ -76,8 +123,48 @@ export function LigneForm({
   return (
     <ModalForm action={action} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
+        {/* La catégorie se choisit en premier : c'est elle qui restreint le catalogue.
+            Sans catégorie proposée (devis de vente), le champ n'offrirait que
+            « — Aucune — » : on le masque au lieu d'afficher un choix vide. */}
+        {categories.length > 0 && (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Catégorie</span>
+            <select
+              name="categorie_id"
+              value={categorieId}
+              onChange={(e) => {
+                setCategorieId(e.target.value);
+                // Un article d'une autre catégorie ne peut pas rester sélectionné.
+                if (referenceId) {
+                  const r = references.find((x) => x.id === referenceId);
+                  if (e.target.value && r && !dansCategorie(r, e.target.value)) {
+                    setReferenceId("");
+                    setQuery("");
+                  }
+                }
+              }}
+              className={input}
+            >
+              <option value="">— Aucune (tout le catalogue) —</option>
+              {groupesCategories.map((g) => (
+                g.enfants.length === 0 ? (
+                  <option key={g.id} value={g.id}>{g.nom}</option>
+                ) : (
+                  <optgroup key={g.id} label={g.nom}>
+                    <option value={g.id}>{g.nom} — tout</option>
+                    {g.enfants.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nom}</option>
+                    ))}
+                  </optgroup>
+                )
+              ))}
+            </select>
+          </label>
+        )}
         <div className="relative">
-          <span className="mb-1 block text-sm font-medium">Depuis le catalogue</span>
+          <span className="mb-1 block text-sm font-medium">
+            Article{categorieId ? ` — ${nomDe.get(categorieId) ?? ""}` : ""}
+          </span>
           <input type="hidden" name="reference_id" value={referenceId} />
           <input
             type="text"
@@ -110,53 +197,55 @@ export function LigneForm({
                 — Ligne libre (saisie manuelle) —
               </button>
               {results.map((r) => {
-                const externe = r.cout_location_jour != null;
+                // Deux informations distinctes : d'où vient l'article (notre
+                // catalogue ou un catalogue externe) et s'il nous coûte une
+                // sous-location. Elles coïncident souvent, pas toujours.
+                const externe = estExterne(r);
+                const sousLoc = r.cout_location_jour != null;
                 return (
                   <button
                     key={r.id}
                     type="button"
                     onClick={() => pick(r)}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface ${
-                      r.id === referenceId ? "bg-surface" : ""
-                    }`}
+                    className={`flex w-full items-center justify-between gap-2 border-l-2 px-3 py-2 text-left text-sm hover:bg-surface ${
+                      externe ? "border-l-amber-400" : "border-l-green-500"
+                    } ${r.id === referenceId ? "bg-surface" : ""}`}
                   >
                     <span className="min-w-0 flex-1 truncate">
                       {labelOf(r)}
                       {r.designation && <span className="ml-1 text-xs text-muted">· {r.nom}</span>}
-                      {externe && (
-                        <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                          Sous-location
+                      {/* Un seul badge : les deux informations coïncident presque
+                          toujours, et côte à côte elles débordaient de la liste.
+                          « Sous-loc. » ne reste visible que sur un article à nous
+                          qu'on sous-loue quand même — le cas qui mérite l'attention. */}
+                      {externe ? (
+                        <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                          Externe
                         </span>
-                      )}
+                      ) : sousLoc ? (
+                        <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                          Sous-loc.
+                        </span>
+                      ) : null}
                     </span>
                     <span className="shrink-0 text-xs text-muted">{euros(r.prix_location_jour)}/j</span>
                   </button>
                 );
               })}
               {results.length === 0 && (
-                <p className="px-3 py-2 text-sm text-muted">Aucun article. La ligne restera libre.</p>
+                <p className="px-3 py-2 text-sm text-muted">
+                  {categorieId
+                    ? `Aucun article dans « ${nomDe.get(categorieId) ?? "cette catégorie"} ». Choisis « Aucune » pour voir tout le catalogue, ou laisse la ligne libre.`
+                    : "Aucun article. La ligne restera libre."}
+                </p>
               )}
+              <p className="flex items-center gap-3 border-t border-border px-3 py-1.5 text-[11px] text-muted">
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-green-500" /> Notre matériel</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-amber-400" /> Catalogue externe</span>
+              </p>
             </div>
           )}
         </div>
-        {/* Sans catégorie proposée (devis de vente), le champ n'offrait que
-            « — Aucune — » : on le masque au lieu d'afficher un choix vide. */}
-        {categories.length > 0 && (
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Catégorie</span>
-            <select
-              name="categorie_id"
-              value={categorieId}
-              onChange={(e) => setCategorieId(e.target.value)}
-              className={input}
-            >
-              <option value="">— Aucune —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       <label className="block">

@@ -580,7 +580,7 @@ export default async function DevisEditorPage({
     await Promise.all([
       supabase.from("ligne_prestation").select("*").eq("devis_id", devisId).order("ordre", { nullsFirst: false }).order("created_at"),
       supabase.from("ligne_prestation").select("*").eq("prestation_id", prestationId),
-      supabase.from("categorie").select("id, nom, ordre").order("ordre", { ascending: true }).order("nom"),
+      supabase.from("categorie").select("id, nom, ordre, parent_id").order("ordre", { ascending: true }).order("nom"),
       supabase.from("materiel_reference").select("id, nom, designation, prix_location_jour, cout_location_jour, categorie_id, est_consommable").order("nom"),
       supabase.from("transport").select("id, devis_id, nb_vehicules, km, cout_calcule, vehicule(nom)").eq("devis_id", devisId),
       supabase.from("vehicule").select("id, nom").order("nom"),
@@ -591,7 +591,7 @@ export default async function DevisEditorPage({
   const tauxTva = Number((entData as { taux_tva?: number } | null)?.taux_tva ?? 0);
   const lignes = (lignesDevis ?? []) as LignePrestation[];
   const allLignes = (lignesEvent ?? []) as LignePrestation[];
-  const categories = (cats ?? []) as { id: string; nom: string; ordre: number | null }[];
+  const categories = (cats ?? []) as { id: string; nom: string; ordre: number | null; parent_id: string | null }[];
   const references = (refs ?? []) as {
     id: string; nom: string; prix_location_jour: number; cout_location_jour: number | null; categorie_id: string | null; est_consommable: boolean;
   }[];

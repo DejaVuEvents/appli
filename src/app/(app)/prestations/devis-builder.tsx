@@ -214,7 +214,7 @@ export async function DevisBuilder(props: {
           </p>
         )}
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
-        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} arbreCategories={categories} infosRef={infosRef} />
+        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} arbreCategories={categories} vente={estVente} infosRef={infosRef} />
 
         {/* Remise globale */}
         <section>

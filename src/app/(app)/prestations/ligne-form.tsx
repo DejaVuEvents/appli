@@ -27,6 +27,7 @@ export function LigneForm({
   references,
   categories,
   arbreCategories,
+  vente = false,
   ligne,
   submitLabel = "+ Ajouter la ligne",
   cancelHref,
@@ -38,6 +39,8 @@ export function LigneForm({
   categories: Cat[];
   /** Arborescence complète du catalogue, pour situer chaque article. */
   arbreCategories?: Cat[];
+  /** Devis de vente : on cède du matériel, on n'en loue pas. */
+  vente?: boolean;
   ligne?: LignePrestation;
   submitLabel?: string;
   cancelHref?: string;
@@ -113,8 +116,11 @@ export function LigneForm({
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // Une vente ne porte que sur NOTRE matériel : le catalogue externe est celui
+    // d'un loueur, on ne cède pas ce qu'on ne possède pas.
+    const possible = vente ? references.filter((r) => !estExterne(r)) : references;
     // La catégorie choisie restreint le catalogue : c'est elle qu'on choisit d'abord.
-    const base = references.filter((r) => !categorieId || dansCategorie(r, categorieId));
+    const base = possible.filter((r) => !categorieId || dansCategorie(r, categorieId));
     const filtres = !q
       ? base
       : base.filter(
@@ -122,7 +128,7 @@ export function LigneForm({
         );
     return filtres.slice(0, 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [references, query, categorieId, parentDe]);
+  }, [references, query, categorieId, parentDe, vente]);
 
   function pick(r: Ref | null) {
     if (!r) {
@@ -132,7 +138,9 @@ export function LigneForm({
       setReferenceId(r.id);
       setQuery(labelOf(r));
       setDesignation(labelOf(r));
-      setPrix(String(r.prix_location_jour ?? 0));
+      // Le tarif de location n'a pas de sens sur une cession : le prix de vente
+      // se saisit, il ne se déduit pas d'un prix au jour.
+      if (!vente) setPrix(String(r.prix_location_jour ?? 0));
       // La catégorie vient en premier : un article choisi ensuite ne la réécrit pas.
       if (!categorieId) setCategorieId(r.categorie_id ?? "");
     }
@@ -182,7 +190,7 @@ export function LigneForm({
         )}
         <div className="relative">
           <span className="mb-1 block text-sm font-medium">
-            Article{categorieId ? ` — ${nomDe.get(categorieId) ?? ""}` : ""}
+            {vente ? "Matériel cédé" : "Article"}{categorieId ? ` — ${nomDe.get(categorieId) ?? ""}` : ""}
           </span>
           <input type="hidden" name="reference_id" value={referenceId} />
           <input
@@ -197,7 +205,7 @@ export function LigneForm({
             onBlur={() => {
               blurTimer.current = setTimeout(() => setOpen(false), 150);
             }}
-            placeholder="Rechercher un article… (ou laisser vide pour ligne libre)"
+            placeholder={vente ? "Chercher dans notre matériel…" : "Rechercher un article… (ou laisser vide pour ligne libre)"}
             className={input}
             autoComplete="off"
           />
@@ -247,7 +255,7 @@ export function LigneForm({
                         </span>
                       ) : null}
                     </span>
-                    <span className="shrink-0 text-xs text-muted">{euros(r.prix_location_jour)}/j</span>
+                    {!vente && <span className="shrink-0 text-xs text-muted">{euros(r.prix_location_jour)}/j</span>}
                   </button>
                 );
               })}
@@ -258,10 +266,12 @@ export function LigneForm({
                     : "Aucun article. La ligne restera libre."}
                 </p>
               )}
-              <p className="flex items-center gap-3 border-t border-border px-3 py-1.5 text-[11px] text-muted">
-                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-green-500" /> Notre matériel</span>
-                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-amber-400" /> Catalogue externe</span>
-              </p>
+              {!vente && (
+                <p className="flex items-center gap-3 border-t border-border px-3 py-1.5 text-[11px] text-muted">
+                  <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-green-500" /> Notre matériel</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-amber-400" /> Catalogue externe</span>
+                </p>
+              )}
             </div>
           )}
         </div>

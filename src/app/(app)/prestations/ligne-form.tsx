@@ -6,6 +6,7 @@ import { useState, useMemo, useRef } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { euros } from "@/lib/format";
 import type { LignePrestation } from "@/lib/types";
+import { bucketPour, ORDRE_BUCKETS } from "@/lib/devis-buckets";
 
 type Ref = {
   id: string;
@@ -25,6 +26,7 @@ export function LigneForm({
   action,
   references,
   categories,
+  arbreCategories,
   ligne,
   submitLabel = "+ Ajouter la ligne",
   cancelHref,
@@ -32,7 +34,10 @@ export function LigneForm({
 }: {
   action: (formData: FormData) => void;
   references: Ref[];
+  /** Choix proposés : les familles du devis, ou l'arborescence complète. */
   categories: Cat[];
+  /** Arborescence complète du catalogue, pour situer chaque article. */
+  arbreCategories?: Cat[];
   ligne?: LignePrestation;
   submitLabel?: string;
   cancelHref?: string;
@@ -49,9 +54,11 @@ export function LigneForm({
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Arbre des catégories : « Amplificateurs » existe sous Son ET sous Catalogue
-  // Externe. Sans son parent, le choix est ambigu dans la liste comme dans le filtre.
-  const parentDe = useMemo(() => new Map(categories.map((c) => [c.id, c.parent_id ?? null])), [categories]);
+  // Deux listes distinctes : celle qu'on PROPOSE (les familles du devis) et celle
+  // qui permet de SITUER un article (l'arborescence complète du catalogue).
+  const arbre = useMemo(() => arbreCategories ?? categories, [arbreCategories, categories]);
+  const parentDe = useMemo(() => new Map(arbre.map((c) => [c.id, c.parent_id ?? null])), [arbre]);
+  const nomArbre = useMemo(() => new Map(arbre.map((c) => [c.id, c.nom])), [arbre]);
   const nomDe = useMemo(() => new Map(categories.map((c) => [c.id, c.nom])), [categories]);
 
   /** Remonte à la racine de l'arborescence. */
@@ -64,10 +71,22 @@ export function LigneForm({
     }
     return cur;
   };
-  const estExterne = (r: Ref) => nomDe.get(racine(r.categorie_id) ?? "") === "Catalogue Externe";
+  const estExterne = (r: Ref) => nomArbre.get(racine(r.categorie_id) ?? "") === "Catalogue Externe";
 
-  /** La catégorie choisie couvre-t-elle cette référence ? (elle-même ou un descendant) */
+  /**
+   * La catégorie choisie couvre-t-elle cette référence ?
+   *
+   * Les familles du devis (Lumière, Son, Structure…) ne sont pas des catégories du
+   * catalogue : le matériel son se trouve aussi bien sous « Son » que sous
+   * « Catalogue Externe › Enceintes & Caissons ». On réutilise donc le classeur qui
+   * range déjà les lignes du devis, au lieu de ne regarder que l'arborescence —
+   * sinon choisir « Son » ne proposait rien.
+   */
   const dansCategorie = (r: Ref, catId: string) => {
+    const nomChoisi = nomDe.get(catId) ?? "";
+    if ((ORDRE_BUCKETS as readonly string[]).includes(nomChoisi)) {
+      return bucketPour(r.designation ?? r.nom, nomArbre.get(r.categorie_id ?? "") ?? null) === nomChoisi;
+    }
     let cur = r.categorie_id;
     for (let i = 0; cur && i < 10; i++) {
       if (cur === catId) return true;

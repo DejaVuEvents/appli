@@ -42,8 +42,8 @@ type Cat = { id: string; nom: string; ordre?: number | null };
 // Masque les petites flèches +/− natives des champs numériques (affichage plus léger).
 const NO_SPIN = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0";
 
-export function LignesEditor({ prestationId, devisId, blocs, references, categories, infosRef }: {
-  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; infosRef: Record<string, RefInfo>;
+export function LignesEditor({ prestationId, devisId, blocs, references, categories, arbreCategories, infosRef }: {
+  prestationId: string; devisId: string; blocs: BlocData[]; references: Ref[]; categories: Cat[]; arbreCategories?: Cat[]; infosRef: Record<string, RefInfo>;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -294,7 +294,7 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
               )}
               <Modal trigger={<>+ Ajouter un élément</>} title={`Ajouter — ${b.nom}`}
                 triggerClassName="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-muted hover:border-primary hover:text-primary">
-                <LigneForm action={addLigne.bind(null, prestationId, devisId)} references={references} categories={categories} defaultCategorieId={b.catId ?? undefined} />
+                <LigneForm action={addLigne.bind(null, prestationId, devisId)} references={references} categories={categories} arbreCategories={arbreCategories} defaultCategorieId={b.catId ?? undefined} />
                 <p className="mt-2 text-xs text-muted">Choisis une référence du catalogue (prix + accessoires auto) ou laisse vide pour une ligne libre.</p>
               </Modal>
             </div>

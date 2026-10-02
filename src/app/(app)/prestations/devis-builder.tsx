@@ -36,7 +36,7 @@ export async function DevisBuilder(props: {
   lignes: LignePrestation[];
   transports: TransportRow[];
   references: { id: string; nom: string; prix_location_jour: number; cout_location_jour: number | null; categorie_id: string | null; est_consommable: boolean }[];
-  categories: { id: string; nom: string; ordre: number | null }[];
+  categories: { id: string; nom: string; ordre: number | null; parent_id?: string | null }[];
   refMap: Map<string, { id: string; nom: string; prix_location_jour: number; cout_location_jour: number | null; categorie_id: string | null; est_consommable: boolean }>;
   vehicules: { id: string; nom: string }[];
   tauxTva: number;
@@ -214,7 +214,7 @@ export async function DevisBuilder(props: {
           </p>
         )}
         {/* Catégories pré-placées — éditeur avec drag-and-drop + édition inline */}
-        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} infosRef={infosRef} />
+        <LignesEditor prestationId={id} devisId={devis.id} blocs={blocsData} references={references} categories={catsDevis} arbreCategories={categories} infosRef={infosRef} />
 
         {/* Remise globale */}
         <section>

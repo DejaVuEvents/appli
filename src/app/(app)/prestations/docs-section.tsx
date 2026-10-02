@@ -20,6 +20,8 @@ export type DocRow = {
   emis: boolean;                     // facture émise (a un n°)
   statutPaiement: string | null;     // facture
   statutSignature: string | null;    // devis
+  /** Devis dont l'événement porte une facture émise. */
+  facture?: boolean;
   factureSurDevis: boolean;          // facture = émission sur un devis (supprimer ≠ supprimer le devis)
 };
 
@@ -59,6 +61,12 @@ function StatutSelect({ d }: { d: DocRow }) {
 
   if (d.type === "devis") {
     return (
+      <div className="flex items-center gap-1.5">
+        {d.facture && !d.statutSignature && (
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+            Facturé
+          </span>
+        )}
       <form action={setStatutSignature.bind(null, d.id, d.prestationId)}>
         <select
           name="statut_signature"
@@ -72,6 +80,7 @@ function StatutSelect({ d }: { d: DocRow }) {
           <option value="refuse">Refusé</option>
         </select>
       </form>
+      </div>
     );
   }
   return (

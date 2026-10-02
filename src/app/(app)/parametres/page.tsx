@@ -217,6 +217,10 @@ export default async function ParametresPage({
               <TextArea label="Conditions — devis" name="conditions_devis" defaultValue={ent.conditions_devis} rows={2} />
               <TextArea label="Conditions — facture" name="conditions_facture" defaultValue={ent.conditions_facture} rows={2} />
               <div className="grid gap-4 sm:grid-cols-2">
+                {/* Préfixe : il distingue la série du site de celle d'un autre outil
+                    (Tiime), où la numérotation continue en parallèle. */}
+                <Field label="Préfixe devis" name="prefixe_num_devis" defaultValue={ent.prefixe_num_devis ?? "DV-"} placeholder="DV-" />
+                <Field label="Préfixe facture" name="prefixe_num_facture" defaultValue={ent.prefixe_num_facture ?? "FA-"} placeholder="FA-" />
                 <Field label="Prochain n° de devis" name="prochain_num_devis" type="number" defaultValue={ent.prochain_num_devis} />
                 <Field label="Prochain n° de facture" name="prochain_num_facture" type="number" defaultValue={ent.prochain_num_facture} />
               </div>

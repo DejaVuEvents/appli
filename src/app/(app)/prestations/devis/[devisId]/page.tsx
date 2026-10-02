@@ -122,7 +122,7 @@ export default async function DevisEditorPage({
   // Émission (n° + montants figés) pour le type de ce document
   const { data: doc } = await supabase
     .from("devis_facture")
-    .select("numero, statut_paiement, date_emission, date_echeance")
+    .select("numero, statut_paiement, date_emission, date_echeance, source")
     .eq("devis_id", devisId)
     .eq("type", devis.type)
     .maybeSingle();
@@ -235,7 +235,14 @@ export default async function DevisEditorPage({
         )}
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold">{titre}{emis && doc?.numero ? ` n° ${doc.numero}` : ""}</span>
+            <span className="text-sm font-semibold">
+              {titre}{emis && doc?.numero ? ` n° ${doc.numero}` : ""}
+              {doc?.source === "importe" && (
+                <span className="ml-1.5 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                  n° repris
+                </span>
+              )}
+            </span>
             {estFacture && badge && (
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
             )}

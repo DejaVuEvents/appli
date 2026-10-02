@@ -237,6 +237,9 @@ export interface ParametresEntreprise {
   taux_tva: number; // % de TVA (0 = franchise en base, art. 293 B)
   conditions_devis: string | null;
   conditions_facture: string | null;
+  /** Préfixe des numéros émis par le site, distinct de ceux d'un autre outil. */
+  prefixe_num_devis: string | null;
+  prefixe_num_facture: string | null;
   prochain_num_devis: number;
   prochain_num_facture: number;
   solde_initial: number;

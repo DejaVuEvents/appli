@@ -162,6 +162,8 @@ export async function updateEntreprise(id: string, formData: FormData) {
       taux_tva: num(formData.get("taux_tva")) ?? 0,
       conditions_devis: str(formData.get("conditions_devis")),
       conditions_facture: str(formData.get("conditions_facture")),
+      prefixe_num_devis: String(formData.get("prefixe_num_devis") ?? "").trim(),
+      prefixe_num_facture: String(formData.get("prefixe_num_facture") ?? "").trim(),
       prochain_num_devis: int(formData.get("prochain_num_devis")),
       prochain_num_facture: int(formData.get("prochain_num_facture")),
       format_date: str(formData.get("format_date")) ?? "fr",

@@ -115,6 +115,13 @@ export default async function PrestationsPage({
 
   // Devis (type=devis) transformés en facture : ils ont une émission de type facture.
   const aEmissionFacture = new Set(dfAll.filter((d) => d.type === "facture").map((d) => d.devis_id));
+  const devisInfo = new Map(dfAll.filter((d) => d.type === "devis").map((d) => [d.devis_id, d]));
+  // Événements dont au moins une facture est émise : leurs devis ont été acceptés.
+  const evenementsFactures = new Set(
+    allDocs
+      .filter((d) => aEmissionFacture.has(d.id) && d.prestation?.id)
+      .map((d) => d.prestation!.id as string),
+  );
 
   const toRow = (d: DevisDocRow, commeFacture: boolean): DocRow => {
     const base = {
@@ -141,14 +148,19 @@ export default async function PrestationsPage({
         factureSurDevis: d.type === "devis",
       };
     }
+    // Un devis porte lui aussi un numéro une fois émis : le forcer à `false`
+    // affichait « Brouillon » sur les 53 devis repris de Tiime, tous numérotés.
+    const dv = devisInfo.get(d.id);
     return {
       ...base,
-      titre: `${d.nom || "Devis"}`,
+      titre: `${d.nom || "Devis"}${dv?.numero ? ` · n°${dv.numero}` : ""}`,
       type: "devis",
-      emis: false,
+      emis: !!dv?.numero,
       statutPaiement: null,
       statutSignature: d.statut_signature ?? null,
       factureSurDevis: false,
+      // Le devis a donné lieu à une facture : il a forcément été accepté.
+      facture: evenementsFactures.has(d.prestation?.id ?? ""),
     };
   };
 

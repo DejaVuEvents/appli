@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Modal, ModalForm, ModalCancelButton, useModalClose } from "@/components/modal";
 import { SubmitButton } from "@/components/submit-button";
 import { normaliser } from "@/lib/rattachement";
+import { bucketPour, BUCKETS, type BucketNom } from "@/lib/devis-buckets";
 import { rattacherLibelle, ignorerLibelle, reprendreLibelle } from "./actions";
 
 export type LibelleLibre = {
@@ -15,7 +17,21 @@ export type LibelleLibre = {
   suggestions: { id: string; nom: string; score: number }[];
 };
 
-/** Pastille de provenance : à nous, catalogue externe, ou groupe. */
+export type RefOption = {
+  id: string;
+  nom: string;
+  /** Nom de la catégorie du catalogue, pour le classement en familles. */
+  categorieNom: string | null;
+  externe: boolean;
+  groupe: boolean;
+};
+
+const input =
+  "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const carte =
+  "rounded-xl border border-border px-4 py-3 text-left text-sm font-medium hover:border-primary/50 hover:bg-background";
+
+/** À nous, catalogue externe, ou groupe. */
 function Provenance({ r }: { r: RefOption }) {
   const cls = r.groupe
     ? "bg-primary/15 text-primary"
@@ -29,146 +45,196 @@ function Provenance({ r }: { r: RefOption }) {
   );
 }
 
-export type RefOption = {
-  id: string;
-  nom: string;
-  /** Catégorie racine : « Lumière & Effets », « Catalogue Externe », « Groupes »… */
-  famille: string;
-  externe: boolean;
-  groupe: boolean;
-};
+const FAMILLES_MATERIEL: BucketNom[] = [BUCKETS.LUM, BUCKETS.SON, BUCKETS.STR, BUCKETS.ELEC];
 
-const input =
-  "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
-
-function Ligne({
-  l,
-  references,
-  familles,
-}: {
-  l: LibelleLibre;
-  references: RefOption[];
-  familles: string[];
-}) {
-  const [choix, setChoix] = useState(l.suggestions[0]?.id ?? "");
+/**
+ * Choix de la référence, en trois temps : la nature (technique, transport,
+ * matériel, groupe), puis la famille si c'est du matériel, puis l'article.
+ *
+ * Dérouler les 400 références d'un coup ne marchait pas : une ligne « technicien »
+ * ne se cherche pas dans les projecteurs.
+ */
+function Choix({ l, references }: { l: LibelleLibre; references: RefOption[] }) {
+  const [etape, setEtape] = useState<"racine" | "materiel" | "items">("racine");
+  const [famille, setFamille] = useState<BucketNom | "groupes" | null>(null);
   const [recherche, setRecherche] = useState("");
-  const [famille, setFamille] = useState("");
+  const [choix, setChoix] = useState(l.suggestions[0]?.id ?? "");
+  const fermer = useModalClose();
 
   const parId = useMemo(() => new Map(references.map((r) => [r.id, r])), [references]);
+  const bucketDe = useMemo(() => {
+    const m = new Map<string, BucketNom>();
+    for (const r of references) m.set(r.id, bucketPour(r.nom, r.categorieNom));
+    return m;
+  }, [references]);
 
-  // Le catalogue fait plusieurs centaines d'entrées, réparties en familles qui ne se
-  // valent pas : une ligne « technicien » ne se cherche pas dans les projecteurs.
-  const liste = useMemo(() => {
+  const compte = (f: BucketNom | "groupes") =>
+    references.filter((r) => (f === "groupes" ? r.groupe : !r.groupe && bucketDe.get(r.id) === f)).length;
+
+  const items = useMemo(() => {
+    if (!famille) return [];
     const n = normaliser(recherche);
     return references
-      .filter((r) => (!famille || r.famille === famille) && (!n || normaliser(r.nom).includes(n)))
-      .slice(0, 200);
-  }, [recherche, famille, references]);
+      .filter((r) => (famille === "groupes" ? r.groupe : !r.groupe && bucketDe.get(r.id) === famille))
+      .filter((r) => !n || normaliser(r.nom).includes(n))
+      .slice(0, 300);
+  }, [famille, recherche, references, bucketDe]);
 
-  const suggIds = new Set(l.suggestions.map((s) => s.id));
+  const ouvrir = (f: BucketNom | "groupes") => {
+    setFamille(f);
+    setRecherche("");
+    setEtape("items");
+  };
+
   const choisi = choix ? parId.get(choix) : null;
 
+  const bouton = (f: BucketNom | "groupes", libelle: string) => (
+    <button key={libelle} type="button" className={carte} onClick={() => ouvrir(f)}>
+      <span className="block">{libelle}</span>
+      <span className="block text-xs font-normal text-muted">{compte(f)} référence{compte(f) > 1 ? "s" : ""}</span>
+    </button>
+  );
+
   return (
-    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:items-start">
-      <div className="min-w-0">
+    <div className="space-y-4">
+      <div>
         <div className="font-medium">{l.designation}</div>
-        <div className="mt-0.5 text-xs text-muted">
+        <div className="text-xs text-muted">
           {l.lignes} ligne{l.lignes > 1 ? "s" : ""} · {l.quantite} unité{l.quantite > 1 ? "s" : ""}
-        </div>
-        <div className="mt-0.5 truncate text-xs text-muted" title={l.evenements.join(", ")}>
-          {l.evenements.slice(0, 3).join(" · ")}
-          {l.evenements.length > 3 && ` · +${l.evenements.length - 3}`}
         </div>
       </div>
 
-      <div className="space-y-2">
-        {/* Suggestions cliquables : la provenance se lit avant de choisir. */}
-        {l.suggestions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {l.suggestions.map((sg) => {
-              const r = parId.get(sg.id);
-              return (
-                <button
-                  key={sg.id}
-                  type="button"
-                  onClick={() => setChoix(sg.id)}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs hover:bg-background ${
-                    choix === sg.id ? "border-primary bg-primary/5" : "border-border"
-                  }`}
-                >
-                  <span className="truncate">{sg.nom}</span>
-                  {r && <Provenance r={r} />}
-                  <span className="text-muted">{Math.round(sg.score * 100)} %</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+      {/* Suggestions : le raccourci, avant toute navigation. */}
+      {etape === "racine" && l.suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {l.suggestions.map((sg) => {
+            const r = parId.get(sg.id);
+            return (
+              <button
+                key={sg.id}
+                type="button"
+                onClick={() => setChoix(sg.id)}
+                className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs hover:bg-background ${
+                  choix === sg.id ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <span className="truncate">{sg.nom}</span>
+                {r && <Provenance r={r} />}
+                <span className="text-muted">{Math.round(sg.score * 100)} %</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
+      {etape === "racine" && (
         <div className="grid gap-2 sm:grid-cols-2">
-          <select className={input} value={famille} onChange={(e) => setFamille(e.target.value)}>
-            <option value="">Toutes les familles</option>
-            {familles.map((f) => (
-              <option key={f} value={f}>{f}</option>
-            ))}
-          </select>
-          <input
-            className={input}
-            placeholder="Filtrer…"
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-          />
+          {bouton(BUCKETS.TECH, "Technique")}
+          {bouton(BUCKETS.TRANSPORT, "Transport")}
+          <button type="button" className={carte} onClick={() => setEtape("materiel")}>
+            <span className="block">Matériel</span>
+            <span className="block text-xs font-normal text-muted">Lumière, son, structure, élec</span>
+          </button>
+          {bouton("groupes", "Groupes")}
         </div>
+      )}
 
-        <select className={input} value={choix} onChange={(e) => setChoix(e.target.value)}>
-          <option value="">— Choisir une référence —</option>
-          {l.suggestions.length > 0 && (
-            <optgroup label="Suggestions">
-              {l.suggestions.map((sg) => (
-                <option key={sg.id} value={sg.id}>{sg.nom}</option>
-              ))}
-            </optgroup>
-          )}
-          <optgroup label={famille || "Tout le catalogue"}>
-            {liste.filter((r) => !suggIds.has(r.id)).map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nom}{r.groupe ? " — groupe" : r.externe ? " — externe" : ""}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <form action={rattacherLibelle}>
-            <input type="hidden" name="designation" value={l.designation} />
-            <input type="hidden" name="reference_id" value={choix} />
-            <SubmitButton
-              className="!px-2.5 !py-1.5 !text-xs"
-              disabled={!choix}
-              pendingLabel="Rattachement…"
-              confirm={`Rattacher les ${l.lignes} ligne${l.lignes > 1 ? "s" : ""} « ${l.designation} » à « ${choisi?.nom ?? ""} » ?`}
-            >
-              Rattacher {l.lignes} ligne{l.lignes > 1 ? "s" : ""}
-            </SubmitButton>
-          </form>
-          {choisi && <Provenance r={choisi} />}
-          <form action={ignorerLibelle}>
-            <input type="hidden" name="designation" value={l.designation} />
-            <button type="submit" className="text-xs text-muted underline hover:text-foreground">
-              Pas du matériel
-            </button>
-          </form>
+      {etape === "materiel" && (
+        <div className="space-y-2">
+          <button type="button" onClick={() => setEtape("racine")} className="text-xs text-muted hover:text-foreground">
+            ← Retour
+          </button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {FAMILLES_MATERIEL.map((f) => bouton(f, f))}
+          </div>
         </div>
+      )}
+
+      {etape === "items" && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setEtape(famille && FAMILLES_MATERIEL.includes(famille as BucketNom) ? "materiel" : "racine")}
+            className="text-xs text-muted hover:text-foreground"
+          >
+            ← {famille === "groupes" ? "Groupes" : famille}
+          </button>
+          <input className={input} placeholder="Filtrer…" value={recherche} onChange={(e) => setRecherche(e.target.value)} autoFocus />
+          <div className="max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+            {items.length === 0 && <p className="px-3 py-2 text-sm text-muted">Aucune référence.</p>}
+            {items.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => { setChoix(r.id); setEtape("racine"); }}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-background ${
+                  r.id === choix ? "bg-primary/5" : ""
+                }`}
+              >
+                <span className="min-w-0 truncate">{r.nom}</span>
+                <Provenance r={r} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ModalForm action={rattacherLibelle} className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
+        <input type="hidden" name="designation" value={l.designation} />
+        <input type="hidden" name="reference_id" value={choix} />
+        <SubmitButton disabled={!choix} pendingLabel="Rattachement…">
+          Rattacher {l.lignes} ligne{l.lignes > 1 ? "s" : ""}
+        </SubmitButton>
+        {choisi ? (
+          <span className="flex items-center gap-1.5 text-sm">
+            <span className="truncate">{choisi.nom}</span>
+            <Provenance r={choisi} />
+          </span>
+        ) : (
+          <span className="text-xs text-muted">Choisis une référence.</span>
+        )}
+        <ModalCancelButton />
+      </ModalForm>
+
+      <form action={ignorerLibelle} onSubmit={() => fermer()}>
+        <input type="hidden" name="designation" value={l.designation} />
+        <button type="submit" className="text-xs text-muted underline hover:text-foreground">
+          Pas du matériel
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function Ligne({ l, references }: { l: LibelleLibre; references: RefOption[] }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+      <div className="min-w-0">
+        <div className="truncate font-medium">{l.designation}</div>
+        <div className="text-xs text-muted">
+          {l.lignes} ligne{l.lignes > 1 ? "s" : ""} · {l.quantite} unité{l.quantite > 1 ? "s" : ""}
+          {l.evenements.length > 0 && ` · ${l.evenements[0]}`}
+          {l.evenements.length > 1 && ` +${l.evenements.length - 1}`}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {l.suggestions.length > 0 && (
+          <span className="hidden max-w-48 truncate text-xs text-muted sm:inline">{l.suggestions[0].nom}</span>
+        )}
+        <Modal
+          trigger="Rattacher"
+          title="Rattacher au catalogue"
+          triggerClassName="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-background"
+          panelClassName="max-w-2xl"
+        >
+          <Choix l={l} references={references} />
+        </Modal>
       </div>
     </div>
   );
 }
 
-/**
- * File de rattachement : un libellé par ligne, toutes les lignes de devis qui le
- * portent traitées d'un seul geste. Trié par nombre de lignes : on commence par ce
- * qui pèse le plus.
- */
+/** File de rattachement : un libellé par ligne, toutes ses lignes traitées d'un geste. */
 export function RattachementListe({
   libelles,
   references,
@@ -180,10 +246,6 @@ export function RattachementListe({
 }) {
   const [recherche, setRecherche] = useState("");
   const [avecSuggestion, setAvecSuggestion] = useState(false);
-  const familles = useMemo(
-    () => [...new Set(references.map((r) => r.famille))].sort((a, b) => a.localeCompare(b, "fr")),
-    [references],
-  );
 
   const visibles = useMemo(() => {
     const n = normaliser(recherche);
@@ -193,8 +255,6 @@ export function RattachementListe({
         (!avecSuggestion || l.suggestions.length > 0),
     );
   }, [libelles, recherche, avecSuggestion]);
-
-  const totalLignes = visibles.reduce((s, l) => s + l.lignes, 0);
 
   return (
     <div className="space-y-4">
@@ -212,40 +272,34 @@ export function RattachementListe({
             onChange={(e) => setAvecSuggestion(e.target.checked)}
             className="h-4 w-4 rounded border-border"
           />
-          Seulement ceux qui ont une suggestion
+          Avec suggestion
         </label>
-        <span className="text-sm text-muted">
-          {visibles.length} libellé{visibles.length > 1 ? "s" : ""} · {totalLignes} ligne{totalLignes > 1 ? "s" : ""}
-        </span>
+        <span className="text-sm text-muted">{visibles.length}</span>
       </div>
 
       {visibles.length === 0 ? (
-        <div className="rounded-xl border border-border px-4 py-6 text-center text-sm text-muted">
-          Rien à rattacher ici.
-        </div>
+        <div className="rounded-xl border border-border px-4 py-6 text-center text-sm text-muted">Rien à rattacher.</div>
       ) : (
         <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
           {visibles.map((l) => (
-            <Ligne key={l.designation} l={l} references={references} familles={familles} />
+            <Ligne key={l.designation} l={l} references={references} />
           ))}
         </div>
       )}
 
       {ignores.length > 0 && (
         <details className="rounded-xl border border-border px-4 py-3">
-          <summary className="cursor-pointer text-sm font-medium">
-            Libellés écartés ({ignores.length})
-          </summary>
+          <summary className="cursor-pointer text-sm font-medium">Écartés ({ignores.length})</summary>
           <div className="mt-2 divide-y divide-border">
             {ignores.map((i) => (
               <div key={i.designation} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span className="min-w-0 truncate">
                   {i.designation}
-                  <span className="ml-2 text-xs text-muted">{i.lignes} ligne{i.lignes > 1 ? "s" : ""}</span>
+                  <span className="ml-2 text-xs text-muted">{i.lignes}</span>
                 </span>
                 <form action={reprendreLibelle}>
                   <input type="hidden" name="designation" value={i.designation} />
-                  <button type="submit" className="shrink-0 text-xs text-primary underline">Remettre dans la file</button>
+                  <button type="submit" className="shrink-0 text-xs text-primary underline">Remettre</button>
                 </form>
               </div>
             ))}

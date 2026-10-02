@@ -426,7 +426,9 @@ export default async function DevisEditorPage({
         {/* Statut du devis + signature */}
         {!estFacture && (
           <Card className="p-3 text-sm">
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted">Statut du devis</span>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted">
+              Statut du devis{!emis && " — brouillon, non émis"}
+            </span>
             <form action={setStatutSignature.bind(null, devisId, prestationId)} className="flex items-center gap-2">
               <select name="statut_signature" defaultValue={sigStatut} className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
                 <option value="">En attente</option>

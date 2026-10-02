@@ -99,16 +99,13 @@ export default async function RattachementPage() {
 
       <RattachementListe
         libelles={aTraiter}
-        references={references.map((r) => {
-          const famille = r.est_groupe ? "Groupes" : familleDe(r.categorie_id);
-          return {
-            id: r.id,
-            nom: r.nom,
-            famille,
-            externe: famille === "Catalogue Externe",
-            groupe: !!r.est_groupe,
-          };
-        })}
+        references={references.map((r) => ({
+          id: r.id,
+          nom: r.nom,
+          categorieNom: r.categorie_id ? nomCat.get(r.categorie_id) ?? null : null,
+          externe: familleDe(r.categorie_id) === "Catalogue Externe",
+          groupe: !!r.est_groupe,
+        }))}
         ignores={ecartes}
       />
     </div>

@@ -51,6 +51,12 @@ function StatutSelect({ d }: { d: DocRow }) {
   const [val, setVal] = useState(d.type === "devis" ? (d.statutSignature ?? "") : (d.statutPaiement ?? "en_attente"));
   const couleur = COULEUR[val] ?? COULEUR[""];
 
+  // Un document sans numéro n'est pas sorti : il est en brouillon, devis comme
+  // facture. Le statut de signature ne veut rien dire tant qu'il n'est pas émis.
+  if (!d.emis) {
+    return <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">Brouillon</span>;
+  }
+
   if (d.type === "devis") {
     return (
       <form action={setStatutSignature.bind(null, d.id, d.prestationId)}>
@@ -67,10 +73,6 @@ function StatutSelect({ d }: { d: DocRow }) {
         </select>
       </form>
     );
-  }
-  // Facture : le statut de paiement n'existe qu'une fois la facture émise (n°).
-  if (!d.emis) {
-    return <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">Brouillon</span>;
   }
   return (
     <form action={setStatutPaiement.bind(null, d.id, d.prestationId)}>

@@ -80,11 +80,100 @@ export async function synchroniserMaterielEvenement(supabase: Supa, prestationId
       .eq("id", e.id);
   }
 
+  await developperGroupes(supabase, prestationId);
+
   // Entrées orphelines : la ligne a été supprimée, ou son document n'est plus retenu.
   const gardees = new Set(attendues.map((l) => l.id));
   const aSupprimer = [...parLigne.entries()]
     .filter(([ligneId, e]) => e.origine === "devis" && !gardees.has(ligneId))
     .map(([, e]) => e.id);
+  if (aSupprimer.length > 0) {
+    await supabase.from("prestation_materiel").delete().in("id", aSupprimer);
+  }
+}
+
+
+/**
+ * Déplie les groupes : « Régie Lumière grandMA2 » part avec ses deux wings et son
+ * flightcase, et ces trois-là doivent compter comme utilisés — compteurs d'unité,
+ * historique de leur fiche, ROI.
+ *
+ * Les composants ne portent aucun montant : le chiffre d'affaires reste sur le
+ * groupe, qui est ce qui a été vendu. Les compter deux fois gonflerait le ROI.
+ */
+async function developperGroupes(supabase: Supa, prestationId: string) {
+  const { data: entreesData } = await supabase
+    .from("prestation_materiel")
+    .select("id, reference_id, quantite, utilise, origine")
+    .eq("prestation_id", prestationId)
+    .neq("origine", "groupe");
+  const entrees = (entreesData ?? []) as {
+    id: string; reference_id: string | null; quantite: number; utilise: boolean; origine: string;
+  }[];
+  const refIds = [...new Set(entrees.map((e) => e.reference_id).filter(Boolean) as string[])];
+  if (refIds.length === 0) return;
+
+  const { data: groupesData } = await supabase
+    .from("materiel_reference")
+    .select("id")
+    .in("id", refIds)
+    .eq("est_groupe", true);
+  const groupes = new Set(((groupesData ?? []) as { id: string }[]).map((g) => g.id));
+
+  const { data: existantsData } = await supabase
+    .from("prestation_materiel")
+    .select("id, parent_materiel_id, reference_id")
+    .eq("prestation_id", prestationId)
+    .eq("origine", "groupe");
+  const existants = (existantsData ?? []) as {
+    id: string; parent_materiel_id: string | null; reference_id: string | null;
+  }[];
+
+  const attendus = new Set<string>();
+
+  for (const e of entrees) {
+    if (!e.reference_id || !groupes.has(e.reference_id)) continue;
+    const { data: reglesData } = await supabase
+      .from("kit_regle")
+      .select("reference_accessoire_id, quantite_par_unite, accessoire:materiel_reference!kit_regle_reference_accessoire_id_fkey(nom)")
+      .eq("reference_parent_id", e.reference_id)
+      .eq("obligatoire", true);
+    const regles = (reglesData ?? []) as unknown as {
+      reference_accessoire_id: string; quantite_par_unite: number; accessoire: { nom: string } | null;
+    }[];
+
+    for (const r of regles) {
+      const cle = `${e.id}:${r.reference_accessoire_id}`;
+      attendus.add(cle);
+      const quantite = Math.max(1, Math.round(Number(e.quantite ?? 1) * Number(r.quantite_par_unite ?? 1)));
+      const deja = existants.find(
+        (x) => x.parent_materiel_id === e.id && x.reference_id === r.reference_accessoire_id,
+      );
+      if (deja) {
+        // Le composant suit son groupe : décocher le groupe décoche ce qu'il contient.
+        await supabase
+          .from("prestation_materiel")
+          .update({ quantite, utilise: e.utilise })
+          .eq("id", deja.id);
+      } else {
+        await supabase.from("prestation_materiel").insert({
+          prestation_id: prestationId,
+          reference_id: r.reference_accessoire_id,
+          designation: r.accessoire?.nom ?? null,
+          quantite,
+          montant: 0,
+          origine: "groupe",
+          parent_materiel_id: e.id,
+          utilise: e.utilise,
+        });
+      }
+    }
+  }
+
+  // Composants dont le groupe a disparu de l'événement.
+  const aSupprimer = existants
+    .filter((x) => !attendus.has(`${x.parent_materiel_id}:${x.reference_id}`))
+    .map((x) => x.id);
   if (aSupprimer.length > 0) {
     await supabase.from("prestation_materiel").delete().in("id", aSupprimer);
   }

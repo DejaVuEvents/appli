@@ -211,6 +211,8 @@ export async function basculerMaterielUtilise(
 ) {
   const supabase = await createSupabase();
   await supabase.from("prestation_materiel").update({ utilise }).eq("id", materielId);
+  // Un composant ne part pas sans son groupe, et revient avec lui.
+  await supabase.from("prestation_materiel").update({ utilise }).eq("parent_materiel_id", materielId);
   rafraichirMateriel(prestationId);
 }
 

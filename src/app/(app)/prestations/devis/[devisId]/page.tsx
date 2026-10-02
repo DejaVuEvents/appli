@@ -11,7 +11,7 @@ import { Field } from "@/components/form";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DevisBuilder, type TransportRow } from "../../devis-builder";
 import { DisponibiliteSection } from "../../[id]/disponibilite";
-import { updateStatut, associerDevisAEvenement, creerAcompteSolde, creerFactureSolde, recalculerSolde, renameDevis } from "../../actions";
+import { updateStatut, associerDevisAEvenement, creerAcompteSolde, creerFactureSolde, recalculerSolde, renameDevis, deleteDevis } from "../../actions";
 import { IconEdit, IconReceipt, IconRefresh, IconFile, IconFolder, IconUpload, IconCheck, IconDownload } from "@/components/icons";
 import { emettreDocument, setStatutPaiement, setStatutSignature, uploaderDevisSigne, supprimerFacture, redaterDevis } from "../../[id]/document/actions";
 import { EnvoyerClientButton } from "../../[id]/document/envoyer-client";
@@ -471,6 +471,22 @@ export default async function DevisEditorPage({
             <AssocierEvenement devisId={devisId} events={events} action={associerDevisAEvenement} triggerClassName={`${fullBtn} border border-border hover:bg-surface`} />
           )}
         </div>
+
+        {/* Suppression du document — elle n'existait qu'en mode édition, alors que
+            c'est cette page qu'on ouvre en premier. Un document émis porte un numéro
+            opposable : on le dit au lieu de laisser croire qu'il s'efface sans trace. */}
+        <form action={deleteDevis.bind(null, devisId, undefined)}>
+          <ConfirmButton
+            confirm={
+              emis
+                ? `Supprimer ${leDoc}${doc?.numero ? ` n° ${doc.numero}` : ""} ? Il a été émis : son numéro restera un trou dans la numérotation, et son entrée de trésorerie disparaîtra.`
+                : `Supprimer ${leDoc} « ${titreDoc} » ? Cette action est définitive.`
+            }
+            className={`${fullBtn} border border-border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30`}
+          >
+            ✕ Supprimer {leDoc}
+          </ConfirmButton>
+        </form>
 
         {/* Historique des modifications */}
         {hist.length > 0 && (

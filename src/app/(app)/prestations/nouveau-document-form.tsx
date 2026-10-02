@@ -36,8 +36,9 @@ export function NouveauDocumentForm({
     evenements.length > 0 ? "existant" : "nouveau",
   );
 
-  // Une facture suit toujours un événement ; seul un devis peut être une vente.
-  const estVente = type === "devis" && nature === "vente";
+  // Une vente de matériel n'a ni lieu ni dates, qu'on l'émette en devis ou
+  // directement en facture : c'est une cession, pas une prestation.
+  const estVente = nature === "vente";
   const nouvelEvenement = rattachement === "nouveau";
 
   const carte = (actif: boolean) =>
@@ -50,9 +51,10 @@ export function NouveauDocumentForm({
       <div className="space-y-4">
         <input type="hidden" name="devis_type" value={type} />
 
-        {type === "devis" && (
-          <fieldset>
-            <legend className="mb-1.5 block text-sm font-medium">Nature du devis</legend>
+        <fieldset>
+            <legend className="mb-1.5 block text-sm font-medium">
+              Nature {type === "facture" ? "de la facture" : "du devis"}
+            </legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {([
                 { v: "location", t: "Location / prestation", d: "Rattachée à un événement" },
@@ -72,8 +74,7 @@ export function NouveauDocumentForm({
                 </label>
               ))}
             </div>
-          </fieldset>
-        )}
+        </fieldset>
 
         <Field
           label={type === "facture" ? "Nom de la facture" : "Nom du devis"}

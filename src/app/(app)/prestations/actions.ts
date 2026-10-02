@@ -1067,7 +1067,9 @@ export async function creerDocument(formData: FormData) {
   // d'événement — sa prestation ne sert que de conteneur et porte le nom du document.
   let prestationId: string = str(formData.get("prestation_id")) ?? "";
   if (!prestationId) {
-    const estVente = type === "devis" && nature === "vente";
+    // Une vente de matériel n'a pas d'événement, qu'elle parte en devis ou
+              // directement en facture : sa prestation n'est qu'un conteneur.
+    const estVente = nature === "vente";
     const { data, error } = await supabase
       .from("prestation")
       .insert({

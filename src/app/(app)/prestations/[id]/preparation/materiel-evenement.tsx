@@ -59,11 +59,6 @@ export function MaterielEvenement({
       triggerClassName="w-full rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted hover:border-primary/40 hover:text-foreground"
     >
       <ModalForm action={ajouterMaterielEvenement.bind(null, prestationId)} className="space-y-3">
-        <p className="text-sm text-muted">
-          Du matériel décidé au dernier moment, absent des documents. Il compte dans l&apos;usage du
-          matériel mais ne rapporte rien : pour le facturer, crée une facture rattachée à
-          l&apos;événement — ses lignes rejoindront cette liste d&apos;elles-mêmes.
-        </p>
         <input
           className={input}
           placeholder="Filtrer le catalogue…"
@@ -109,16 +104,8 @@ export function MaterielEvenement({
         </span>
       </div>
 
-      <p className="text-xs text-muted">
-        Décocher un matériel le retire du ROI et de l&apos;historique d&apos;usage — le devis et la facture,
-        eux, ne bougent pas.
-      </p>
-
       {materiel.length === 0 ? (
-        <Card className="px-4 py-3 text-sm text-muted">
-          Aucun matériel de catalogue sur cet événement. Ajoute des lignes au devis, ou du matériel
-          ci-dessous.
-        </Card>
+        <Card className="px-4 py-3 text-sm text-muted">Aucun matériel de catalogue.</Card>
       ) : (
         <Card className="divide-y divide-border overflow-hidden">
           {materiel.map((m) => (

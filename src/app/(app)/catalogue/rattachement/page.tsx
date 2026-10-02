@@ -24,16 +24,34 @@ type LigneRow = {
  */
 export default async function RattachementPage() {
   const supabase = await createClient();
-  const [{ data: lignesData }, { data: refData }, { data: ignoresData }] = await Promise.all([
+  const [{ data: lignesData }, { data: refData }, { data: ignoresData }, { data: catsData }] = await Promise.all([
     supabase
       .from("ligne_prestation")
       .select("designation, quantite, prix_total, prix_unitaire, prestation:prestation_id(nom)")
       .is("reference_id", null),
-    supabase.from("materiel_reference").select("id, nom, designation").order("nom"),
+    supabase.from("materiel_reference").select("id, nom, designation, categorie_id, est_groupe").order("nom"),
     supabase.from("libelle_ignore").select("designation"),
+    supabase.from("categorie").select("id, nom, parent_id"),
   ]);
 
-  const references = (refData ?? []) as { id: string; nom: string; designation: string | null }[];
+  const references = (refData ?? []) as {
+    id: string; nom: string; designation: string | null; categorie_id: string | null; est_groupe: boolean | null;
+  }[];
+
+  // Famille = catégorie racine. C'est elle qui permet de naviguer : une ligne
+  // « technicien » ne se cherche pas dans les projecteurs.
+  const cats = (catsData ?? []) as { id: string; nom: string; parent_id: string | null }[];
+  const parentDe = new Map(cats.map((c) => [c.id, c.parent_id]));
+  const nomCat = new Map(cats.map((c) => [c.id, c.nom]));
+  const familleDe = (catId: string | null): string => {
+    let cur = catId;
+    for (let i = 0; cur && i < 10; i++) {
+      const parent = parentDe.get(cur) ?? null;
+      if (!parent) return nomCat.get(cur) ?? "Sans famille";
+      cur = parent;
+    }
+    return "Sans famille";
+  };
   const ignores = new Set(((ignoresData ?? []) as { designation: string }[]).map((i) => i.designation));
 
   // Regroupement par libellé exact : c'est l'unité de travail de l'écran.
@@ -74,25 +92,23 @@ export default async function RattachementPage() {
         }
       />
 
-      <Card className="p-4 text-sm">
-        <p>
-          <strong>{lignesRestantes} ligne{lignesRestantes > 1 ? "s" : ""}</strong> de devis et de factures
-          ne sont reliées à aucune référence, réparties sur{" "}
-          <strong>{aTraiter.length} libellé{aTraiter.length > 1 ? "s" : ""}</strong> — dont {avecSuggestion} avec
-          une suggestion. Tant qu&apos;une ligne n&apos;est pas rattachée, elle est invisible du ROI, ne réserve
-          aucune unité et n&apos;apparaît pas dans la check-list par unité.
-        </p>
-        <p className="mt-2 text-muted">
-          Rattacher agit sur <strong>toutes</strong> les lignes portant exactement le même libellé, sur tous les
-          documents. Les montants ne bougent pas et aucun accessoire de kit n&apos;est ajouté : ces documents sont
-          déjà émis. La main d&apos;œuvre, le transport, le câblage au mètre et les consommables n&apos;ont
-          rien à faire ici — écarte-les.
-        </p>
+      <Card className="px-4 py-2.5 text-sm">
+        <strong>{lignesRestantes}</strong> ligne{lignesRestantes > 1 ? "s" : ""} hors catalogue ·{" "}
+        {aTraiter.length} libellé{aTraiter.length > 1 ? "s" : ""} · {avecSuggestion} avec suggestion
       </Card>
 
       <RattachementListe
         libelles={aTraiter}
-        references={references.map((r) => ({ id: r.id, nom: r.nom }))}
+        references={references.map((r) => {
+          const famille = r.est_groupe ? "Groupes" : familleDe(r.categorie_id);
+          return {
+            id: r.id,
+            nom: r.nom,
+            famille,
+            externe: famille === "Catalogue Externe",
+            groupe: !!r.est_groupe,
+          };
+        })}
         ignores={ecartes}
       />
     </div>

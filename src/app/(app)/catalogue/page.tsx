@@ -179,6 +179,9 @@ export default async function CataloguePage({
                 {aRattacher} ligne{aRattacher > 1 ? "s" : ""} à rattacher
               </Link>
             )}
+            <Link href="/catalogue/groupes" className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-background">
+              Groupes
+            </Link>
             {nouvelleReference}
           </div>
         }

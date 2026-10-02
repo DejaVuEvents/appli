@@ -343,9 +343,7 @@ export function TrajetForm({
       <div className="block">
         <span className="mb-1 block text-sm font-medium">Justificatif (optionnel)</span>
         <FileDropzone name="justificatif" accept="image/*,application/pdf" />
-        <p className="mt-1 text-xs text-muted">
-          Le trajet est déjà tracé et daté ici ; tu peux joindre un ticket de péage ou un plein.
-        </p>
+
       </div>
 
       {/* Le serveur refuse un déplacement sans distance ni adresses exploitables ;

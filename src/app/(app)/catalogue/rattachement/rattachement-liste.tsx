@@ -15,7 +15,28 @@ export type LibelleLibre = {
   suggestions: { id: string; nom: string; score: number }[];
 };
 
-export type RefOption = { id: string; nom: string };
+/** Pastille de provenance : à nous, catalogue externe, ou groupe. */
+function Provenance({ r }: { r: RefOption }) {
+  const cls = r.groupe
+    ? "bg-primary/15 text-primary"
+    : r.externe
+      ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+      : "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+  return (
+    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>
+      {r.groupe ? "Groupe" : r.externe ? "Externe" : "À nous"}
+    </span>
+  );
+}
+
+export type RefOption = {
+  id: string;
+  nom: string;
+  /** Catégorie racine : « Lumière & Effets », « Catalogue Externe », « Groupes »… */
+  famille: string;
+  externe: boolean;
+  groupe: boolean;
+};
 
 const input =
   "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -23,27 +44,32 @@ const input =
 function Ligne({
   l,
   references,
+  familles,
 }: {
   l: LibelleLibre;
   references: RefOption[];
+  familles: string[];
 }) {
   const [choix, setChoix] = useState(l.suggestions[0]?.id ?? "");
   const [recherche, setRecherche] = useState("");
+  const [famille, setFamille] = useState("");
 
-  // Le catalogue fait plusieurs centaines d'entrées : sans filtre, la liste
-  // déroulante est inutilisable. Les suggestions restent toujours en tête.
+  const parId = useMemo(() => new Map(references.map((r) => [r.id, r])), [references]);
+
+  // Le catalogue fait plusieurs centaines d'entrées, réparties en familles qui ne se
+  // valent pas : une ligne « technicien » ne se cherche pas dans les projecteurs.
   const liste = useMemo(() => {
     const n = normaliser(recherche);
-    const base = n
-      ? references.filter((r) => normaliser(r.nom).includes(n))
-      : references;
-    return base.slice(0, 200);
-  }, [recherche, references]);
+    return references
+      .filter((r) => (!famille || r.famille === famille) && (!n || normaliser(r.nom).includes(n)))
+      .slice(0, 200);
+  }, [recherche, famille, references]);
 
   const suggIds = new Set(l.suggestions.map((s) => s.id));
+  const choisi = choix ? parId.get(choix) : null;
 
   return (
-    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start">
+    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:items-start">
       <div className="min-w-0">
         <div className="font-medium">{l.designation}</div>
         <div className="mt-0.5 text-xs text-muted">
@@ -56,26 +82,58 @@ function Ligne({
       </div>
 
       <div className="space-y-2">
-        <input
-          className={input}
-          placeholder="Filtrer le catalogue…"
-          value={recherche}
-          onChange={(e) => setRecherche(e.target.value)}
-        />
+        {/* Suggestions cliquables : la provenance se lit avant de choisir. */}
+        {l.suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {l.suggestions.map((sg) => {
+              const r = parId.get(sg.id);
+              return (
+                <button
+                  key={sg.id}
+                  type="button"
+                  onClick={() => setChoix(sg.id)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs hover:bg-background ${
+                    choix === sg.id ? "border-primary bg-primary/5" : "border-border"
+                  }`}
+                >
+                  <span className="truncate">{sg.nom}</span>
+                  {r && <Provenance r={r} />}
+                  <span className="text-muted">{Math.round(sg.score * 100)} %</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <select className={input} value={famille} onChange={(e) => setFamille(e.target.value)}>
+            <option value="">Toutes les familles</option>
+            {familles.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+          <input
+            className={input}
+            placeholder="Filtrer…"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+          />
+        </div>
+
         <select className={input} value={choix} onChange={(e) => setChoix(e.target.value)}>
           <option value="">— Choisir une référence —</option>
           {l.suggestions.length > 0 && (
             <optgroup label="Suggestions">
-              {l.suggestions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nom} ({Math.round(s.score * 100)} %)
-                </option>
+              {l.suggestions.map((sg) => (
+                <option key={sg.id} value={sg.id}>{sg.nom}</option>
               ))}
             </optgroup>
           )}
-          <optgroup label="Tout le catalogue">
+          <optgroup label={famille || "Tout le catalogue"}>
             {liste.filter((r) => !suggIds.has(r.id)).map((r) => (
-              <option key={r.id} value={r.id}>{r.nom}</option>
+              <option key={r.id} value={r.id}>
+                {r.nom}{r.groupe ? " — groupe" : r.externe ? " — externe" : ""}
+              </option>
             ))}
           </optgroup>
         </select>
@@ -88,20 +146,18 @@ function Ligne({
               className="!px-2.5 !py-1.5 !text-xs"
               disabled={!choix}
               pendingLabel="Rattachement…"
-              confirm={`Rattacher les ${l.lignes} ligne${l.lignes > 1 ? "s" : ""} « ${l.designation} » à cette référence ?`}
+              confirm={`Rattacher les ${l.lignes} ligne${l.lignes > 1 ? "s" : ""} « ${l.designation} » à « ${choisi?.nom ?? ""} » ?`}
             >
               Rattacher {l.lignes} ligne{l.lignes > 1 ? "s" : ""}
             </SubmitButton>
           </form>
+          {choisi && <Provenance r={choisi} />}
           <form action={ignorerLibelle}>
             <input type="hidden" name="designation" value={l.designation} />
             <button type="submit" className="text-xs text-muted underline hover:text-foreground">
-              Ce n&apos;est pas du matériel
+              Pas du matériel
             </button>
           </form>
-          {!choix && (
-            <span className="text-xs text-muted">Choisis une référence pour activer le bouton.</span>
-          )}
         </div>
       </div>
     </div>
@@ -124,6 +180,10 @@ export function RattachementListe({
 }) {
   const [recherche, setRecherche] = useState("");
   const [avecSuggestion, setAvecSuggestion] = useState(false);
+  const familles = useMemo(
+    () => [...new Set(references.map((r) => r.famille))].sort((a, b) => a.localeCompare(b, "fr")),
+    [references],
+  );
 
   const visibles = useMemo(() => {
     const n = normaliser(recherche);
@@ -166,7 +226,7 @@ export function RattachementListe({
       ) : (
         <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
           {visibles.map((l) => (
-            <Ligne key={l.designation} l={l} references={references} />
+            <Ligne key={l.designation} l={l} references={references} familles={familles} />
           ))}
         </div>
       )}

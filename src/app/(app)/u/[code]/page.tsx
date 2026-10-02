@@ -7,6 +7,7 @@ import { Field, Select, TextArea } from "@/components/form";
 import { euros, dateFr } from "@/lib/format";
 import { etatDepuisMouvements, resoudrePrestationUnite } from "@/lib/mouvements";
 import { ficheSortie, ficheRetour, updateUniteMaintenance, pointerInventaire } from "./actions";
+import { serieUnite } from "@/lib/unite";
 import {
   ETAT_LABELS,
   PHASE_LABELS,
@@ -108,7 +109,7 @@ export default async function FicheUnitePage({
       </Link>
       <PageHeader
         title={ref?.nom ?? "Unité"}
-        subtitle={u.numero_serie ? `N° de série ${u.numero_serie}` : "Fiche unité"}
+        subtitle={serieUnite(u) ? `N° de série ${serieUnite(u)}` : (u.numero_serie ? `N° de série ${u.numero_serie}` : "Fiche unité")}
         action={<Badge tone={u.etat as EtatUnite}>{ETAT_LABELS[u.etat as EtatUnite]}</Badge>}
       />
 

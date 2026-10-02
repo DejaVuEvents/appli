@@ -92,6 +92,7 @@ async function referenceFromForm(
     dimensions: str(formData.get("dimensions")),
     lieu_stockage: str(formData.get("lieu_stockage")),
     est_consommable: formData.get("est_consommable") === "on",
+    prefixe_unite: str(formData.get("prefixe_unite")),
   };
 }
 
@@ -144,6 +145,7 @@ function uniteFromForm(formData: FormData) {
   const override = formData.get("override_connecteurs") === "on";
   return {
     numero_serie: str(formData.get("numero_serie")),
+    numero_interne: num(formData.get("numero_interne")),
     qr_code: str(formData.get("qr_code")),
     etat: str(formData.get("etat")) ?? "ok",
     date_achat: str(formData.get("date_achat")),

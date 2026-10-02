@@ -20,7 +20,10 @@ export function UniteFields({
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-        <Field label="N° de série" name="numero_serie" defaultValue={unite?.numero_serie} />
+        {/* Le numéro interne est le nom d'usage : « Laser 3 ». Le n° de série du
+            fabricant reste à côté, pour la garantie et le SAV. */}
+        <Field label="N° de l'unité" name="numero_interne" type="number" step="1" defaultValue={unite?.numero_interne} />
+        <Field label="N° de série (fabricant)" name="numero_serie" defaultValue={unite?.numero_serie} />
         <Select label="État" name="etat" defaultValue={unite?.etat ?? "ok"} options={etatOptions} />
         <Field label="QR code" name="qr_code" defaultValue={unite?.qr_code} />
         <Field label="Date d'achat" name="date_achat" type="date" defaultValue={unite?.date_achat} />

@@ -1,5 +1,7 @@
 "use client";
 
+import { nomUnite } from "@/lib/unite";
+
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui";
@@ -14,8 +16,9 @@ type LigneRow = {
   unite_id: string;
   unite: {
     numero_serie: string | null;
+    numero_interne: number | null;
     qr_code: string | null;
-    reference: { nom: string } | null;
+    reference: { nom: string; prefixe_unite: string | null } | null;
   } | null;
 };
 
@@ -95,7 +98,7 @@ export function InventaireListe({ sessionId, lignes }: { sessionId: string; lign
                       </button>
                     </form>
                     <Link href={`/u/${l.unite?.qr_code || l.unite_id}`} className="flex-1 truncate font-medium hover:underline">
-                      {l.unite?.numero_serie || "Unité"}
+                      {l.unite ? nomUnite(l.unite) : "Unité"}
                     </Link>
                     <EtatConstateSelect action={setEtatConstate.bind(null, sessionId, l.id, l.unite_id)} etat={l.etat_constate} />
                   </div>

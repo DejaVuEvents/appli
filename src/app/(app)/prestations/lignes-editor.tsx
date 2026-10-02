@@ -13,6 +13,7 @@ import { SousLocationBadge } from "@/components/sous-location-badge";
 import { euros } from "@/lib/format";
 import { ETAT_LABELS, type EtatUnite } from "@/lib/types";
 import { addLigne, setLigneInline, deleteLigne, reordonnerLignes, ajouterAccessoireOptionnel, lierLigneAuCatalogue, setSpecsLigne } from "./actions";
+import { nomUnite } from "@/lib/unite";
 
 export type LigneData = {
   id: string; reference_id: string | null; designation: string | null; quantite: number; unite: string | null;
@@ -24,12 +25,14 @@ export type LigneData = {
 export type BlocData = { catId: string | null; nom: string; lignes: LigneData[] };
 export type RefInfo = {
   nom: string; description: string | null;
+  /** Nom court des unités (« Laser »), pour les désigner « Laser 3 ». */
+  prefixeUnite?: string | null;
   puissance_w: number | null; intensite_a: number | null; phase: string | null;
   connecteurs_puissance: string[]; connecteurs_data: string[];
   poids_kg: number | null; dimensions: string | null;
-  reserves: { id: string; numero_serie: string | null }[];
+  reserves: { id: string; numero_serie: string | null; numero_interne: number | null }[];
   /** Parc complet de la référence, états compris. */
-  unites?: { id: string; numero_serie: string | null; etat: string }[];
+  unites?: { id: string; numero_serie: string | null; numero_interne: number | null; etat: string }[];
   /** Renseigné quand le matériel est loué à un fournisseur (sous-location). */
   sousLoc?: { fournisseur: string | null; coutHt: number; remisePct: number; tvaPct: number } | null;
 };
@@ -341,7 +344,7 @@ function FicheProduit({ info, unitePrefix }: { info: RefInfo; unitePrefix: strin
               return (
                 <div key={u.id} className="flex items-center gap-2 px-2.5 py-1.5 text-xs">
                   <Link href={`${unitePrefix}${u.id}`} className="min-w-0 flex-1 truncate hover:underline">
-                    {u.numero_serie || "Sans n° de série"}
+                    {nomUnite({ ...u, reference: { nom: info.nom, prefixe_unite: info.prefixeUnite ?? null } })}
                   </Link>
                   <span className="shrink-0 text-muted">{ETAT_LABELS[u.etat as EtatUnite] ?? u.etat}</span>
                   {reservee && (

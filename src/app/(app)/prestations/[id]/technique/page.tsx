@@ -9,6 +9,7 @@ import { ElecTree } from "./elec-tree";
 import { LevagePlan } from "./levage-plan";
 import { InfoHint } from "@/components/info-hint";
 import { EventTabBar } from "@/components/event-tab-bar";
+import { nomUnite } from "@/lib/unite";
 
 type LigneRow = {
   id: string;
@@ -70,14 +71,14 @@ export default async function TechniquePage({
   // Unités réservées pour l'événement → n° de série par référence (pour nommer les exemplaires).
   const { data: resData } = await supabase
     .from("reservation_unite")
-    .select("unite:unite(id, reference_id, numero_serie)")
+    .select("unite:unite(id, reference_id, numero_serie, numero_interne, reference:materiel_reference(nom, prefixe_unite))")
     .eq("prestation_id", id);
-  const serialsParRef = new Map<string, { id: string; numero_serie: string | null }[]>();
-  for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null } | null }[]) {
+  const serialsParRef = new Map<string, { id: string; nom: string }[]>();
+  for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null; numero_interne: number | null; reference: { nom: string; prefixe_unite: string | null } | null } | null }[]) {
     const u = r.unite;
     if (!u) continue;
     const arr = serialsParRef.get(u.reference_id) ?? [];
-    arr.push({ id: u.id, numero_serie: u.numero_serie });
+    arr.push({ id: u.id, nom: nomUnite(u) });
     serialsParRef.set(u.reference_id, arr);
   }
 
@@ -112,7 +113,7 @@ export default async function TechniquePage({
     const courantUnite = courantLigne(elecDe(l), 1);
     const serials = l.reference_id ? serialsParRef.get(l.reference_id) ?? [] : [];
     return Array.from({ length: q }, (_, rang) => {
-      const serial = serials[rang]?.numero_serie ?? null;
+      const serial = serials[rang]?.nom ?? null;
       const suffixe = q > 1 ? ` #${serial ?? rang + 1}` : serial ? ` #${serial}` : "";
       return {
         key: `${l.id}:${rang}`,

@@ -33,6 +33,8 @@ export interface MaterielReference {
   tva_fournisseur_pct: number;
   est_consommable: boolean;
   created_at: string;
+  /** Nom court des unités de cette référence (« Laser », « Beam »). */
+  prefixe_unite: string | null;
 }
 
 // Tarif dégressif GLOBAL (paramètres devis/facturation), appliqué à tous les devis.
@@ -54,6 +56,8 @@ export interface Unite {
   id: string;
   reference_id: string;
   numero_serie: string | null;
+  /** Numéro de l'unité au sein de sa référence : « Laser 3 ». */
+  numero_interne: number | null;
   qr_code: string | null;
   etat: EtatUnite;
   compteur_heures: number;

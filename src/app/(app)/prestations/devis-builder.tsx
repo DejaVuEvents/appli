@@ -122,41 +122,41 @@ export async function DevisBuilder(props: {
     ? await Promise.all([
         supabase
           .from("materiel_reference")
-          .select("id, nom, description, puissance_w, intensite_a, phase, connecteurs_puissance, connecteurs_data, poids_kg, dimensions, cout_location_jour, fournisseur, remise_fournisseur_pct, tva_fournisseur_pct")
+          .select("id, nom, prefixe_unite, description, puissance_w, intensite_a, phase, connecteurs_puissance, connecteurs_data, poids_kg, dimensions, cout_location_jour, fournisseur, remise_fournisseur_pct, tva_fournisseur_pct")
           .in("id", ligneRefIds),
         supabase
           .from("reservation_unite")
-          .select("unite:unite(id, reference_id, numero_serie)")
+          .select("unite:unite(id, reference_id, numero_serie, numero_interne)")
           .eq("prestation_id", prestationId),
         supabase
           .from("unite")
-          .select("id, reference_id, numero_serie, etat")
+          .select("id, reference_id, numero_serie, numero_interne, etat")
           .in("reference_id", ligneRefIds)
           .order("created_at"),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }];
-  type SpecRow = { id: string; nom: string; description: string | null; puissance_w: number | null; intensite_a: number | null; phase: string | null; connecteurs_puissance: string[] | null; connecteurs_data: string[] | null; poids_kg: number | null; dimensions: string | null; cout_location_jour: number | null; fournisseur: string | null; remise_fournisseur_pct: number | null; tva_fournisseur_pct: number | null };
-  const reservesParRef = new Map<string, { id: string; numero_serie: string | null }[]>();
-  for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null } | null }[]) {
+  type SpecRow = { id: string; nom: string; prefixe_unite: string | null; description: string | null; puissance_w: number | null; intensite_a: number | null; phase: string | null; connecteurs_puissance: string[] | null; connecteurs_data: string[] | null; poids_kg: number | null; dimensions: string | null; cout_location_jour: number | null; fournisseur: string | null; remise_fournisseur_pct: number | null; tva_fournisseur_pct: number | null };
+  const reservesParRef = new Map<string, { id: string; numero_serie: string | null; numero_interne: number | null }[]>();
+  for (const r of (resData ?? []) as unknown as { unite: { id: string; reference_id: string; numero_serie: string | null; numero_interne: number | null } | null }[]) {
     const u = r.unite;
     if (!u) continue;
     const arr = reservesParRef.get(u.reference_id) ?? [];
-    arr.push({ id: u.id, numero_serie: u.numero_serie });
+    arr.push({ id: u.id, numero_serie: u.numero_serie, numero_interne: u.numero_interne });
     reservesParRef.set(u.reference_id, arr);
   }
   // Toutes les unités de chaque référence (pas seulement celles réservées) : la fiche
   // doit montrer le parc complet et signaler celles retenues pour cet événement.
-  const unitesParRef = new Map<string, { id: string; numero_serie: string | null; etat: string }[]>();
-  for (const u of (unitesData ?? []) as { id: string; reference_id: string; numero_serie: string | null; etat: string }[]) {
+  const unitesParRef = new Map<string, { id: string; numero_serie: string | null; numero_interne: number | null; etat: string }[]>();
+  for (const u of (unitesData ?? []) as { id: string; reference_id: string; numero_serie: string | null; numero_interne: number | null; etat: string }[]) {
     const arr = unitesParRef.get(u.reference_id) ?? [];
-    arr.push({ id: u.id, numero_serie: u.numero_serie, etat: u.etat });
+    arr.push({ id: u.id, numero_serie: u.numero_serie, numero_interne: u.numero_interne, etat: u.etat });
     unitesParRef.set(u.reference_id, arr);
   }
 
   const infosRef: Record<string, RefInfo> = {};
   for (const s of (specsData ?? []) as SpecRow[]) {
     infosRef[s.id] = {
-      nom: s.nom, description: s.description,
+      nom: s.nom, prefixeUnite: s.prefixe_unite, description: s.description,
       puissance_w: s.puissance_w, intensite_a: s.intensite_a, phase: s.phase,
       connecteurs_puissance: s.connecteurs_puissance ?? [], connecteurs_data: s.connecteurs_data ?? [],
       poids_kg: s.poids_kg, dimensions: s.dimensions,

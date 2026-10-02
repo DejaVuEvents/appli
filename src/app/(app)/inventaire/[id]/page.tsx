@@ -21,8 +21,9 @@ type LigneRow = {
   unite_id: string;
   unite: {
     numero_serie: string | null;
+    numero_interne: number | null;
     qr_code: string | null;
-    reference: { nom: string } | null;
+    reference: { nom: string; prefixe_unite: string | null } | null;
   } | null;
 };
 
@@ -38,7 +39,7 @@ export default async function SessionInventairePage({
     supabase.from("session_inventaire").select("*").eq("id", id).single(),
     supabase
       .from("ligne_inventaire")
-      .select("id, present, etat_constate, remarque_maintenance, unite_id, unite:unite(numero_serie, qr_code, reference:materiel_reference(nom))")
+      .select("id, present, etat_constate, remarque_maintenance, unite_id, unite:unite(numero_serie, numero_interne, qr_code, reference:materiel_reference(nom, prefixe_unite))")
       .eq("session_id", id),
   ]);
 

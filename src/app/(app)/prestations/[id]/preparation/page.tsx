@@ -7,6 +7,7 @@ import { etatDepuisMouvements, type EtatPrepa } from "@/lib/mouvements";
 import { chargerUnite, rentrerUnite, annulerSortieUnite, basculerCharge } from "./actions";
 import { PrepaScanner, RemplacerBtn } from "./prepa-scanner";
 import { MaterielEvenement, type MaterielRow } from "./materiel-evenement";
+import { nomUnite } from "@/lib/unite";
 import { synchroniserMaterielEvenement } from "@/lib/materiel-evenement";
 import type { Prestation } from "@/lib/types";
 import { EventTabBar } from "@/components/event-tab-bar";
@@ -16,9 +17,10 @@ type ResaRow = {
   unite_id: string;
   unite: {
     numero_serie: string | null;
+    numero_interne: number | null;
     qr_code: string | null;
     reference_id: string;
-    reference: { nom: string } | null;
+    reference: { nom: string; prefixe_unite: string | null } | null;
   } | null;
 };
 type LigneRow = {
@@ -58,7 +60,7 @@ export default async function PreparationPage({
     supabase.from("prestation").select("*").eq("id", id).single(),
     supabase
       .from("reservation_unite")
-      .select("unite_id, unite:unite(numero_serie, qr_code, reference_id, reference:materiel_reference(nom))")
+      .select("unite_id, unite:unite(numero_serie, numero_interne, qr_code, reference_id, reference:materiel_reference(nom, prefixe_unite))")
       .eq("prestation_id", id),
     supabase.from("mouvement").select("unite_id, type").eq("prestation_id", id),
     supabase
@@ -161,7 +163,7 @@ export default async function PreparationPage({
                       <div key={r.unite_id} className="flex items-center justify-between gap-3 px-4 py-3">
                         <div className="min-w-0">
                           <Link href={`/u/${r.unite?.qr_code || r.unite_id}`} className="font-medium hover:underline">
-                            {r.unite?.numero_serie || "Unité"}
+                            {r.unite ? nomUnite(r.unite) : "Unité"}
                           </Link>
                           <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
                             {badge.label}

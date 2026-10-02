@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FileDropzone } from "@/components/file-dropzone";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { nomUnite } from "@/lib/unite";
 import { PageHeader, Card } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { EventTabBar } from "@/components/event-tab-bar";
@@ -10,7 +11,7 @@ import { urlDocument } from "@/lib/storage";
 
 type ResaRow = {
   unite_id: string;
-  unite: { numero_serie: string | null; qr_code: string | null; reference: { nom: string } | null } | null;
+  unite: { numero_serie: string | null; numero_interne: number | null; qr_code: string | null; reference: { nom: string; prefixe_unite: string | null } | null } | null;
 };
 type ControleRow = { unite_id: string | null; etat: string; remarque: string | null; photo_url: string | null; controle: boolean };
 
@@ -33,7 +34,7 @@ export default async function RetourPage({ params }: { params: Promise<{ id: str
     supabase.from("prestation").select("nom").eq("id", id).single(),
     supabase
       .from("reservation_unite")
-      .select("unite_id, unite:unite(numero_serie, qr_code, reference:materiel_reference(nom))")
+      .select("unite_id, unite:unite(numero_serie, numero_interne, qr_code, reference:materiel_reference(nom, prefixe_unite))")
       .eq("prestation_id", id),
     supabase.from("controle_retour").select("unite_id, etat, remarque, photo_url, controle").eq("prestation_id", id),
   ]);
@@ -99,7 +100,7 @@ export default async function RetourPage({ params }: { params: Promise<{ id: str
                 <Card key={r.unite_id} className="p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <Link href={`/u/${r.unite?.qr_code || r.unite_id}`} className="font-medium hover:underline">
-                      {r.unite?.numero_serie || "Unité"}
+                      {r.unite ? nomUnite(r.unite) : "Unité"}
                     </Link>
                     {c?.controle ? (
                       <span className={`text-xs font-semibold ${ETAT_CLS[c.etat] ?? ""}`}>

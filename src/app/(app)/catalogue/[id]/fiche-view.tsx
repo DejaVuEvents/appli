@@ -131,7 +131,9 @@ export function FicheView({
                   <div key={u.id} className="px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">
-                        Unité #{i + 1}
+                        {r.prefixe_unite && u.numero_interne != null
+                          ? `${r.prefixe_unite} ${u.numero_interne}`
+                          : `Unité #${i + 1}`}
                         {u.numero_serie ? ` · S/N ${u.numero_serie}` : ""}
                       </span>
                       <Badge tone={u.etat as EtatUnite}>{ETAT_LABELS[u.etat as EtatUnite]}</Badge>

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { reserverUnites, libererReservations } from "../actions";
+import { nomUnite } from "@/lib/unite";
 
 type Besoin = { referenceId: string; nom: string; qty: number };
 
@@ -50,7 +51,7 @@ export async function DisponibiliteSection({
   const [{ data: mesRes }, { data: okUnites }, { data: autresRes }] = await Promise.all([
     supabase
       .from("reservation_unite")
-      .select("unite_id, unite:unite(reference_id, numero_serie)")
+      .select("unite_id, unite:unite(reference_id, numero_serie, numero_interne, reference:materiel_reference(nom, prefixe_unite))")
       .eq("prestation_id", prestationId),
     supabase.from("unite").select("id, reference_id").in("reference_id", refIds).eq("etat", "ok"),
     supabase
@@ -73,7 +74,7 @@ export async function DisponibiliteSection({
     return [...m.entries()];
   };
 
-  type ResRow = { unite_id: string; unite: { reference_id: string; numero_serie: string | null } | null };
+  type ResRow = { unite_id: string; unite: { reference_id: string; numero_serie: string | null; numero_interne: number | null; reference: { nom: string; prefixe_unite: string | null } | null } | null };
   const reservParRef = (refId: string) =>
     ((mesRes ?? []) as unknown as ResRow[]).filter((r) => r.unite?.reference_id === refId);
 
@@ -103,7 +104,7 @@ export async function DisponibiliteSection({
                       href={`/u/${r.unite_id}`}
                       className="rounded-full bg-primary/10 px-2 py-0.5 text-primary hover:underline"
                     >
-                      {r.unite?.numero_serie || "unité"}
+                      {r.unite ? nomUnite(r.unite) : "unité"}
                     </Link>
                   ))}
                 </div>

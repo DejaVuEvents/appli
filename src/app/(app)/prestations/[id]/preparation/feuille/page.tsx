@@ -5,6 +5,7 @@ import { PrintButton } from "@/components/print-button";
 import { poidsLigne, courantLigne, niveauAlerte } from "@/lib/technique";
 import { dateFr } from "@/lib/format";
 import type { CircuitElec, Pont } from "@/lib/types";
+import { nomUnite } from "@/lib/unite";
 
 const ZONE_INCONNUE = "Zone non renseignée";
 const amp = (n: number) => `${n.toFixed(1)} A`;
@@ -16,9 +17,9 @@ function capaciteEffective(i: number | null, phase: string | null): number | nul
   return phase === "tri" ? i * 3 : i;
 }
 
-type RefElec = { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null; nom: string; lieu_stockage: string | null } | null;
+type RefElec = { poids_kg: number | null; charge_max_kg: number | null; intensite_a: number | null; puissance_w: number | null; phase: "mono" | "tri" | null; nom: string; prefixe_unite: string | null; lieu_stockage: string | null } | null;
 type LigneRow = { id: string; designation: string | null; quantite: number; unite: string | null; reference_id: string | null; reference: RefElec };
-type ResaRow = { unite: { id: string; numero_serie: string | null; lieu_stockage: string | null; reference_id: string; reference: RefElec } | null };
+type ResaRow = { unite: { id: string; numero_serie: string | null; numero_interne: number | null; lieu_stockage: string | null; reference_id: string; reference: RefElec } | null };
 
 export default async function FeuillePreparationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,7 +29,7 @@ export default async function FeuillePreparationPage({ params }: { params: Promi
     supabase.from("prestation").select("*, client(nom)").eq("id", id).single(),
     supabase
       .from("reservation_unite")
-      .select("unite:unite(id, numero_serie, lieu_stockage, reference_id, reference:materiel_reference(nom, lieu_stockage, poids_kg, charge_max_kg, intensite_a, puissance_w, phase))")
+      .select("unite:unite(id, numero_serie, numero_interne, lieu_stockage, reference_id, reference:materiel_reference(nom, prefixe_unite, lieu_stockage, poids_kg, charge_max_kg, intensite_a, puissance_w, phase))")
       .eq("prestation_id", id),
     supabase
       .from("ligne_prestation")
@@ -78,7 +79,7 @@ export default async function FeuillePreparationPage({ params }: { params: Promi
     const entry = getZone(z);
     const refNom = u.reference?.nom ?? "Matériel";
     if (!entry.refs.has(u.reference_id)) entry.refs.set(u.reference_id, { nom: refNom, series: [] });
-    entry.refs.get(u.reference_id)!.series.push(u.numero_serie || "unité");
+    entry.refs.get(u.reference_id)!.series.push(nomUnite(u));
   }
   // Matériel non sérialisé (lignes sans unités réservées)
   for (const l of lignes) {

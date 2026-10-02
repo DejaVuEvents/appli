@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { appliquerSortie, appliquerRetour, annulerDerniereSortie, etatDepuisMouvements } from "@/lib/mouvements";
 import { periodeReservation } from "@/lib/devis";
+import { nomUnite, type UniteNommable } from "@/lib/unite";
 
 function num(v: FormDataEntryValue | null): number {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -68,13 +69,13 @@ export type ResultatScan =
   | { status: "inconnu"; code: string };
 
 type UniteScan = {
-  id: string; numero_serie: string | null; reference_id: string;
-  reference: { nom: string } | null;
+  id: string; numero_serie: string | null; numero_interne: number | null; reference_id: string;
+  reference: { nom: string; prefixe_unite: string | null } | null;
 };
 
-function labelUnite(u: { numero_serie: string | null; reference: { nom: string } | null }): string {
-  const nom = u.reference?.nom ?? "Matériel";
-  return u.numero_serie ? `${nom} — ${u.numero_serie}` : nom;
+/** « Laser 3 » quand la référence est numérotée, sinon le nom du matériel. */
+function labelUnite(u: UniteNommable & { reference: { nom: string; prefixe_unite: string | null } | null }): string {
+  return nomUnite(u);
 }
 
 /**
@@ -86,7 +87,7 @@ export async function scannerPourCharger(prestationId: string, codeBrut: string)
   const code = extraireCode(codeBrut);
   if (!code) return { status: "inconnu", code: codeBrut };
 
-  const sel = "id, numero_serie, reference_id, reference:materiel_reference(nom)";
+  const sel = "id, numero_serie, numero_interne, reference_id, reference:materiel_reference(nom, prefixe_unite)";
   let unite = (await supabase.from("unite").select(sel).eq("qr_code", code).maybeSingle()).data as UniteScan | null;
   if (!unite) unite = (await supabase.from("unite").select(sel).eq("numero_serie", code).maybeSingle()).data as UniteScan | null;
   if (!unite && UUID_RE.test(code)) unite = (await supabase.from("unite").select(sel).eq("id", code).maybeSingle()).data as UniteScan | null;
@@ -97,9 +98,9 @@ export async function scannerPourCharger(prestationId: string, codeBrut: string)
   // Réservations de cette prestation (unités + réf.)
   const { data: resasData } = await supabase
     .from("reservation_unite")
-    .select("unite_id, unite:unite(numero_serie, reference_id, reference:materiel_reference(nom))")
+    .select("unite_id, unite:unite(numero_serie, numero_interne, reference_id, reference:materiel_reference(nom, prefixe_unite))")
     .eq("prestation_id", prestationId);
-  const resas = (resasData ?? []) as unknown as { unite_id: string; unite: { numero_serie: string | null; reference_id: string; reference: { nom: string } | null } | null }[];
+  const resas = (resasData ?? []) as unknown as { unite_id: string; unite: { numero_serie: string | null; numero_interne: number | null; reference_id: string; reference: { nom: string; prefixe_unite: string | null } | null } | null }[];
 
   const estReservee = resas.some((r) => r.unite_id === unite!.id);
 
@@ -161,7 +162,7 @@ export async function remplacerUnite(prestationId: string, ancienneUniteId: stri
   );
   const { data: candidats } = await supabase
     .from("unite")
-    .select("id, numero_serie, compteur_sorties, compteur_heures")
+    .select("id, numero_serie, numero_interne, compteur_sorties, compteur_heures, reference:materiel_reference(prefixe_unite, nom)")
     .eq("reference_id", ancienne.reference_id)
     .eq("etat", "ok")
     .order("compteur_sorties", { ascending: true })
@@ -188,7 +189,7 @@ export async function remplacerUnite(prestationId: string, ancienneUniteId: stri
   if (error) return { ok: false, message: error.message };
 
   revalider(prestationId);
-  return { ok: true, message: `Remplacée par ${remplacant.numero_serie || "une autre unité"}.` };
+  return { ok: true, message: `Remplacée par ${nomUnite(remplacant as unknown as UniteNommable)}.` };
 }
 
 /* ---------------------------------------------- Matériel réellement utilisé ---- */

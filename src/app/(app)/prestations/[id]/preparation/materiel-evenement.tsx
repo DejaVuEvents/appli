@@ -19,6 +19,8 @@ export type MaterielRow = {
   utilise: boolean;
   origine: string;
   note: string | null;
+  /** Unités physiques affectées à cette ligne (« Laser 1 », « Laser 2 »…). */
+  unites?: string[];
 };
 
 const input =
@@ -146,6 +148,16 @@ export function MaterielEvenement({
                     </span>
                   )}
                   {m.note && <span className="ml-2 text-xs italic text-muted">{m.note}</span>}
+                  {/* Quelles unités partent, et ce que le parc ne couvre pas :
+                      le manque, c'est de la sous-location à prévoir. */}
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {m.unites && m.unites.length > 0 ? m.unites.join(", ") : "aucune unité affectée"}
+                    {m.unites && m.unites.length < m.quantite && (
+                      <span className="text-amber-700 dark:text-amber-400">
+                        {" "}· {m.quantite - m.unites.length} à sous-louer
+                      </span>
+                    )}
+                  </span>
                 </span>
               </form>
               {m.origine === "ajout" && (

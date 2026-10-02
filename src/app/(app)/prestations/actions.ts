@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import { synchroniserMaterielEvenement } from "@/lib/materiel-evenement";
+import { affecterUnites } from "@/lib/affectation-unites";
 import { montantLigne, coutTransport, periodeReservation, montantRemise, totalApresCoeffEtRemise, type RemiseType } from "@/lib/devis";
 import { totalDevis } from "@/lib/acompte";
 import { BUCKET_PRIVE } from "@/lib/storage";
@@ -936,86 +937,26 @@ export async function deleteTransport(prestationId: string, transportId: string)
  */
 export async function reserverUnites(prestationId: string) {
   const supabase = await createSupabase();
+  // La liste du matériel de l'événement doit être à jour avant d'affecter des unités.
+  await synchroniserMaterielEvenement(supabase, prestationId);
+  const r = await affecterUnites(supabase, prestationId);
 
-  const { data: p } = await supabase
-    .from("prestation")
-    .select("date_prepa, date_event_debut, date_event_fin, date_retour")
-    .eq("id", prestationId)
-    .single();
-  const periode = p ? periodeReservation(p) : null;
-  if (!periode) throw new Error("Dates de prestation incomplètes (préparation et retour requis).");
-
-  // On repart de zéro pour cet événement (évite les auto-conflits).
-  await supabase.from("reservation_unite").delete().eq("prestation_id", prestationId);
-
-  // Besoin par référence sérialisée (toutes lignes de l'événement)
-  const { data: lignes } = await supabase
-    .from("ligne_prestation")
-    .select("reference_id, quantite")
-    .eq("prestation_id", prestationId)
-    .not("reference_id", "is", null);
-
-  const refIds = [...new Set((lignes ?? []).map((l) => l.reference_id as string))];
-  if (refIds.length === 0) {
-    revalidatePath(`/prestations/${prestationId}`);
-    return;
-  }
-
-  const { data: refs } = await supabase
-    .from("materiel_reference")
-    .select("id, est_consommable, cout_location_jour")
-    .in("id", refIds);
-  const serialise = new Set(
-    (refs ?? []).filter((r) => !r.est_consommable && r.cout_location_jour == null).map((r) => r.id),
-  );
-
-  const besoin = new Map<string, number>();
-  for (const l of lignes ?? []) {
-    if (serialise.has(l.reference_id as string)) {
-      besoin.set(l.reference_id as string, (besoin.get(l.reference_id as string) ?? 0) + l.quantite);
-    }
-  }
-  if (besoin.size === 0) {
-    revalidatePath(`/prestations/${prestationId}`);
-    return;
-  }
-
-  const { data: unites } = await supabase
-    .from("unite")
-    .select("id, reference_id, compteur_sorties, compteur_heures")
-    .in("reference_id", [...besoin.keys()])
-    .eq("etat", "ok")
-    .order("compteur_sorties", { ascending: true })
-    .order("compteur_heures", { ascending: true });
-
-  const { data: prises } = await supabase
-    .from("reservation_unite")
-    .select("unite_id")
-    .lte("date_debut", periode.fin)
-    .gte("date_fin", periode.debut);
-  const indispo = new Set((prises ?? []).map((r) => r.unite_id));
-
-  const inserts: { unite_id: string; prestation_id: string; date_debut: string; date_fin: string }[] = [];
-  for (const [refId, qty] of besoin) {
-    const dispo = (unites ?? []).filter((u) => u.reference_id === refId && !indispo.has(u.id));
-    for (const u of dispo.slice(0, qty)) {
-      inserts.push({ unite_id: u.id, prestation_id: prestationId, date_debut: periode.debut, date_fin: periode.fin });
-    }
-  }
-
-  if (inserts.length > 0) {
-    const { error } = await supabase.from("reservation_unite").insert(inserts);
-    if (error) throw new Error(error.message);
-  }
-  // Stock insuffisant : on réserve ce qui est possible mais on le signale (sinon la
-  // sous-réservation passe totalement inaperçue).
-  const demande = [...besoin.values()].reduce((s2, q) => s2 + q, 0);
-  const manquant = demande - inserts.length;
   revalidatePath(`/prestations/${prestationId}`);
-  if (manquant > 0) {
-    redirect(`/prestations/${prestationId}?msg=${encodeURIComponent(
-      `${inserts.length} unité(s) réservée(s) — ${manquant} manquante(s) : stock insuffisant sur ces dates.`)}`);
+  revalidatePath(`/prestations/${prestationId}/preparation`);
+
+  // Un résultat partiel doit se voir : une sous-réservation silencieuse se
+  // découvrirait le jour du chargement, camion déjà chargé.
+  if (r.blocage) {
+    redirect(`/prestations/${prestationId}?msg=${encodeURIComponent(r.blocage)}`);
   }
+  if (r.manquants.length > 0) {
+    const detail = r.manquants
+      .map((m) => `${m.manque} × ${m.reference} (${m.motif === "dates" ? "déjà réservé sur ces dates" : "pas au parc à cette date"})`)
+      .join(", ");
+    redirect(`/prestations/${prestationId}?msg=${encodeURIComponent(
+      `${r.affectees} unité(s) affectée(s). À sous-louer : ${detail}.`)}`);
+  }
+  redirect(`/prestations/${prestationId}?msg=${encodeURIComponent(`${r.affectees} unité(s) affectée(s).`)}`);
 }
 
 export async function libererReservations(prestationId: string) {

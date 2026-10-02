@@ -56,7 +56,7 @@ export default async function PreparationPage({
   await synchroniserMaterielEvenement(supabase, id);
 
   const [{ data: prest }, { data: resaData }, { data: mvtData }, { data: lignesData },
-         { data: materielData }, { data: refData }] = await Promise.all([
+         { data: materielData }, { data: refData }, { data: affectData }] = await Promise.all([
     supabase.from("prestation").select("*").eq("id", id).single(),
     supabase
       .from("reservation_unite")
@@ -75,6 +75,11 @@ export default async function PreparationPage({
       .order("origine")
       .order("designation"),
     supabase.from("materiel_reference").select("id, nom").order("nom"),
+    // Unités affectées, pour dire QUELLE lyre part sur quelle ligne.
+    supabase
+      .from("reservation_unite")
+      .select("prestation_materiel_id, unite:unite(id, numero_serie, numero_interne, reference:materiel_reference(nom, prefixe_unite))")
+      .eq("prestation_id", id),
   ]);
 
   if (!prest) notFound();
@@ -84,6 +89,23 @@ export default async function PreparationPage({
   const lignes = (lignesData ?? []) as LigneRow[];
   const materiel = (materielData ?? []) as MaterielRow[];
   const references = (refData ?? []) as { id: string; nom: string }[];
+
+  const unitesParMateriel = new Map<string, string[]>();
+  for (const a of (affectData ?? []) as unknown as {
+    prestation_materiel_id: string | null;
+    unite: { numero_serie: string | null; numero_interne: number | null; reference: { nom: string; prefixe_unite: string | null } | null } | null;
+  }[]) {
+    if (!a.prestation_materiel_id || !a.unite) continue;
+    const arr = unitesParMateriel.get(a.prestation_materiel_id) ?? [];
+    arr.push(nomUnite(a.unite));
+    unitesParMateriel.set(a.prestation_materiel_id, arr);
+  }
+  const materielAvecUnites = materiel.map((m) => ({
+    ...m,
+    unites: (unitesParMateriel.get(m.id) ?? []).sort((x, y) =>
+      x.localeCompare(y, "fr", { numeric: true }),
+    ),
+  }));
 
   // État de chaque unité réservée
   const etatUnite = (uniteId: string): EtatPrepa =>
@@ -139,7 +161,7 @@ export default async function PreparationPage({
         </div>
       </Card>
 
-      <MaterielEvenement prestationId={id} materiel={materiel} references={references} />
+      <MaterielEvenement prestationId={id} materiel={materielAvecUnites} references={references} />
 
       {total === 0 && (
         <Card className="px-4 py-4 text-sm text-muted">

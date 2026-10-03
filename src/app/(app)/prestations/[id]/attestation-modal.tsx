@@ -23,7 +23,6 @@ export type AttestationVue = {
   responsable_montage: string | null;
   installateur_adresse: string | null;
   documents_plans: string | null;
-  moyens_par: string | null;
   descriptif: string | null;
   soussigne: string | null;
   fait_a: string | null;
@@ -100,8 +99,7 @@ export function AttestationModal({
             </div>
             <Field label="Adresse de l'installateur" name="installateur_adresse" defaultValue={a.installateur_adresse ?? ""} />
             <Field label="Documents et plans utilisés" name="documents_plans" defaultValue={a.documents_plans ?? ""} placeholder="Plan installation gymnase" />
-            <Field label="Moyens mis en place par" name="moyens_par" defaultValue={a.moyens_par ?? ""} />
-            <TextArea label="Descriptif sommaire" name="descriptif" defaultValue={a.descriptif ?? ""} />
+            <TextArea label="Description des moyens mis en place" name="descriptif" defaultValue={a.descriptif ?? ""} />
             <Field label="Je soussigné (nom, prénom, fonction)" name="soussigne" defaultValue={a.soussigne ?? ""} />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Fait à" name="fait_a" defaultValue={a.fait_a ?? ""} />
@@ -109,8 +107,16 @@ export function AttestationModal({
             </div>
           </fieldset>
           {modifiable && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <SubmitButton>Enregistrer</SubmitButton>
+              {a.estRedacteur && (
+                <SubmitButton
+                  formAction={soumettreAttestation.bind(null, prestationId)}
+                  confirm="Signer et envoyer l'attestation aux co-présidents pour validation ?"
+                >
+                  Signer et envoyer
+                </SubmitButton>
+              )}
               <ModalCancelButton />
             </div>
           )}
@@ -136,17 +142,9 @@ export function AttestationModal({
             </a>
           )}
 
-          {a.existe && modifiable && a.estRedacteur && (
-            <form action={soumettreAttestation.bind(null, prestationId)}>
-              <SubmitButton confirm="Signer et envoyer l'attestation aux co-présidents pour validation ?">
-                Signer et envoyer
-              </SubmitButton>
-            </form>
-          )}
-          {a.existe && modifiable && !a.estRedacteur && (
+          {modifiable && !a.estRedacteur && (
             <span className="text-xs text-muted">Seul {a.redacteurNom ?? "le rédacteur"} peut la signer.</span>
           )}
-          {!a.existe && <span className="text-xs text-muted">Enregistre d&apos;abord pour pouvoir signer.</span>}
 
           {a.statut === "soumise" && a.estRedacteur && (
             <form action={repasserBrouillonAttestation.bind(null, prestationId)}>

@@ -72,6 +72,15 @@ export function nomMembre(m: { prenom?: string | null; nom: string | null; email
 }
 
 /**
+ * Prénom ET nom, pour les documents qui engagent une personne — une attestation
+ * signée « Léo » ne vaut rien.
+ */
+export function nomCompletMembre(m: { prenom?: string | null; nom: string | null; email: string | null } | null): string {
+  const complet = [m?.prenom?.trim(), m?.nom?.trim()].filter(Boolean).join(" ");
+  return complet || m?.email?.split("@")[0] || "—";
+}
+
+/**
  * Champs d'identité indispensables pour qu'une note de frais soit remboursable :
  * ce sont exactement ceux que le PDF imprime (identité, adresse, contact, IBAN).
  * Sans eux, la note part en validation sans dire à qui ni où rembourser.

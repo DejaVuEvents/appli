@@ -12,6 +12,7 @@ export function SubmitButton({
   className = "",
   form,
   disabled = false,
+  formAction,
 }: {
   children?: React.ReactNode;
   pendingLabel?: string;
@@ -23,6 +24,9 @@ export function SubmitButton({
   form?: string;
   /** Grise le bouton (en plus de l'état « envoi en cours »). */
   disabled?: boolean;
+  /** Action alternative : le même formulaire, soumis à une autre destination —
+   *  pour qu'un second bouton emporte les champs saisis plutôt que de partir sans. */
+  formAction?: (formData: FormData) => void | Promise<void>;
 }) {
   const { pending } = useFormStatus();
   const inactif = pending || disabled;
@@ -37,7 +41,7 @@ export function SubmitButton({
   // Sans confirmation : bouton de soumission classique (état "pending").
   if (!confirm) {
     return (
-      <button type="submit" form={form} disabled={inactif} className={cls}>
+      <button type="submit" form={form} formAction={formAction} disabled={inactif} className={cls}>
         {pending ? pendingLabel : children}
       </button>
     );
@@ -46,7 +50,8 @@ export function SubmitButton({
   // Avec confirmation : ouvre la modale, puis soumet le formulaire.
   return (
     <>
-      <button ref={ref} type="button" form={form} disabled={inactif} onClick={() => setOpen(true)} className={cls}>
+      <button ref={ref} type="submit" form={form} formAction={formAction} disabled={inactif}
+        onClick={(e) => { e.preventDefault(); setOpen(true); }} className={cls}>
         {pending ? pendingLabel : children}
       </button>
       <ConfirmDialog
@@ -58,8 +63,10 @@ export function SubmitButton({
         onConfirm={() => {
           setOpen(false);
           const b = ref.current;
-          if (form) (document.getElementById(form) as HTMLFormElement | null)?.requestSubmit();
-          else b?.form?.requestSubmit();
+          // `requestSubmit(bouton)` conserve son `formAction` : sans le passer, la
+          // confirmation renverrait le formulaire à son action par défaut.
+          if (form) (document.getElementById(form) as HTMLFormElement | null)?.requestSubmit(b ?? undefined);
+          else b?.form?.requestSubmit(b ?? undefined);
         }}
       />
     </>

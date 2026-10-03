@@ -1,10 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { urlDocument } from "@/lib/storage";
-import { nomMembre } from "@/lib/membre";
+import { nomCompletMembre } from "@/lib/membre";
 import { dateFr } from "@/lib/format";
 import type { AttestationArgs, SignataireAttestation } from "@/lib/pdf/attestation-montage";
 
 type Supa = SupabaseClient;
+
+export const DESCRIPTIF_PAR_DEFAUT =
+  "Élingues de sécurité, système de sécurisation des praticables de scène, "
+  + "marquage visuel des zones à risque et bords de scène.";
 
 export type AttestationRow = {
   id: string;
@@ -70,7 +74,7 @@ export async function valeursParDefaut(
   const adresseEntreprise = [e?.adresse, [e?.code_postal, e?.ville].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(", ");
-  const nomResponsable = membre ? nomMembre(membre) : null;
+  const nomResponsable = membre ? nomCompletMembre(membre) : null;
 
   return {
     manifestation: prest?.nom ?? null,
@@ -84,6 +88,9 @@ export async function valeursParDefaut(
     soussigne: nomResponsable
       ? `${nomResponsable}${membre?.fonction ? `, ${membre.fonction}` : ""}${e?.raison_sociale ? ` ${e.raison_sociale}` : ""}`
       : null,
+    // Les mesures de sécurité sont les mêmes d'un montage à l'autre : on les
+    // propose, quitte à les ajuster.
+    descriptif: DESCRIPTIF_PAR_DEFAUT,
     fait_a: e?.ville ?? null,
     fait_le: new Date().toISOString().slice(0, 10),
   };
@@ -102,7 +109,7 @@ async function signataire(
     .maybeSingle();
   const m = data as { nom: string | null; prenom: string | null; fonction: string | null; email: string | null; signature_url: string | null } | null;
   return {
-    nom: m ? nomMembre(m) : null,
+    nom: m ? nomCompletMembre(m) : null,
     fonction: m?.fonction ?? null,
     signatureUrl: await urlDocument(supabase, m?.signature_url ?? null),
     signeLe,
@@ -137,7 +144,6 @@ export async function assemblerAttestation(
     responsableMontage: a.responsable_montage,
     installateurAdresse: a.installateur_adresse,
     documentsPlans: a.documents_plans,
-    moyensPar: a.moyens_par,
     descriptif: a.descriptif,
     soussigne: a.soussigne,
     faitA: a.fait_a,

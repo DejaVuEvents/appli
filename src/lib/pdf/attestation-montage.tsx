@@ -18,7 +18,6 @@ export type AttestationArgs = {
   responsableMontage: string | null;
   installateurAdresse: string | null;
   documentsPlans: string | null;
-  moyensPar: string | null;
   descriptif: string | null;
   soussigne: string | null;
   faitA: string | null;
@@ -101,9 +100,8 @@ export async function genererAttestationPdf(a: AttestationArgs): Promise<Buffer>
         <Champ label="Documents et plans utilisés pour l'installation : références, dates, indices, etc." valeur={a.documentsPlans} />
 
         <Text style={s.sousTitre}>CARACTÉRISTIQUES DES MOYENS MIS EN PLACE</Text>
-        <Champ label="par" valeur={a.moyensPar} />
         <View style={s.bloc}>
-          <Text style={s.etiquette}>Descriptif sommaire :</Text>
+          <Text style={s.etiquette}>Description des moyens mis en place :</Text>
           <Text style={s.valeurBloc}>{a.descriptif ?? ""}</Text>
         </View>
 

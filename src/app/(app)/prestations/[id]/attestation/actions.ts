@@ -14,7 +14,7 @@ const str = (v: FormDataEntryValue | null) => {
 const CHAMPS = [
   "manifestation", "lieu_montage", "dates_exploitation", "organisateur",
   "organisateur_adresse", "installateur", "responsable_montage",
-  "installateur_adresse", "documents_plans", "moyens_par", "descriptif",
+  "installateur_adresse", "documents_plans", "descriptif",
   "soussigne", "fait_a",
 ] as const;
 
@@ -77,8 +77,11 @@ export async function modifierAttestation(prestationId: string, formData: FormDa
  * Le monteur signe puis soumet : sa signature doit exister, sinon le document
  * partirait en validation avec une case vide.
  */
-export async function soumettreAttestation(prestationId: string) {
+export async function soumettreAttestation(prestationId: string, formData?: FormData) {
   const supabase = await createSupabase();
+  // Le bouton vit dans le formulaire : on enregistre la saisie avant de signer,
+  // sinon on soumettait l'état d'avant, voire un document vide.
+  if (formData) await modifierAttestation(prestationId, formData);
   const membre = await getMembreActuel(supabase);
   if (!membre?.signature_url) {
     throw new Error("Aucune signature enregistrée : ajoute-la dans Paramètres → Mon compte.");

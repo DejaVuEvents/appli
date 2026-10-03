@@ -37,6 +37,9 @@ const s = StyleSheet.create({
   // Le trait de conduite du formulaire officiel : la valeur s'inscrit dessus.
   valeur: { flex: 1, borderBottomWidth: 0.7, borderBottomColor: "#444", borderBottomStyle: "dotted", paddingLeft: 4, paddingBottom: 1 },
   bloc: { marginBottom: 7 },
+  // Même trait, mais sans `flex: 1` : hors d'une ligne, il faisait se superposer
+  // l'étiquette et le texte.
+  valeurBloc: { borderBottomWidth: 0.7, borderBottomColor: "#444", borderBottomStyle: "dotted", paddingLeft: 4, paddingBottom: 2, marginTop: 4, minHeight: 34 },
   sousTitre: { fontSize: 11.5, marginTop: 16, marginBottom: 10 },
   engagement: { marginTop: 14 },
   puce: { marginTop: 8, marginLeft: 10, fontFamily: "Helvetica-Bold", color: "#1d4ed8" },
@@ -101,7 +104,7 @@ export async function genererAttestationPdf(a: AttestationArgs): Promise<Buffer>
         <Champ label="par" valeur={a.moyensPar} />
         <View style={s.bloc}>
           <Text style={s.etiquette}>Descriptif sommaire :</Text>
-          <Text style={[s.valeur, { marginTop: 3, minHeight: 34 }]}>{a.descriptif ?? ""}</Text>
+          <Text style={s.valeurBloc}>{a.descriptif ?? ""}</Text>
         </View>
 
         <View style={s.engagement}>

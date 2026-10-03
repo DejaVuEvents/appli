@@ -6,14 +6,13 @@ import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { dateFr } from "@/lib/format";
 import {
-  modifierAttestation, soumettreAttestation, repasserBrouillonAttestation,
-  validerAttestation, refuserAttestation, supprimerAttestation,
+  modifierAttestation, signerAttestation, retirerSignatureAttestation, supprimerAttestation,
 } from "./attestation/actions";
 
 export type AttestationVue = {
   /** null tant qu'elle n'a jamais été enregistrée : les champs sont pré-remplis. */
   existe: boolean;
-  statut: "brouillon" | "soumise" | "validee" | "refusee";
+  signee: boolean;
   manifestation: string | null;
   lieu_montage: string | null;
   dates_exploitation: string | null;
@@ -28,21 +27,11 @@ export type AttestationVue = {
   soussigne: string | null;
   fait_a: string | null;
   fait_le: string | null;
-  motif_refus: string | null;
   redacteurNom: string | null;
   redacteurSigneLe: string | null;
-  validateurNom: string | null;
-  valideLe: string | null;
-  estRedacteur: boolean;
-  peutValider: boolean;
 };
 
-const BADGE: Record<AttestationVue["statut"], { label: string; cls: string }> = {
-  brouillon: { label: "Brouillon", cls: "bg-surface text-muted" },
-  soumise: { label: "Attente de signature", cls: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
-  validee: { label: "Validée", cls: "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300" },
-  refusee: { label: "Refusée", cls: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
-};
+const SIGNEE = "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
 
 /**
  * Attestation de bon montage, dans une popup : c'est un formulaire à remplir une
@@ -58,7 +47,8 @@ export function AttestationModal({
   a: AttestationVue;
   ouvertParDefaut: boolean;
 }) {
-  const modifiable = a.statut === "brouillon" || a.statut === "refusee";
+  // Un document signé ne se modifie pas sans retirer la signature.
+  const modifiable = !a.signee;
 
   return (
     <Modal
@@ -70,20 +60,13 @@ export function AttestationModal({
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <span className={`rounded-full px-2.5 py-1 font-semibold ${BADGE[a.statut].cls}`}>{BADGE[a.statut].label}</span>
+          <span className={`rounded-full px-2.5 py-1 font-semibold ${a.signee ? SIGNEE : "bg-surface text-muted"}`}>
+            {a.signee ? "Signée" : "Brouillon"}
+          </span>
           {a.redacteurSigneLe && (
-            <span className="text-muted">Monteur : {a.redacteurNom ?? "—"} · {dateFr(a.redacteurSigneLe)}</span>
-          )}
-          {a.valideLe && (
-            <span className="text-muted">Validée par {a.validateurNom ?? "—"} le {dateFr(a.valideLe)}</span>
+            <span className="text-muted">{a.redacteurNom ?? "—"} · {dateFr(a.redacteurSigneLe)}</span>
           )}
         </div>
-
-        {a.statut === "refusee" && a.motif_refus && (
-          <p className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-            Refusée : {a.motif_refus}
-          </p>
-        )}
 
         <ModalForm action={modifierAttestation.bind(null, prestationId)} className="space-y-3">
           <fieldset disabled={!modifiable} className="space-y-3">
@@ -111,14 +94,12 @@ export function AttestationModal({
           {modifiable && (
             <div className="flex flex-wrap items-center gap-3">
               <SubmitButton>Enregistrer</SubmitButton>
-              {a.estRedacteur && (
-                <SubmitButton
-                  formAction={soumettreAttestation.bind(null, prestationId)}
-                  confirm="Signer et envoyer l'attestation aux co-présidents pour validation ?"
-                >
-                  Signer et envoyer
-                </SubmitButton>
-              )}
+              <SubmitButton
+                formAction={signerAttestation.bind(null, prestationId)}
+                confirm="Signer l'attestation ? Ta signature enregistrée sera apposée sur le document."
+              >
+                Signer
+              </SubmitButton>
               <ModalCancelButton />
             </div>
           )}
@@ -135,7 +116,7 @@ export function AttestationModal({
               Aperçu PDF
             </a>
           )}
-          {a.statut === "validee" && (
+          {a.signee && (
             <a
               href={`/prestations/${prestationId}/attestation/pdf`}
               className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
@@ -143,38 +124,16 @@ export function AttestationModal({
               Télécharger
             </a>
           )}
-
-          {modifiable && !a.estRedacteur && (
-            <span className="text-xs text-muted">Seul {a.redacteurNom ?? "le rédacteur"} peut la signer.</span>
-          )}
-
-          {a.statut === "soumise" && a.estRedacteur && (
-            <form action={repasserBrouillonAttestation.bind(null, prestationId)}>
-              <button className="text-sm text-primary underline" type="submit">Repasser en brouillon</button>
+          {a.signee && (
+            <form action={retirerSignatureAttestation.bind(null, prestationId)}>
+              <button className="text-sm text-primary underline" type="submit">Retirer la signature</button>
             </form>
-          )}
-          {a.statut === "soumise" && !a.estRedacteur && !a.peutValider && (
-            <span className="text-xs text-muted">En attente d&apos;un autre co-président.</span>
-          )}
-
-          {a.peutValider && (
-            <>
-              <form action={validerAttestation.bind(null, prestationId)}>
-                <SubmitButton confirm="Signer cette attestation ? Ta signature enregistrée sera apposée sur le document.">
-                  Signer et valider
-                </SubmitButton>
-              </form>
-              <ModalForm action={refuserAttestation.bind(null, prestationId)} className="flex items-end gap-2">
-                <Field label="Motif de refus" name="motif_refus" className="flex-1" />
-                <SubmitButton variant="danger">Refuser</SubmitButton>
-              </ModalForm>
-            </>
           )}
 
           {a.existe && (
             <form action={supprimerAttestation.bind(null, prestationId)} className="ml-auto">
               <ConfirmButton
-                confirm="Supprimer l'attestation ? Les signatures déjà posées seront perdues."
+                confirm="Supprimer l'attestation ? La signature déjà posée sera perdue."
                 className="text-sm text-muted hover:text-red-600"
               >
                 Supprimer

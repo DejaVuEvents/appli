@@ -24,10 +24,8 @@ export type AttestationArgs = {
   soussigne: string | null;
   faitA: string | null;
   faitLe: string | null;
-  /** Celui qui a monté : il signe en premier. */
+  /** Le responsable du montage : le modèle officiel ne prévoit que sa signature. */
   monteur: SignataireAttestation;
-  /** Le co-président qui valide ; sa case reste vide tant qu'il n'a pas signé. */
-  validateur: SignataireAttestation | null;
 };
 
 const s = StyleSheet.create({
@@ -122,7 +120,6 @@ export async function genererAttestationPdf(a: AttestationArgs): Promise<Buffer>
 
         <View style={s.signatures}>
           <Case titre="Signature du monteur" p={a.monteur} />
-          <Case titre="Signature de l'organisateur" p={a.validateur} />
         </View>
       </Page>
     </Document>,

@@ -127,7 +127,7 @@ export default async function PrestationDetailPage({
   const att = attRow as AttestationRow | null;
   const defauts = att ? null : await valeursParDefaut(supabase, id, moi?.id ?? null);
 
-  const idsAtt = [att?.redacteur_id, att?.valide_par].filter(Boolean) as string[];
+  const idsAtt = [att?.redacteur_id].filter(Boolean) as string[];
   const { data: membresAtt } = idsAtt.length
     ? await supabase.from("membre").select("id, nom, prenom, email").in("id", idsAtt)
     : { data: [] };
@@ -143,7 +143,7 @@ export default async function PrestationDetailPage({
   const base = att ?? (defauts as Partial<AttestationRow>);
   const attestationVue: AttestationVue = {
     existe: !!att,
-    statut: att?.statut ?? "brouillon",
+    signee: att?.statut === "validee",
     manifestation: base.manifestation ?? null,
     lieu_montage: base.lieu_montage ?? null,
     dates_exploitation: base.dates_exploitation ?? null,
@@ -158,15 +158,8 @@ export default async function PrestationDetailPage({
     soussigne: base.soussigne ?? null,
     fait_a: base.fait_a ?? null,
     fait_le: base.fait_le ?? null,
-    motif_refus: att?.motif_refus ?? null,
     redacteurNom: att?.redacteur_id ? nomAtt.get(att.redacteur_id) ?? null : null,
     redacteurSigneLe: att?.redacteur_signe_le ?? null,
-    validateurNom: att?.valide_par ? nomAtt.get(att.valide_par) ?? null : null,
-    valideLe: att?.valide_le ?? null,
-    estRedacteur: !att || att.redacteur_id === moi?.id,
-    peutValider:
-      !!att && att.statut === "soumise" && moi?.role === "co_president"
-      && att.redacteur_id !== moi?.id,
   };
 
   type MembreLite = { id: string; prenom: string | null; nom: string | null; email: string | null; competences: string[] | null };

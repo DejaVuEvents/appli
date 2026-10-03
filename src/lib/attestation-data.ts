@@ -32,9 +32,6 @@ export type AttestationRow = {
   fait_le: string | null;
   redacteur_id: string | null;
   redacteur_signe_le: string | null;
-  valide_par: string | null;
-  valide_le: string | null;
-  motif_refus: string | null;
 };
 
 /** Dates d'exploitation en clair : « 17/01/2026 » ou « du 18/09 au 20/09/2026 ». */
@@ -131,10 +128,7 @@ export async function assemblerAttestation(
   const a = data as AttestationRow | null;
   if (!a) return null;
 
-  const [monteur, validateur] = await Promise.all([
-    signataire(supabase, a.redacteur_id, a.redacteur_signe_le),
-    signataire(supabase, a.valide_par, a.valide_le),
-  ]);
+  const monteur = await signataire(supabase, a.redacteur_id, a.redacteur_signe_le);
 
   return {
     manifestation: a.manifestation,
@@ -152,6 +146,5 @@ export async function assemblerAttestation(
     faitA: a.fait_a,
     faitLe: a.fait_le,
     monteur: monteur ?? { nom: null, fonction: null, signatureUrl: null, signeLe: null },
-    validateur,
   };
 }

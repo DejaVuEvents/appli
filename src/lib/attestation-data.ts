@@ -23,6 +23,8 @@ export type AttestationRow = {
   responsable_montage: string | null;
   installateur_adresse: string | null;
   documents_plans: string | null;
+  /** Fabricant de la structure montée (modèle officiel, article 67). */
+  fabrique_par: string | null;
   moyens_par: string | null;
   descriptif: string | null;
   soussigne: string | null;
@@ -144,6 +146,7 @@ export async function assemblerAttestation(
     responsableMontage: a.responsable_montage,
     installateurAdresse: a.installateur_adresse,
     documentsPlans: a.documents_plans,
+    fabriquePar: a.fabrique_par,
     descriptif: a.descriptif,
     soussigne: a.soussigne,
     faitA: a.fait_a,

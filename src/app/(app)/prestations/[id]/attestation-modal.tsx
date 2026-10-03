@@ -23,6 +23,7 @@ export type AttestationVue = {
   responsable_montage: string | null;
   installateur_adresse: string | null;
   documents_plans: string | null;
+  fabrique_par: string | null;
   descriptif: string | null;
   soussigne: string | null;
   fait_a: string | null;
@@ -99,6 +100,7 @@ export function AttestationModal({
             </div>
             <Field label="Adresse de l'installateur" name="installateur_adresse" defaultValue={a.installateur_adresse ?? ""} />
             <Field label="Documents et plans utilisés" name="documents_plans" defaultValue={a.documents_plans ?? ""} placeholder="Plan installation gymnase" />
+            <Field label="Fabriqué par (fabricant de la structure)" name="fabrique_par" defaultValue={a.fabrique_par ?? ""} placeholder="ASD, Mobiltruss, SAMIA…" />
             <TextArea label="Description des moyens mis en place" name="descriptif" defaultValue={a.descriptif ?? ""} />
             <Field label="Je soussigné (nom, prénom, fonction)" name="soussigne" defaultValue={a.soussigne ?? ""} />
             <div className="grid gap-3 sm:grid-cols-2">

@@ -18,6 +18,8 @@ export type AttestationArgs = {
   responsableMontage: string | null;
   installateurAdresse: string | null;
   documentsPlans: string | null;
+  /** Fabricant de la structure — « Fabriqué par » du modèle officiel. */
+  fabriquePar: string | null;
   descriptif: string | null;
   soussigne: string | null;
   faitA: string | null;
@@ -99,7 +101,8 @@ export async function genererAttestationPdf(a: AttestationArgs): Promise<Buffer>
         <Champ label="Adresse de l'entreprise « installateur »" valeur={a.installateurAdresse} />
         <Champ label="Documents et plans utilisés pour l'installation : références, dates, indices, etc." valeur={a.documentsPlans} />
 
-        <Text style={s.sousTitre}>CARACTÉRISTIQUES DES MOYENS MIS EN PLACE</Text>
+        <Text style={s.sousTitre}>CARACTÉRISTIQUES DES MATÉRIELS ET ENSEMBLES DÉMONTABLES</Text>
+        <Champ label="Fabriqué par" valeur={a.fabriquePar} />
         <View style={s.bloc}>
           <Text style={s.etiquette}>Description des moyens mis en place :</Text>
           <Text style={s.valeurBloc}>{a.descriptif ?? ""}</Text>

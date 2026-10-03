@@ -14,7 +14,7 @@ const str = (v: FormDataEntryValue | null) => {
 const CHAMPS = [
   "manifestation", "lieu_montage", "dates_exploitation", "organisateur",
   "organisateur_adresse", "installateur", "responsable_montage",
-  "installateur_adresse", "documents_plans", "descriptif",
+  "installateur_adresse", "documents_plans", "fabrique_par", "descriptif",
   "soussigne", "fait_a",
 ] as const;
 

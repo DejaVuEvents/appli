@@ -153,6 +153,7 @@ export default async function PrestationDetailPage({
     responsable_montage: base.responsable_montage ?? null,
     installateur_adresse: base.installateur_adresse ?? null,
     documents_plans: base.documents_plans ?? null,
+    fabrique_par: base.fabrique_par ?? null,
     descriptif: base.descriptif ?? null,
     soussigne: base.soussigne ?? null,
     fait_a: base.fait_a ?? null,

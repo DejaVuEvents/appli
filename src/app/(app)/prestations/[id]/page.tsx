@@ -118,6 +118,15 @@ export default async function PrestationDetailPage({
     ? (creeParData.prenom ?? "").trim() || (creeParData.nom ?? "").trim() || creeParData.email?.split("@")[0] || null
     : null;
 
+  // État de l'attestation, résumé en un mot à côté du bouton.
+  const { data: attRow } = await supabase
+    .from("attestation_montage").select("statut").eq("prestation_id", id).maybeSingle();
+  const attestationStatut = attRow
+    ? ({ brouillon: "Brouillon", soumise: "Attente de signature", validee: "Validée", refusee: "Refusée" } as Record<string, string>)[
+        (attRow as { statut: string }).statut
+      ] ?? null
+    : "Pas encore générée";
+
   type MembreLite = { id: string; prenom: string | null; nom: string | null; email: string | null; competences: string[] | null };
   type Attache = { role: string[] | null; membre: MembreLite };
   const nomMembre = (m: MembreLite) => (m.prenom ?? "").trim() || (m.nom ?? "").trim() || m.email?.split("@")[0] || "Membre";
@@ -160,6 +169,20 @@ export default async function PrestationDetailPage({
                 <span><span className="text-muted">Total devis : </span><span className="font-semibold">{euros(totalTousDevis)}</span></span>
                 <span><span className="text-muted">Gain net estimé : </span><span className={`font-semibold ${gainNetEvenement >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>{euros(gainNetEvenement)}</span>{coutSousLoc > 0 && <span className="ml-1 text-xs text-muted">(− {euros(coutSousLoc)} sous-loc.)</span>}</span>
               </div>
+            </div>
+
+            {/* Attestation de bon montage : l'organisateur la réclame, elle vit
+                à l'échelle de l'événement. */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-sm">
+              <Link
+                href={`/prestations/${id}/attestation`}
+                className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
+              >
+                Attestation de bon montage
+              </Link>
+              {attestationStatut && (
+                <span className="text-xs text-muted">{attestationStatut}</span>
+              )}
             </div>
 
             {/* Personnes attachées + rôles + compétences */}

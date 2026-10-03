@@ -29,32 +29,46 @@ export type AttestationArgs = {
 };
 
 const s = StyleSheet.create({
-  page: { paddingVertical: 48, paddingHorizontal: 56, fontSize: 10.5, color: "#111", fontFamily: "Helvetica", lineHeight: 1.5 },
-  titre: { fontSize: 13, textAlign: "center", marginBottom: 22 },
-  ligne: { flexDirection: "row", marginBottom: 7 },
-  etiquette: { fontSize: 10.5 },
-  // Le trait de conduite du formulaire officiel : la valeur s'inscrit dessus.
-  valeur: { flex: 1, borderBottomWidth: 0.7, borderBottomColor: "#444", borderBottomStyle: "dotted", paddingLeft: 4, paddingBottom: 1 },
-  bloc: { marginBottom: 7 },
-  // Même trait, mais sans `flex: 1` : hors d'une ligne, il faisait se superposer
-  // l'étiquette et le texte.
-  valeurBloc: { borderBottomWidth: 0.7, borderBottomColor: "#444", borderBottomStyle: "dotted", paddingLeft: 4, paddingBottom: 2, marginTop: 4, minHeight: 34 },
-  sousTitre: { fontSize: 11.5, marginTop: 16, marginBottom: 10 },
-  engagement: { marginTop: 14 },
+  page: { paddingVertical: 52, paddingHorizontal: 56, fontSize: 10.5, color: "#111", fontFamily: "Helvetica", lineHeight: 1.45 },
+  titre: { fontSize: 18, fontFamily: "Helvetica-Bold", textAlign: "center", letterSpacing: 0.6, marginBottom: 30 },
+
+  // Étiquette à largeur fixe : elle tient sur une ligne, et toutes les valeurs
+  // s'alignent sur la même colonne.
+  ligne: { flexDirection: "row", marginBottom: 8 },
+  etiquette: { width: 222, fontSize: 9.5, color: "#555" },
+  valeur: { flex: 1 },
+
+  // Étiquette trop longue pour la colonne : elle prend sa propre ligne.
+  bloc: { marginBottom: 8 },
+  etiquetteBloc: { fontSize: 9.5, color: "#555", marginBottom: 2 },
+
+  sousTitre: { fontSize: 11.5, fontFamily: "Helvetica-Bold", marginTop: 18, marginBottom: 10 },
+  engagement: { marginTop: 16 },
   puce: { marginTop: 8, marginLeft: 10, fontFamily: "Helvetica-Bold", color: "#1d4ed8" },
-  signatures: { flexDirection: "row", justifyContent: "space-between", marginTop: 26 },
-  caseSig: { width: 210 },
-  sigImage: { height: 52, marginTop: 6, objectFit: "contain" },
-  sigVide: { height: 52, marginTop: 6, borderBottomWidth: 0.7, borderBottomColor: "#999" },
-  sigNom: { fontSize: 8.5, color: "#555", marginTop: 3 },
+
+  signatures: { flexDirection: "row", justifyContent: "space-between", marginTop: 30 },
+  caseSig: { width: 230 },
+  sigImage: { height: 54, marginTop: 8, objectFit: "contain" },
+  sigVide: { height: 54, marginTop: 8 },
+  sigNom: { fontSize: 8.5, color: "#555", marginTop: 4 },
 });
 
-/** Une ligne « Étiquette : valeur » posée sur un trait pointillé. */
+/** « Étiquette : valeur » sur une ligne, l'étiquette dans une colonne fixe. */
 function Champ({ label, valeur }: { label: string; valeur: string | null | undefined }) {
   return (
-    <View style={s.ligne} wrap={false}>
-      <Text style={s.etiquette}>{label} : </Text>
+    <View style={s.ligne}>
+      <Text style={s.etiquette}>{label} :</Text>
       <Text style={s.valeur}>{valeur ?? ""}</Text>
+    </View>
+  );
+}
+
+/** Même chose pour une étiquette trop longue pour tenir dans la colonne. */
+function ChampLong({ label, valeur }: { label: string; valeur: string | null | undefined }) {
+  return (
+    <View style={s.bloc}>
+      <Text style={s.etiquetteBloc}>{label} :</Text>
+      <Text>{valeur ?? ""}</Text>
     </View>
   );
 }
@@ -97,17 +111,14 @@ export async function genererAttestationPdf(a: AttestationArgs): Promise<Buffer>
         <Champ label="Installateur" valeur={a.installateur} />
         <Champ label="Nom et prénom du responsable du montage" valeur={a.responsableMontage} />
         <Champ label="Adresse de l'entreprise « installateur »" valeur={a.installateurAdresse} />
-        <Champ label="Documents et plans utilisés pour l'installation : références, dates, indices, etc." valeur={a.documentsPlans} />
+        <ChampLong label="Documents et plans utilisés pour l'installation (références, dates, indices…)" valeur={a.documentsPlans} />
 
         <Text style={s.sousTitre}>CARACTÉRISTIQUES DES MATÉRIELS ET ENSEMBLES DÉMONTABLES</Text>
         <Champ label="Fabriqué par" valeur={a.fabriquePar} />
-        <View style={s.bloc}>
-          <Text style={s.etiquette}>Description des moyens mis en place :</Text>
-          <Text style={s.valeurBloc}>{a.descriptif ?? ""}</Text>
-        </View>
+        <ChampLong label="Description des moyens mis en place" valeur={a.descriptif} />
 
         <View style={s.engagement}>
-          <Champ label="Je, soussigné, (Nom, prénom et fonction) M." valeur={a.soussigne} />
+          <ChampLong label="Je, soussigné, (Nom, prénom et fonction) M." valeur={a.soussigne} />
           <Text>certifie avoir monté ou fait monter ces matériels et ensembles démontables conformément :</Text>
           <Text style={s.puce}>• à la notice technique d&apos;installation et d&apos;utilisation et aux plans du fabricant</Text>
         </View>

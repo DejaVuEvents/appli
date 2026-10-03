@@ -56,6 +56,7 @@ export function Modal({
   panelClassName = "max-w-2xl",
   triggerClassName = "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90",
   triggerTitle,
+  ouvertParDefaut = false,
 }: {
   trigger: React.ReactNode;
   title?: string;
@@ -63,8 +64,10 @@ export function Modal({
   panelClassName?: string;
   triggerClassName?: string;
   triggerTitle?: string;
+  /** Ouverte dès l'affichage — pour qu'un lien de mail mène droit au formulaire. */
+  ouvertParDefaut?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(ouvertParDefaut);
   const close = () => setOpen(false);
 
   useEffect(() => {

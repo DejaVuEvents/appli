@@ -45,10 +45,10 @@ export async function genererAttestation(prestationId: string) {
 
 export async function modifierAttestation(prestationId: string, formData: FormData) {
   const supabase = await createSupabase();
+  const membre = await getMembreActuel(supabase);
   const { data: a } = await supabase
     .from("attestation_montage").select("id, statut").eq("prestation_id", prestationId).maybeSingle();
-  if (!a) throw new Error("Attestation introuvable.");
-  if (a.statut !== "brouillon" && a.statut !== "refusee") {
+  if (a && a.statut !== "brouillon" && a.statut !== "refusee") {
     throw new Error("Attestation déjà soumise : repasse-la en brouillon pour la modifier.");
   }
 
@@ -56,10 +56,19 @@ export async function modifierAttestation(prestationId: string, formData: FormDa
   for (const c of CHAMPS) payload[c] = str(formData.get(c));
   const faitLe = str(formData.get("fait_le"));
 
-  const { error } = await supabase
-    .from("attestation_montage")
-    .update({ ...payload, fait_le: faitLe, updated_at: new Date().toISOString() })
-    .eq("id", a.id);
+  // Première sauvegarde = création : la popup est pré-remplie avant même
+  // qu'une ligne existe, enregistrer suffit à la créer.
+  const { error } = a
+    ? await supabase
+        .from("attestation_montage")
+        .update({ ...payload, fait_le: faitLe, updated_at: new Date().toISOString() })
+        .eq("id", a.id)
+    : await supabase.from("attestation_montage").insert({
+        prestation_id: prestationId,
+        redacteur_id: membre?.id ?? null,
+        ...payload,
+        fait_le: faitLe,
+      });
   if (error) throw new Error(error.message);
   rafraichir(prestationId);
 }
@@ -105,7 +114,7 @@ export async function soumettreAttestation(prestationId: string) {
       sujet: `Attestation de bon montage à valider — ${a.manifestation}`,
       corps:
         `${nomMembre(membre)} a soumis l'attestation de bon montage de « ${a.manifestation} ».\n\n`
-        + `Elle attend ta signature : ${baseUrl()}/prestations/${prestationId}/attestation\n`,
+        + `Elle attend ta signature : ${baseUrl()}/prestations/${prestationId}?attestation=1\n`,
     });
   }
   rafraichir(prestationId);
@@ -163,7 +172,7 @@ export async function validerAttestation(prestationId: string) {
       sujet: `Attestation validée — ${a.manifestation}`,
       corps:
         `${nomMembre(membre)} a signé l'attestation de bon montage de « ${a.manifestation} ».\n\n`
-        + `Tu peux la télécharger : ${baseUrl()}/prestations/${prestationId}/attestation\n`,
+        + `Tu peux la télécharger : ${baseUrl()}/prestations/${prestationId}?attestation=1\n`,
     });
   }
   rafraichir(prestationId);

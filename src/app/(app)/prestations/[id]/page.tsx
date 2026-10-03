@@ -22,6 +22,8 @@ import { IconReceipt, IconFile } from "@/components/icons";
 import { calculerTotaux } from "@/lib/devis";
 import { statutFactureAffichage, statutDevisAffichage } from "@/lib/facture-statut";
 import type { LignePrestation, Prestation, PrestationStatut, Devis } from "@/lib/types";
+import { AttestationModal, type AttestationVue } from "./attestation-modal";
+import { valeursParDefaut, type AttestationRow } from "@/lib/attestation-data";
 
 type TransportRow = { id: string; devis_id: string | null; cout_calcule: number | null };
 
@@ -30,10 +32,10 @@ export default async function PrestationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; attestation?: string }>;
 }) {
   const { id } = await params;
-  const { tab } = await searchParams;
+  const { tab, attestation } = await searchParams;
   const supabase = await createClient();
 
   const showDevis = tab === "devis";
@@ -118,14 +120,49 @@ export default async function PrestationDetailPage({
     ? (creeParData.prenom ?? "").trim() || (creeParData.nom ?? "").trim() || creeParData.email?.split("@")[0] || null
     : null;
 
-  // État de l'attestation, résumé en un mot à côté du bouton.
+  // Attestation de bon montage : la popup est pré-remplie même si rien n'est
+  // encore enregistré, pour n'avoir qu'un geste à faire.
   const { data: attRow } = await supabase
-    .from("attestation_montage").select("statut").eq("prestation_id", id).maybeSingle();
-  const attestationStatut = attRow
-    ? ({ brouillon: "Brouillon", soumise: "Attente de signature", validee: "Validée", refusee: "Refusée" } as Record<string, string>)[
-        (attRow as { statut: string }).statut
-      ] ?? null
-    : "Pas encore générée";
+    .from("attestation_montage").select("*").eq("prestation_id", id).maybeSingle();
+  const att = attRow as AttestationRow | null;
+  const defauts = att ? null : await valeursParDefaut(supabase, id, moi?.id ?? null);
+
+  const idsAtt = [att?.redacteur_id, att?.valide_par].filter(Boolean) as string[];
+  const { data: membresAtt } = idsAtt.length
+    ? await supabase.from("membre").select("id, nom, prenom, email").in("id", idsAtt)
+    : { data: [] };
+  const nomAtt = new Map(
+    ((membresAtt ?? []) as { id: string; nom: string | null; prenom: string | null; email: string | null }[])
+      .map((m) => [m.id, nomMembre({ ...m, competences: null })]),
+  );
+  const base = att ?? (defauts as Partial<AttestationRow>);
+  const attestationVue: AttestationVue = {
+    existe: !!att,
+    statut: att?.statut ?? "brouillon",
+    manifestation: base.manifestation ?? null,
+    lieu_montage: base.lieu_montage ?? null,
+    dates_exploitation: base.dates_exploitation ?? null,
+    organisateur: base.organisateur ?? null,
+    organisateur_adresse: base.organisateur_adresse ?? null,
+    installateur: base.installateur ?? null,
+    responsable_montage: base.responsable_montage ?? null,
+    installateur_adresse: base.installateur_adresse ?? null,
+    documents_plans: base.documents_plans ?? null,
+    moyens_par: base.moyens_par ?? null,
+    descriptif: base.descriptif ?? null,
+    soussigne: base.soussigne ?? null,
+    fait_a: base.fait_a ?? null,
+    fait_le: base.fait_le ?? null,
+    motif_refus: att?.motif_refus ?? null,
+    redacteurNom: att?.redacteur_id ? nomAtt.get(att.redacteur_id) ?? null : null,
+    redacteurSigneLe: att?.redacteur_signe_le ?? null,
+    validateurNom: att?.valide_par ? nomAtt.get(att.valide_par) ?? null : null,
+    valideLe: att?.valide_le ?? null,
+    estRedacteur: !att || att.redacteur_id === moi?.id,
+    peutValider:
+      !!att && att.statut === "soumise" && moi?.role === "co_president"
+      && att.redacteur_id !== moi?.id,
+  };
 
   type MembreLite = { id: string; prenom: string | null; nom: string | null; email: string | null; competences: string[] | null };
   type Attache = { role: string[] | null; membre: MembreLite };
@@ -174,15 +211,11 @@ export default async function PrestationDetailPage({
             {/* Attestation de bon montage : l'organisateur la réclame, elle vit
                 à l'échelle de l'événement. */}
             <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-sm">
-              <Link
-                href={`/prestations/${id}/attestation`}
-                className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-background"
-              >
-                Attestation de bon montage
-              </Link>
-              {attestationStatut && (
-                <span className="text-xs text-muted">{attestationStatut}</span>
-              )}
+              <AttestationModal
+                prestationId={id}
+                a={attestationVue}
+                ouvertParDefaut={attestation === "1"}
+              />
             </div>
 
             {/* Personnes attachées + rôles + compétences */}

@@ -54,7 +54,7 @@ export async function valeursParDefaut(
   const [{ data: p }, { data: ent }, { data: m }] = await Promise.all([
     supabase
       .from("prestation")
-      .select("nom, lieu, date_event_debut, date_event_fin, client:client_id(nom, adresse)")
+      .select("nom, lieu, date_event_debut, date_event_fin, client(nom, adresse)")
       .eq("id", prestationId)
       .maybeSingle(),
     supabase.from("parametres_entreprise").select("raison_sociale, adresse, code_postal, ville").limit(1).maybeSingle(),

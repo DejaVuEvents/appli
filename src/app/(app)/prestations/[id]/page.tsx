@@ -131,9 +131,14 @@ export default async function PrestationDetailPage({
   const { data: membresAtt } = idsAtt.length
     ? await supabase.from("membre").select("id, nom, prenom, email").in("id", idsAtt)
     : { data: [] };
+  // Nom calculé sur place : `nomMembre` est déclaré en `const` plus bas dans la
+  // fonction, l'appeler ici levait une ReferenceError qui cassait toute la page.
   const nomAtt = new Map(
     ((membresAtt ?? []) as { id: string; nom: string | null; prenom: string | null; email: string | null }[])
-      .map((m) => [m.id, nomMembre({ ...m, competences: null })]),
+      .map((m) => [
+        m.id,
+        [m.prenom?.trim(), m.nom?.trim()].filter(Boolean).join(" ") || m.email?.split("@")[0] || "—",
+      ]),
   );
   const base = att ?? (defauts as Partial<AttestationRow>);
   const attestationVue: AttestationVue = {

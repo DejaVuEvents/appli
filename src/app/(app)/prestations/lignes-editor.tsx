@@ -242,7 +242,9 @@ export function LignesEditor({ prestationId, devisId, blocs, references, categor
                             {l.reference_id && infosRef[l.reference_id]?.sousLoc && (
                               <SousLocationBadge sl={infosRef[l.reference_id].sousLoc!} quantite={l.quantite} />
                             )}
-                            {!l.reference_id && (
+                            {/* Hors catalogue ne veut rien dire sur une vente :
+                                une cession ne réserve ni unité ni plan technique. */}
+                            {!l.reference_id && !vente && (
                               <IconHorsCatalogue className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-label="Hors catalogue" />
                             )}
                           </span>

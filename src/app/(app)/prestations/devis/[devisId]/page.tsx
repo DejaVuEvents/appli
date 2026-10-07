@@ -105,15 +105,20 @@ export default async function DevisEditorPage({
   // Retour contextuel : la provenance est transmise par le lien d'origine (?retour=…),
   // sinon on remonte à l'événement / la location qui porte le document.
   const provenance = sp?.retour;
+  // Une vente de matériel n'a ni événement ni location : sa prestation n'est
+  // qu'un conteneur, y renvoyer n'aurait aucun sens.
+  const estVenteDoc = devis.nature === "vente";
   const backHref =
     provenance === "liste" ? `/prestations?tab=${estFacture ? "factures" : "devis"}`
     : provenance === "client" && sp?.clientId ? `/clients/${sp.clientId}`
+    : estVenteDoc ? `/prestations?tab=${estFacture ? "factures" : "devis"}`
     : prestation?.est_evenement ? `/prestations/${prestationId}?tab=devis`
     : prestation ? `/planification/location/${prestationId}?tab=devis`
     : `/prestations?tab=${estFacture ? "factures" : "devis"}`;
   const backLabel =
     provenance === "liste" ? "Devis & Factures"
     : provenance === "client" ? "Client"
+    : estVenteDoc ? "Devis & Factures"
     : prestation?.est_evenement ? "Événement"
     : prestation ? "Location"
     : "Devis & Factures";
@@ -553,7 +558,7 @@ export default async function DevisEditorPage({
                       {l.reference_id && sousLocParRef.get(l.reference_id) && (
                         <SousLocationBadge sl={sousLocParRef.get(l.reference_id)!} quantite={l.quantite} />
                       )}
-                      {!l.reference_id && <HorsCatalogueBadge />}
+                      {!l.reference_id && !estVenteDoc && <HorsCatalogueBadge />}
                     </div>
                     <div className="text-xs text-muted">{l.quantite}{l.unite ? ` ${l.unite}` : ""} × {euros(l.prix_unitaire)}</div>
                   </div>

@@ -37,10 +37,11 @@ export default async function DocumentPage({
 
   const { data: devisRow } = await supabase
     .from("devis")
-    .select("prestation_id, nom, remise_globale_type, remise_globale_valeur, coefficient_duree, pdf_import, statut_signature, pdf_signe")
+    .select("prestation_id, nom, nature, remise_globale_type, remise_globale_valeur, coefficient_duree, pdf_import, statut_signature, pdf_signe")
     .eq("id", devisId)
     .single();
   if (!devisRow) notFound();
+  const estVente = (devisRow as { nature?: string | null }).nature === "vente";
   const pdfSigneUrl = devisRow.pdf_signe ? await urlDocument(supabase, devisRow.pdf_signe) : null;
 
   // Document importé : l'original ne s'affiche que tant qu'il n'a pas été repris dans
@@ -215,7 +216,7 @@ export default async function DocumentPage({
           </thead>
           <tbody>
             {groupesTries.map(([nom, items]) => (
-              <DocGroup key={nom} nom={nom} items={items} sousLoc={sousLocParRef} />
+              <DocGroup key={nom} nom={nom} items={items} sousLoc={sousLocParRef} estVente={estVente} />
             ))}
             {coeffDuree !== 1 && surchargeDuree !== 0 && (
               <tr className="border-b border-border/60">
@@ -278,7 +279,7 @@ export default async function DocumentPage({
   );
 }
 
-function DocGroup({ nom, items, sousLoc }: { nom: string; items: LigneRow[]; sousLoc: Map<string, SousLocInfo> }) {
+function DocGroup({ nom, items, sousLoc, estVente }: { nom: string; items: LigneRow[]; sousLoc: Map<string, SousLocInfo>; estVente: boolean }) {
   return (
     <>
       <tr className="bg-background/60">
@@ -297,7 +298,8 @@ function DocGroup({ nom, items, sousLoc }: { nom: string; items: LigneRow[]; sou
                   <SousLocationBadge sl={sousLoc.get(l.reference_id)!} quantite={l.quantite} />
                 </span>
               )}
-              {!l.reference_id && (
+              {/* Sans objet sur une vente : une cession ne réserve aucune unité. */}
+              {!l.reference_id && !estVente && (
                 <span className="ml-1 inline-flex align-middle">
                   <HorsCatalogueBadge />
                 </span>

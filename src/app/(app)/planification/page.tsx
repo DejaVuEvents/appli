@@ -37,7 +37,7 @@ export default async function PlanificationPage({ searchParams }: { searchParams
   const { vue } = await searchParams;
   const onglet = vue === "location" ? "location" : "evenements";
   const supabase = await createClient();
-  const [{ data }, { data: clientsData }, { data: locData }] = await Promise.all([
+  const [{ data }, { data: clientsData }, { data: locData }, { data: ventesData }] = await Promise.all([
     supabase
       .from("prestation")
       .select("id, nom, statut, date_prepa, date_event_debut, date_event_fin, date_retour, client(nom)")
@@ -45,8 +45,22 @@ export default async function PlanificationPage({ searchParams }: { searchParams
       .order("date_event_debut", { ascending: false }),
     supabase.from("client").select("id, nom").order("nom"),
     supabase.from("location").select("*").order("date_debut", { ascending: false }),
+    // Une vente de matériel n'est pas un événement : sa prestation n'est qu'un
+    // conteneur pour le document, elle n'a ni lieu ni dates.
+    supabase.from("devis").select("prestation_id, nature"),
   ]);
-  const prestations = (data ?? []) as unknown as PrestaRow[];
+  const parPrestation = new Map<string, Set<string>>();
+  for (const d of (ventesData ?? []) as { prestation_id: string | null; nature: string | null }[]) {
+    if (!d.prestation_id) continue;
+    const set = parPrestation.get(d.prestation_id) ?? new Set<string>();
+    set.add(d.nature ?? "location");
+    parPrestation.set(d.prestation_id, set);
+  }
+  const estConteneurVente = (id: string) => {
+    const natures = parPrestation.get(id);
+    return !!natures && natures.size > 0 && !natures.has("location");
+  };
+  const prestations = ((data ?? []) as unknown as PrestaRow[]).filter((p) => !estConteneurVente(p.id));
   const clients = (clientsData ?? []) as { id: string; nom: string }[];
   const clientNom = new Map(clients.map((c) => [c.id, c.nom]));
   const locations = (locData ?? []) as LocationRow[];

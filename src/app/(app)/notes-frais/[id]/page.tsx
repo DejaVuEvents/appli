@@ -20,7 +20,14 @@ import { urlDocument } from "@/lib/storage";
 import { TrajetForm, type VehiculeTrajet } from "./trajet-form";
 import { STATUT_NDF_LABELS, TYPE_NDF_LABELS, type LigneNoteFrais, type NoteFrais, type StatutNoteFrais } from "@/lib/types";
 
-export default async function NoteFraisDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function NoteFraisDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ msg?: string }>;
+}) {
+  const msg = (await searchParams)?.msg ?? null;
   const { id } = await params;
   const supabase = await createClient();
   const membre = await getMembreActuel(supabase);
@@ -90,6 +97,14 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
   return (
     <div className="max-w-2xl space-y-6">
       <Link href="/notes-frais" className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">← Notes de frais</Link>
+
+      {/* Next masque le message d'une Server Action en production : ce qui a
+          échoué revient par l'URL, sinon l'échec serait muet. */}
+      {msg && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+          {msg}
+        </p>
+      )}
       <PageHeader
         title={
           <>

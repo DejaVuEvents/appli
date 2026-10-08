@@ -277,13 +277,14 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
   // l'outil produit lui-même — c'est ce qu'on imprimait sur Mappy pour l'agrafer.
   let justificatif = await uploadJustificatif(supabase, formData.get("justificatif") as File | null);
   if (!justificatif) {
+    // Relevé produit d'office : c'est la pièce du déplacement.
     const lire = (cle: string): [number, number] | null => {
       const v = str(formData.get(cle));
       if (!v) return null;
       const [lon, lat] = v.split(",").map(Number);
       return Number.isFinite(lon) && Number.isFinite(lat) ? [lon, lat] : null;
     };
-    justificatif = await releveItineraire(supabase, {
+    const releve = await releveItineraire(supabase, {
       depart: departLabel,
       arrivee: arriveeLabel,
       coordDepart: lire("depart_coord"),
@@ -298,6 +299,7 @@ export async function ajouterTrajetNDF(noteId: string, formData: FormData) {
       detail,
       vehicule: veh?.nom ?? null,
     });
+    justificatif = "erreur" in releve ? null : releve;
   }
 
   const { error } = await supabase.from("ligne_note_frais").insert({
@@ -752,7 +754,7 @@ async function releveItineraire(
     detail: { km: number; carburant: number; peages: number; total: number };
     vehicule: string | null;
   },
-): Promise<{ path: string; nom: string } | null> {
+): Promise<{ path: string; nom: string } | { erreur: string }> {
   try {
     const ca = a.coordDepart ?? (await geocode(a.depart).then((g) => g.coord).catch(() => null));
     const cb = a.coordArrivee ?? (await geocode(a.arrivee).then((g) => g.coord).catch(() => null));
@@ -790,15 +792,17 @@ async function releveItineraire(
     });
 
     const chemin = `ndf/${Date.now()}-itineraire.pdf`;
-    const { data, error } = await supabase.storage.from(BUCKET_PRIVE).upload(chemin, pdf, {
-      contentType: "application/pdf",
-      upsert: false,
-    });
-    if (error) throw new Error(error.message);
+    // Uint8Array plutôt que Buffer : c'est ce que le client de stockage attend,
+    // un Buffer part parfois en objet sérialisé et le fichier arrive vide.
+    const { data, error } = await supabase.storage
+      .from(BUCKET_PRIVE)
+      .upload(chemin, new Uint8Array(pdf), { contentType: "application/pdf", upsert: false });
+    if (error) throw new Error(`dépôt du fichier : ${error.message}`);
     return { path: data.path, nom: `Itineraire ${a.depart} - ${a.arrivee}.pdf`.replace(/[\\/]/g, "-") };
   } catch (e) {
-    console.error("[ndf] relevé d'itinéraire non généré :", e instanceof Error ? e.message : e);
-    return null;
+    const raison = e instanceof Error ? e.message : String(e);
+    console.error("[ndf] relevé d'itinéraire non généré :", raison);
+    return { erreur: raison };
   }
 }
 
@@ -809,22 +813,24 @@ async function releveItineraire(
 export async function genererReleveTrajet(noteId: string, ligneId: string) {
   const supabase = await createSupabase();
   await assertModifiable(supabase, noteId);
-  const ok = await produireReleveTrajet(supabase, ligneId);
-  if (!ok) throw new Error("Le relevé n'a pas pu être produit (itinéraire ou carte indisponible). Réessaie.");
+  const raison = await produireReleveTrajet(supabase, ligneId);
   revalidatePath(`/notes-frais/${noteId}`);
+  if (raison) {
+    redirect(`/notes-frais/${noteId}?msg=${encodeURIComponent(`Relevé non produit — ${raison}`)}`);
+  }
 }
 
 /**
  * Produit et attache le relevé d'itinéraire d'une ligne de déplacement.
  * Renvoie false si la ligne n'est pas un trajet ou si le relevé a échoué.
  */
-async function produireReleveTrajet(supabase: Supa, ligneId: string): Promise<boolean> {
+async function produireReleveTrajet(supabase: Supa, ligneId: string): Promise<string | null> {
   const { data: l } = await supabase
     .from("ligne_note_frais")
     .select("depart, arrivee, date, distance_km, aller_retour, conso_l_100km, prix_carburant, peages, tarif_km, vehicule_id")
     .eq("id", ligneId)
     .single();
-  if (!l?.depart || !l?.arrivee) return false;
+  if (!l?.depart || !l?.arrivee) return "cette ligne n'est pas un déplacement (ni départ ni arrivée)";
 
   const { data: veh } = l.vehicule_id
     ? await supabase.from("vehicule").select("nom").eq("id", l.vehicule_id).maybeSingle()
@@ -858,11 +864,11 @@ async function produireReleveTrajet(supabase: Supa, ligneId: string): Promise<bo
     detail,
     vehicule: veh?.nom ?? null,
   });
-  if (!releve) return false;
+  if ("erreur" in releve) return releve.erreur;
 
   await supabase
     .from("ligne_note_frais")
     .update({ justificatif_url: releve.path, justificatif_nom: releve.nom })
     .eq("id", ligneId);
-  return true;
+  return null;
 }

@@ -112,18 +112,29 @@ export async function assemblerContenuDocument(
   const taux = Number(ent?.taux_tva ?? 0);
   const montant = Math.round(totaux.totalHT * (taux / 100) * 100) / 100;
 
-  const g = new Map<string, DocLigne[]>();
-  for (const l of lignes) {
-    const nom = bucketPour(l.designation, l.categorie_id ? catById.get(l.categorie_id)?.nom ?? null : null);
-    if (!g.has(nom)) g.set(nom, []);
-    g.get(nom)!.push(l);
+  // Les familles organisent une PRESTATION : lumière, son, structure, technique.
+  // Une vente cède des objets, elle n'a pas de plan de scène — le document les
+  // liste d'une traite, comme le constructeur.
+  let groupes: { nom: string; items: DocLigne[] }[];
+  if (estVente) {
+    groupes = [{ nom: "", items: lignes }];
+  } else {
+    const g = new Map<string, DocLigne[]>();
+    for (const l of lignes) {
+      const nom = bucketPour(l.designation, l.categorie_id ? catById.get(l.categorie_id)?.nom ?? null : null);
+      if (!g.has(nom)) g.set(nom, []);
+      g.get(nom)!.push(l);
+    }
+    groupes = ORDRE_BUCKETS.filter((b) => g.has(b)).map((nom) => ({ nom, items: g.get(nom)! }));
   }
-  const groupes = ORDRE_BUCKETS.filter((b) => g.has(b)).map((nom) => ({ nom, items: g.get(nom)! }));
 
   return {
     ent,
     client: prestation.client ?? null,
-    prestationNom: devis.nom && devis.nom !== "Devis" && devis.nom !== "Facture" ? `${prestation.nom} — ${devis.nom}` : prestation.nom,
+    prestationNom:
+      devis.nom && devis.nom !== "Devis" && devis.nom !== "Facture" && devis.nom !== prestation.nom
+        ? `${prestation.nom} — ${devis.nom}`
+        : prestation.nom,
     groupes,
     transportTotal,
     coefficientDuree,

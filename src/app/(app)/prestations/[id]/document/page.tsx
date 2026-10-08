@@ -282,9 +282,11 @@ export default async function DocumentPage({
 function DocGroup({ nom, items, sousLoc, estVente }: { nom: string; items: LigneRow[]; sousLoc: Map<string, SousLocInfo>; estVente: boolean }) {
   return (
     <>
-      <tr className="bg-background/60">
-        <td colSpan={5} className="px-1 py-1 font-semibold">{nom}</td>
-      </tr>
+      {nom ? (
+        <tr className="bg-background/60">
+          <td colSpan={5} className="px-1 py-1 font-semibold">{nom}</td>
+        </tr>
+      ) : null}
       {items.map((l) => {
         const brut = Number(l.prix_unitaire ?? 0) * l.quantite;
         const remise = brut - Number(l.prix_total ?? 0);

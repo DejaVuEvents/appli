@@ -91,7 +91,9 @@ function DocPDF({ contenu, doc, logo }: { contenu: DocContenu; doc: { type: "dev
 
           {groupes.map((g) => (
             <View key={g.nom} wrap={false}>
-              <Text style={s.grp}>{g.nom}</Text>
+              {/* Sans nom de famille (vente), pas de bandeau : les lignes se
+                  suivent d'une traite. */}
+              {g.nom ? <Text style={s.grp}>{g.nom}</Text> : null}
               {g.items.map((l) => {
                 const brut = Number(l.prix_unitaire ?? 0) * l.quantite;
                 const remise = brut - Number(l.prix_total ?? 0);

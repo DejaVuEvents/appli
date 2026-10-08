@@ -227,14 +227,19 @@ export default async function NoteFraisDetail({ params }: { params: Promise<{ id
                     {l.tarif_km != null && (
                       <span className="text-muted">barème {Number(l.tarif_km).toFixed(2)} €/km</span>
                     )}
-                    {/* Déplacement sans pièce jointe : l'outil sait produire le relevé
-                        (carte + calcul). Les lignes créées avant ne l'ont pas. */}
-                    {editable && !justifUrl.get(l.id) && (
-                      <form action={genererReleveTrajet.bind(null, id, l.id)}>
-                        <SubmitButton className="!px-2 !py-0.5 !text-[11px]" pendingLabel="Génération…">
-                          Générer le relevé
-                        </SubmitButton>
-                      </form>
+                    {/* Déplacement sans pièce : l'outil sait produire le relevé
+                        (carte + calcul), et le dit plutôt que de le taire. */}
+                    {!justifUrl.get(l.id) && (
+                      <span className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                        Sans relevé
+                        {editable && (
+                          <form action={genererReleveTrajet.bind(null, id, l.id)}>
+                            <SubmitButton className="!px-2 !py-0.5 !text-[11px]" pendingLabel="Génération…">
+                              Générer
+                            </SubmitButton>
+                          </form>
+                        )}
+                      </span>
                     )}
                   </div>
                 )}

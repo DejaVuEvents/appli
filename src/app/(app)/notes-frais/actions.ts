@@ -397,6 +397,19 @@ export async function soumettreNDF(noteId: string) {
   if (nn.type_ndf !== "predepense" && (nn.lignes ?? []).length === 0) {
     throw new Error("Ajoute au moins une dépense avant de soumettre.");
   }
+  // Un déplacement part en validation sans pièce : le validateur n'a rien à
+  // regarder. On produit le relevé d'itinéraire si personne ne l'a fait.
+  const { data: sansPiece } = await supabase
+    .from("ligne_note_frais")
+    .select("id")
+    .eq("note_frais_id", noteId)
+    .is("justificatif_url", null)
+    .not("depart", "is", null)
+    .not("arrivee", "is", null);
+  for (const l of (sansPiece ?? []) as { id: string }[]) {
+    await produireReleveTrajet(supabase, l.id);
+  }
+
   await supabase.from("note_frais").update({ statut: "soumise", motif_refus: null }).eq("id", noteId).eq("statut", "brouillon");
   await prevenirValideurs(supabase, noteId, moi);
   revalidatePath(`/notes-frais/${noteId}`);
@@ -796,12 +809,22 @@ async function releveItineraire(
 export async function genererReleveTrajet(noteId: string, ligneId: string) {
   const supabase = await createSupabase();
   await assertModifiable(supabase, noteId);
+  const ok = await produireReleveTrajet(supabase, ligneId);
+  if (!ok) throw new Error("Le relevé n'a pas pu être produit (itinéraire ou carte indisponible). Réessaie.");
+  revalidatePath(`/notes-frais/${noteId}`);
+}
+
+/**
+ * Produit et attache le relevé d'itinéraire d'une ligne de déplacement.
+ * Renvoie false si la ligne n'est pas un trajet ou si le relevé a échoué.
+ */
+async function produireReleveTrajet(supabase: Supa, ligneId: string): Promise<boolean> {
   const { data: l } = await supabase
     .from("ligne_note_frais")
     .select("depart, arrivee, date, distance_km, aller_retour, conso_l_100km, prix_carburant, peages, tarif_km, vehicule_id")
     .eq("id", ligneId)
     .single();
-  if (!l?.depart || !l?.arrivee) throw new Error("Cette ligne n'est pas un déplacement : pas de départ ni d'arrivée.");
+  if (!l?.depart || !l?.arrivee) return false;
 
   const { data: veh } = l.vehicule_id
     ? await supabase.from("vehicule").select("nom").eq("id", l.vehicule_id).maybeSingle()
@@ -835,11 +858,11 @@ export async function genererReleveTrajet(noteId: string, ligneId: string) {
     detail,
     vehicule: veh?.nom ?? null,
   });
-  if (!releve) throw new Error("Le relevé n'a pas pu être produit (itinéraire ou carte indisponible). Réessaie.");
+  if (!releve) return false;
 
   await supabase
     .from("ligne_note_frais")
     .update({ justificatif_url: releve.path, justificatif_nom: releve.nom })
     .eq("id", ligneId);
-  revalidatePath(`/notes-frais/${noteId}`);
+  return true;
 }

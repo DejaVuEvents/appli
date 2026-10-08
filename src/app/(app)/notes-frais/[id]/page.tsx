@@ -14,7 +14,7 @@ import { Modal, ModalForm, ModalCancelButton } from "@/components/modal";
 import { euros, dateFr } from "@/lib/format";
 import { getMembreActuel, nomMembre, champsDemandeurManquants } from "@/lib/membre";
 import {
-  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF, genererReleveTrajet } from "../actions";
+  addLigneNDF, deleteLigneNDF, soumettreNDF, repasserBrouillonNDF, validerNDF, refuserNDF, deleteNoteFrais, signerNDF, ajouterTrajetNDF, setPredepenseInfos, marquerNDFRemboursee, updateLigneNDF, retirerJustificatifNDF, renommerNDF } from "../actions";
 import { mappyUrl, googleMapsUrl } from "@/lib/itineraire";
 import { urlDocument } from "@/lib/storage";
 import { TrajetForm, type VehiculeTrajet } from "./trajet-form";
@@ -242,19 +242,13 @@ export default async function NoteFraisDetail({
                     {l.tarif_km != null && (
                       <span className="text-muted">barème {Number(l.tarif_km).toFixed(2)} €/km</span>
                     )}
-                    {/* Ce qui manque, c'est la PIÈCE jointe, pas la saisie :
-                        « sans relevé » laissait croire que la ligne était vide. */}
+                    {/* Le relevé d'un déplacement calculé ici se reconstruit depuis
+                        la ligne : il est toujours disponible, rien à joindre. */}
                     {!justifUrl.get(l.id) && (
-                      <span className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                        Aucun justificatif joint
-                        {editable && (
-                          <form action={genererReleveTrajet.bind(null, id, l.id)}>
-                            <SubmitButton className="!px-2 !py-0.5 !text-[11px]" pendingLabel="Génération…">
-                              Générer le relevé
-                            </SubmitButton>
-                          </form>
-                        )}
-                      </span>
+                      <JustificatifPreview
+                        url={`/notes-frais/${id}/trajet/${l.id}/pdf?apercu=1`}
+                        libelle="Relevé d'itinéraire"
+                      />
                     )}
                   </div>
                 )}

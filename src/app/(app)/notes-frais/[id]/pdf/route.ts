@@ -5,6 +5,7 @@ import { genererNoteFraisPdf } from "@/lib/pdf/note-frais";
 import { assemblerNdfPdfArgs } from "@/lib/note-frais-data";
 import { nomFichierSafe } from "@/lib/drive";
 import { urlDocument, dispositionFichier } from "@/lib/storage";
+import { relevePourLigne } from "@/lib/releve-trajet";
 
 export const runtime = "nodejs";
 
@@ -25,13 +26,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // 2) Fusionner tous les justificatifs associés (PDF ajoutés page à page, images en pleine page)
   const { data: lignes } = await supabase
     .from("ligne_note_frais")
-    .select("libelle, justificatif_url")
+    .select("id, libelle, justificatif_url, depart, arrivee")
     .eq("note_frais_id", id)
-    .not("justificatif_url", "is", null)
     .order("date");
 
-  for (const l of (lignes ?? []) as { libelle: string | null; justificatif_url: string | null }[]) {
+  for (const l of (lignes ?? []) as {
+    id: string; libelle: string | null; justificatif_url: string | null;
+    depart: string | null; arrivee: string | null;
+  }[]) {
     try {
+      // Un déplacement calculé ici porte sa propre pièce : le relevé se
+      // reconstruit à partir de la ligne, sans dépendre d'un fichier déposé.
+      if (!l.justificatif_url && l.depart && l.arrivee) {
+        const releve = await relevePourLigne(supabase, l.id);
+        if (releve) {
+          const src = await PDFDocument.load(new Uint8Array(releve));
+          const pages = await merged.copyPages(src, src.getPageIndices());
+          pages.forEach((p) => merged.addPage(p));
+        }
+        continue;
+      }
+      if (!l.justificatif_url) continue;
+
       const url = await urlDocument(supabase, l.justificatif_url);
       if (!url) continue;
       const resp = await fetch(url);

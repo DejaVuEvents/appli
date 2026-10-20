@@ -65,7 +65,24 @@ const handler = createMcpHandler((server) => {
         date_prepa: string | null; date_event_debut: string | null; date_event_fin: string | null;
         statut: string; client: { nom: string } | null;
       }[];
-      if (evts.length === 0) return texte(`Rien de prévu dans les ${jours} prochains jours.`);
+      if (evts.length === 0) {
+        // Un état dit toujours la suite : on va chercher le prochain, même hors fenêtre.
+        const { data: suivant } = await sb()
+          .from("prestation")
+          .select("nom, lieu, date_event_debut")
+          .eq("est_evenement", true)
+          .neq("statut", "annule")
+          .gt("date_event_debut", fin)
+          .order("date_event_debut")
+          .limit(1)
+          .maybeSingle();
+        const s = suivant as { nom: string; lieu: string | null; date_event_debut: string | null } | null;
+        if (!s?.date_event_debut) return texte(`Rien de prévu dans les ${jours} prochains jours, et rien après non plus.`);
+        return texte(
+          `Rien dans les ${jours} prochains jours. Le prochain est ${s.nom}, le ${dateFr(s.date_event_debut)}`
+          + `${s.lieu ? ` à ${s.lieu}` : ""}.`,
+        );
+      }
 
       const { data: equipeData } = await sb()
         .from("prestation_membre")
@@ -317,6 +334,8 @@ const handler = createMcpHandler((server) => {
       );
     },
   );
+}, {
+  serverInfo: { name: "Déjà Vu", version: "1.0.0" },
 });
 
 /**

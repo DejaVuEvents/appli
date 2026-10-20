@@ -1,4 +1,5 @@
 "use server";
+import { randomBytes } from "crypto";
 
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabase } from "@/lib/supabase/server";
@@ -186,5 +187,31 @@ export async function updateEmailModele(id: string, formData: FormData) {
     .update({ email_message: str(formData.get("email_message")) })
     .eq("id", id);
   if (error) throw new Error(error.message);
+  revalidatePath("/parametres");
+}
+
+/**
+ * Régénère le jeton MCP du membre connecté.
+ *
+ * C'est ce jeton que Claude envoie pour piloter l'outil à la voix. Il vaut
+ * identité : le régénérer coupe immédiatement les connecteurs qui portaient
+ * l'ancien.
+ */
+export async function regenererJetonMcp() {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non connecté.");
+  const jeton = randomBytes(24).toString("hex");
+  const { error } = await supabase.from("membre").update({ mcp_token: jeton }).eq("id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/parametres");
+}
+
+/** Coupe l'accès MCP : les connecteurs qui portaient le jeton cessent de répondre. */
+export async function revoquerJetonMcp() {
+  const supabase = await createSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non connecté.");
+  await supabase.from("membre").update({ mcp_token: null }).eq("id", user.id);
   revalidatePath("/parametres");
 }

@@ -14,7 +14,9 @@ export const config = {
      * Toutes les routes sauf :
      * - _next/static, _next/image (assets Next)
      * - favicon, manifest, icônes, fichiers images
+     * - api/mcp : appelée par Claude avec un jeton, pas avec un cookie de
+     *   session. La laisser passer ici lui renverrait la page de connexion.
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!api/mcp|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

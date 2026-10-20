@@ -15,6 +15,7 @@ import { FinanceCategories, type FinanceCat } from "./finance-categories";
 import { MaterielCategories, type MaterielCat } from "./materiel-categories";
 import type { TarifDegressifGlobal, ParametresEntreprise } from "@/lib/types";
 import type { Membre } from "@/lib/membre";
+import { JetonMcp } from "./jeton-mcp";
 
 const TABS = [
   { id: "moncompte", label: "Mon compte" },
@@ -167,6 +168,10 @@ export default async function ParametresPage({
               <SubmitButton>Enregistrer mon profil</SubmitButton>
             </form>
           </Card>
+
+          <div className="mt-4">
+            <JetonMcp jeton={(moi as { mcp_token?: string | null }).mcp_token ?? null} />
+          </div>
         </section>
       )}
 

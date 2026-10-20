@@ -170,7 +170,7 @@ export default async function ParametresPage({
           </Card>
 
           <div className="mt-4">
-            <JetonMcp jeton={(moi as { mcp_token?: string | null }).mcp_token ?? null} />
+            <JetonMcp jeton={moi.mcp_token ?? null} />
           </div>
         </section>
       )}

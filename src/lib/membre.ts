@@ -20,6 +20,8 @@ export type Membre = {
   fonction: string | null;
   photo_url: string | null;
   signature_url: string | null;
+  /** Jeton d'accès MCP : il identifie le membre quand Claude appelle l'outil. */
+  mcp_token?: string | null;
   role: RoleMembre;
   actif: boolean;
   competences: string[] | null;

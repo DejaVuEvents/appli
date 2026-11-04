@@ -290,11 +290,6 @@ export function JournalTabs({ all, prestations = [], sidebar, avecJustif = [], f
                               {hasDoc && (
                                 <IconPaperclip className="h-3 w-3 shrink-0 text-muted" aria-label="Justificatif présent" />
                               )}
-                              {!e.valide && (
-                                <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" title="Écriture à valider">
-                                  à valider
-                                </span>
-                              )}
                               {catFlag(e) && (
                                 <span className="shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-500/15 dark:text-red-300" title={e.type ? `Catégorie inconnue : « ${typeLabel(e.type)} »` : "Aucune catégorie"}>
                                   ⚠ catégorie

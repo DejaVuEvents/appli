@@ -45,3 +45,17 @@ export function peutVoirFinance(appelant: AppelantMcp): boolean {
 export function peutVoirMateriel(appelant: AppelantMcp): boolean {
   return appelant.role === "co_president" || appelant.role === "technique";
 }
+
+/**
+ * Écrire par Claude (notes de frais, justificatifs) : réservé aux membres listés
+ * dans MCP_ECRITURE_MEMBRES (ids séparés par des virgules), en plus du rôle
+ * co-président. Générer un jeton dans Paramètres ne suffit donc pas. Variable
+ * absente ou vide : personne n'écrit.
+ */
+export function peutEcrire(appelant: AppelantMcp): boolean {
+  const autorises = (process.env.MCP_ECRITURE_MEMBRES ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return appelant.role === "co_president" && autorises.includes(appelant.id);
+}

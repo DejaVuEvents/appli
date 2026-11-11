@@ -1,8 +1,10 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
-import { membreDuJeton, peutVoirFinance, peutVoirMateriel, type AppelantMcp } from "@/lib/mcp-auth";
+import { membreDuJeton, peutEcrire, peutVoirFinance, peutVoirMateriel, type AppelantMcp } from "@/lib/mcp-auth";
+import { depensesSansJustificatif, refusModificationNote } from "@/lib/mcp-ecriture";
 import { syntheseMensuelle } from "@/lib/finance";
 import { periodeReservation } from "@/lib/devis";
 import { dateFr, euros } from "@/lib/format";
@@ -13,14 +15,23 @@ export const maxDuration = 60;
 
 /** Réponse texte : c'est lu à voix haute, donc des phrases, pas du JSON. */
 const texte = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
+/** Refus ou échec : signalé comme erreur pour que Claude ne le prenne pas pour un succès. */
+const echec = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
+
+const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format AAAA-MM-JJ.");
+const MONTANT = z.number().positive().max(100000).describe("Montant TTC en euros, par exemple 42.5.");
+const arrondi = (n: number) => Math.round(n * 100) / 100;
+/** Annotations des outils qui écrivent : rien n'est détruit, mais ce n'est plus de la lecture. */
+const ECRITURE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
 
 /**
  * Serveur MCP de l'outil Déjà Vu.
  *
- * Ouvert à Claude pour consulter l'activité à la voix. Il n'expose que des
- * lectures ciblées, jamais de SQL libre : la clé de service contourne les règles
- * de la base, c'est donc cette route qui porte le contrôle d'accès, en
- * rejouant les mêmes rôles que l'application.
+ * Ouvert à Claude pour consulter l'activité à la voix, et pour préparer des notes
+ * de frais en brouillon. Jamais de SQL libre : la clé de service contourne les
+ * règles de la base, c'est donc cette route qui porte le contrôle d'accès, en
+ * rejouant les mêmes rôles et garde-fous que l'application. Signer, soumettre et
+ * valider restent dans l'application. Les fichiers passent par /api/mcp/upload.
  */
 const handler = createMcpHandler((server) => {
   const sb = () => {
@@ -337,6 +348,177 @@ const handler = createMcpHandler((server) => {
           `matériel facturé : ${euros(total)}`,
           `${lignes.length} ligne${lignes.length > 1 ? "s" : ""} de matériel, ${(resa ?? []).length} unité${(resa ?? []).length > 1 ? "s" : ""} affectée${(resa ?? []).length > 1 ? "s" : ""}`,
         ].join(" · "),
+      );
+    },
+  );
+
+  // ─── Écriture : notes de frais en brouillon ────────────────────────────────
+
+  server.registerTool(
+    "creer_note_frais",
+    {
+      description:
+        "Crée une note de frais en BROUILLON au nom de l'appelant, avec ses dépenses. "
+        + "Ne signe ni ne soumet : c'est fait ensuite dans l'application. "
+        + "Renvoie l'id de la note et l'id de chaque ligne, pour y joindre un justificatif via /api/mcp/upload.",
+      annotations: ECRITURE,
+      inputSchema: z.object({
+        titre: z.string().trim().min(2).max(200).describe("Intitulé de la note, par exemple « Courses soirée Supaero »."),
+        date: DATE.describe("Date de la note, format AAAA-MM-JJ."),
+        lignes: z.array(z.object({
+          libelle: z.string().trim().min(1).max(200),
+          date: DATE.describe("Date de la dépense, format AAAA-MM-JJ."),
+          montant_ttc: MONTANT,
+        })).min(1).max(50),
+      }),
+    },
+    async ({ titre, date, lignes }, ctx) => {
+      const moi = await appelantDe(ctx);
+      if (!peutEcrire(moi)) return echec("Tu n'es pas autorisé à écrire par Claude.");
+      const db = sb();
+
+      const { data: numero, error: errNum } = await db.rpc("attribuer_numero_ndf");
+      if (errNum) return echec(`Numérotation impossible : ${errNum.message}`);
+      const libererNumero = async () => {
+        if (numero) await db.rpc("liberer_numero_ndf", { p_numero: numero as string });
+      };
+
+      const { data: note, error } = await db
+        .from("note_frais")
+        .insert({ numero, titre, date, type_ndf: "depense", demandeur_id: moi.id, statut: "brouillon" })
+        .select("id, numero")
+        .single();
+      if (error || !note) {
+        await libererNumero();
+        return echec(`Création impossible : ${error?.message ?? "erreur inconnue"}`);
+      }
+
+      const { data: crees, error: errLignes } = await db
+        .from("ligne_note_frais")
+        .insert(lignes.map((l) => ({
+          note_frais_id: note.id, libelle: l.libelle, date: l.date, montant_ttc: arrondi(l.montant_ttc),
+        })))
+        .select("id, libelle, montant_ttc");
+      if (errLignes) {
+        // Pas de note à moitié créée : on retire la note (les lignes suivent en cascade)
+        // puis on rend le numéro, qui n'est libérable qu'une fois la note supprimée.
+        await db.from("note_frais").delete().eq("id", note.id);
+        await libererNumero();
+        return echec(`Lignes refusées, rien n'a été créé : ${errLignes.message}`);
+      }
+
+      revalidatePath("/notes-frais");
+      const rows = (crees ?? []) as { id: string; libelle: string | null; montant_ttc: number }[];
+      const total = rows.reduce((s, l) => s + Number(l.montant_ttc), 0);
+      return texte(
+        [
+          `Note ${note.numero ?? ""} créée en brouillon (id ${note.id}), total ${euros(total)}.`,
+          ...rows.map((l) => `- ligne ${l.id} : ${l.libelle ?? "—"}, ${euros(Number(l.montant_ttc))}`),
+          "À signer et soumettre dans l'application.",
+        ].join("\n"),
+      );
+    },
+  );
+
+  server.registerTool(
+    "ajouter_ligne_note_frais",
+    {
+      description:
+        "Ajoute une dépense à une note de frais en brouillon dont l'appelant est le demandeur. "
+        + "Renvoie l'id de la ligne, pour y joindre un justificatif via /api/mcp/upload.",
+      annotations: ECRITURE,
+      inputSchema: z.object({
+        note_id: z.string().uuid().describe("Id de la note (voir lister_notes_frais_brouillon)."),
+        libelle: z.string().trim().min(1).max(200),
+        date: DATE.describe("Date de la dépense, format AAAA-MM-JJ."),
+        montant_ttc: MONTANT,
+      }),
+    },
+    async ({ note_id, libelle, date, montant_ttc }, ctx) => {
+      const moi = await appelantDe(ctx);
+      if (!peutEcrire(moi)) return echec("Tu n'es pas autorisé à écrire par Claude.");
+      const db = sb();
+      const refus = await refusModificationNote(db, note_id, moi.id);
+      if (refus) return echec(refus);
+
+      const { data, error } = await db
+        .from("ligne_note_frais")
+        .insert({ note_frais_id: note_id, libelle, date, montant_ttc: arrondi(montant_ttc) })
+        .select("id")
+        .single();
+      if (error || !data) return echec(`Ajout impossible : ${error?.message ?? "erreur inconnue"}`);
+
+      revalidatePath(`/notes-frais/${note_id}`);
+      return texte(`Ligne ${data.id} ajoutée : ${libelle}, ${euros(arrondi(montant_ttc))}.`);
+    },
+  );
+
+  server.registerTool(
+    "lister_notes_frais_brouillon",
+    {
+      description:
+        "Les notes de frais en brouillon de l'appelant, avec l'id de chaque ligne et la présence "
+        + "ou non d'un justificatif. Répond à « où en sont mes notes de frais ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      inputSchema: z.object({}),
+    },
+    async (_args, ctx) => {
+      const moi = await appelantDe(ctx);
+      if (!peutVoirFinance(moi)) return echec("Les notes de frais sont réservées aux co-présidents.");
+
+      const { data } = await sb()
+        .from("note_frais")
+        .select("id, numero, titre, date, lignes:ligne_note_frais(id, libelle, date, montant_ttc, justificatif_url)")
+        .eq("demandeur_id", moi.id)
+        .eq("statut", "brouillon")
+        .order("created_at", { ascending: false });
+      const notes = (data ?? []) as unknown as {
+        id: string; numero: string | null; titre: string | null; date: string | null;
+        lignes: { id: string; libelle: string | null; date: string | null; montant_ttc: number; justificatif_url: string | null }[];
+      }[];
+      if (notes.length === 0) return texte("Aucune note de frais en brouillon.");
+
+      return texte(
+        notes
+          .map((n) => {
+            const lignes = n.lignes ?? [];
+            const total = lignes.reduce((s, l) => s + Number(l.montant_ttc ?? 0), 0);
+            const sansPiece = lignes.filter((l) => !l.justificatif_url).length;
+            return [
+              `${n.numero ?? "NDF"} — ${n.titre ?? "sans titre"} — ${euros(total)} (id ${n.id})`
+                + (sansPiece ? `, ${sansPiece} ligne${sansPiece > 1 ? "s" : ""} sans justificatif` : ""),
+              ...lignes.map((l) =>
+                `- ligne ${l.id} : ${l.libelle ?? "—"}${l.date ? `, ${dateFr(l.date)}` : ""}, ${euros(Number(l.montant_ttc))}`
+                + (l.justificatif_url ? "" : " — sans justificatif")),
+            ].join("\n");
+          })
+          .join("\n\n"),
+      );
+    },
+  );
+
+  server.registerTool(
+    "lister_depenses_sans_justificatif",
+    {
+      description:
+        "Les dépenses réelles du journal (dont les transactions Qonto) qui n'ont aucun justificatif, "
+        + "les plus récentes d'abord, avec leur id pour y joindre une pièce via /api/mcp/upload (champ ecriture_id).",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      inputSchema: z.object({
+        limite: z.number().int().min(1).max(100).default(20).describe("Nombre maximal de dépenses à lister."),
+      }),
+    },
+    async ({ limite }, ctx) => {
+      const moi = await appelantDe(ctx);
+      if (!peutVoirFinance(moi)) return echec("Le journal est réservé aux co-présidents.");
+
+      const liste = await depensesSansJustificatif(sb(), limite);
+      if (liste.length === 0) return texte("Toutes les dépenses ont un justificatif.");
+      return texte(
+        liste
+          .map((d) => `- ${dateFr(d.date)} — ${d.denomination ?? "sans libellé"} — ${euros(d.montant_ttc)}`
+            + `${d.qonto ? " (Qonto)" : ""} — id ${d.id}`)
+          .join("\n"),
       );
     },
   );

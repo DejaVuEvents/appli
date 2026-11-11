@@ -8,8 +8,10 @@ import { createClient as createSupabaseClient, type SupabaseClient } from "@supa
  * rejetteraient tout. La clé de service contourne RLS.
  *
  * La protection ne vient donc plus de la base mais de la route : elle n'expose
- * qu'une poignée d'outils en lecture, jamais de SQL libre, et chacun vérifie le
- * rôle du porteur du jeton. Ne JAMAIS utiliser ce client ailleurs.
+ * qu'une poignée d'outils (lectures, et brouillons de notes de frais avec leurs
+ * justificatifs), jamais de SQL libre, et chacun vérifie le rôle du porteur du
+ * jeton et rejoue les garde-fous de l'application (lib/mcp-ecriture.ts).
+ * Réservé à /api/mcp et /api/mcp/upload. Ne JAMAIS utiliser ce client ailleurs.
  */
 export function createServiceClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

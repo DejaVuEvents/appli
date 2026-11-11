@@ -41,6 +41,7 @@ const handler = createMcpHandler((server) => {
       description:
         "Les prochains événements de l'association : nom, dates, lieu, client et équipe affectée. "
         + "Répond à « qu'est-ce qu'on a ce week-end », « c'est quoi la prochaine presta ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       inputSchema: z.object({
         jours: z.number().int().min(1).max(365).default(30)
           .describe("Fenêtre à regarder, en jours à partir d'aujourd'hui."),
@@ -123,6 +124,7 @@ const handler = createMcpHandler((server) => {
       description:
         "Combien d'exemplaires d'un matériel sont libres sur une période. "
         + "Répond à « est-ce que les lasers sont libres le 3 octobre ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       inputSchema: z.object({
         materiel: z.string().min(2).describe("Nom ou début du nom, par exemple « laser », « wash »."),
         debut: z.string().describe("Date de début, format AAAA-MM-JJ."),
@@ -178,6 +180,7 @@ const handler = createMcpHandler((server) => {
       description:
         "Solde réel, solde projeté de fin d'année et mois à découvert. "
         + "Répond à « où en est la trésorerie », « est-ce qu'on passe dans le rouge ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       inputSchema: z.object({
         annee: z.number().int().min(2020).max(2100).optional().describe("Année à regarder, par défaut l'année en cours."),
       }),
@@ -216,6 +219,7 @@ const handler = createMcpHandler((server) => {
       description:
         "Les notes de frais en attente de validation, avec leur auteur et leur montant. "
         + "Répond à « il y a des notes de frais à valider ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       inputSchema: z.object({}),
     },
     async (_args, ctx) => {
@@ -256,6 +260,7 @@ const handler = createMcpHandler((server) => {
       description:
         "L'état d'un exemplaire précis : compteurs, maintenance, remarques. "
         + "Répond à « c'est quoi l'état du Beam 11 ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       inputSchema: z.object({
         unite: z.string().min(2).describe("Nom d'usage de l'unité, par exemple « Beam 11 » ou « Laser 3 »."),
       }),
@@ -300,6 +305,7 @@ const handler = createMcpHandler((server) => {
       description:
         "Ce qu'un événement a rapporté et ce qu'il a mobilisé. "
         + "Répond à « combien le Big Bazar a rapporté ».",
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
       inputSchema: z.object({
         evenement: z.string().min(2).describe("Nom ou début du nom de l'événement."),
       }),
